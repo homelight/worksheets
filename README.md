@@ -54,6 +54,40 @@ all worksheets are versionned, it's like if all worksheets have
 
 field on them, all edits to worksheets use optimistic locking
 
+### Enums
+
+While the language does not support enums, these can be described easily with the use of single field worksheet
+
+	worksheet name_suffixes {
+		1:suffix text constrained_by {
+			return suffix in [
+				"Jr.",
+				"Sr."
+				...
+			]
+		}
+	}
+
+Which can then be used
+
+	worksheet borrower {
+		...
+
+		3:first_name text
+		4:last_name text
+		5:suffix name_suffixes
+
+		...
+	}
+
+And the Golang hooks allow handling of single field worksheets in a natural way
+
+	borrower.SetText("suffix", "Jr.")
+
+Or
+
+	borrower.GetText("suffix")
+
 ## Numbers
 
 Since we intent to eventally have a statically typed langugage, 
