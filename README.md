@@ -47,19 +47,21 @@ The general syntax for a field is
 
 (We explain the need for the index in the storage section.)
 
-### Types
+### Base Types
 
-We have only three types
+The various base types are
 
-- `number(n)` number with precision of n decimal places
-- `text` arbitraty length text
-- `map[W]` collection of worksheets `W` indexed by the key of `W`
+| Type        | Represents |
+|-------------|------------|
+| `bool`      | Booleans. |
+| `number(n)` | Numbers with precision of _n_ decimal places. |
+| `text`      | Text of arbitrary legnth. |
+| `time`      | Instant in time. |
+| `date`      | Specific date like 7/20/1969. |
 
-Specific details about each of these types are given in dedicated sections.
+All base types represent optional values, i.e. `bool` covers three values `true`, `false`, and `undefined`.
 
-numbers are what we normally of think of them + undefined
-text same + undefined
-maps is the universe of all maps
+As described later, all operations over base types have an interpretation with respect to `undefined`. It is often simply treated as an absorbing element such that `v OP undefined = undefined OP v = undefined`.
 
 ### Input Fields
 
@@ -165,13 +167,17 @@ switch remainder % 2 {
 
 ## Text
 
+## Time and Date
+
+TBD
+
 ## Maps
 
 We have
 
 	map[W]
 
-which represents a map of worksheets.
+which represents a collection of worksheets `W` indexed by the key of `W`.
 
 ### Keyed Worksheets
 
