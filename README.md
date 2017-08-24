@@ -1,3 +1,37 @@
+## Overview
+
+Let's start with a motivating example, easily representing a borrower's legal name, age, and determining if they are of legal age to get a mortgage.
+
+We first describe the domain in a special purpose language
+
+	worksheet borrower {
+		1:first_name text
+		2:last_name text
+		3:dob date
+		4:can_take_mortgage computed {
+			return dob > now + 18 years
+		}
+	}
+
+From this definition, we generate Golang hooks to create worksheets, manipulate them (CRUD), and store them
+
+	joey := worksheet.Create("borrower")
+	joey.SetText("first_name", "Joey")
+	joey.SetText("last_name", "Pizzapie")
+	joey.SetDate(1980, 5, 23)
+
+We can query worksheet
+
+	joey.GetBool("can_take_mortgage")
+
+Store it
+
+	bytes, err := joey.Marshal()
+
+Retrieve it from storage
+
+	joey, err := worksheet.Unmarshal("borrower", bytes)
+
 ## Worksheets
 
 All centers around the concept of a `worksheet` with named fields which have a predetermined type.
