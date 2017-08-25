@@ -1,8 +1,8 @@
-## Overview
+## Introductory Example
 
-Let's start with a motivating example, easily representing a borrower's legal name, age, and determining if they are of legal age to get a mortgage.
+Let's start with a motivating example, easily representing a borrower's legal name, date of birth, and determining if they are of legal age to get a mortgage.
 
-We first describe the domain in a special purpose language
+We start by giving the definition for what data describe a `borrower` worksheet
 
 	worksheet borrower {
 		1:first_name text
@@ -13,7 +13,7 @@ We first describe the domain in a special purpose language
 		}
 	}
 
-From this definition, we generate Golang hooks to create worksheets, manipulate them (CRUD), and store them
+From this definition, we generate Golang hooks to manipulte borrowers' worksheets, store and retrieve them
 
 	joey := worksheet.Create("borrower")
 	joey.SetText("first_name", "Joey")
@@ -24,17 +24,17 @@ We can query worksheet
 
 	joey.GetBool("can_take_mortgage")
 
-Store it
+Store the worksheet
 
 	bytes, err := joey.Marshal()
 
-Retrieve it from storage
+And retrieve the worksheet
 
 	joey, err := worksheet.Unmarshal("borrower", bytes)
 
 ## Worksheets
 
-All centers around the concept of a `worksheet` with named fields which have a predetermined type.
+All centers around the concept of a `worksheet` which is constituted of typed named fields
 
 	worksheet person {
 		1:age number(0)
@@ -45,7 +45,7 @@ The general syntax for a field is
 
 	index:name type [extras]
 
-(We explain the need for the index in the storage section.)
+(We explain the need for the index in the storage section. Those familiar with Thrift or Protocol Buffers can see the parralel with these data representation tools.)
 
 ### Base Types
 
@@ -55,7 +55,7 @@ The various base types are
 |-------------|------------|
 | `bool`      | Booleans. |
 | `number(n)` | Numbers with precision of _n_ decimal places. |
-| `text`      | Text of arbitrary legnth. |
+| `text`      | Text of arbitrary length. |
 | `time`      | Instant in time. |
 | `date`      | Specific date like 7/20/1969. |
 
@@ -80,19 +80,26 @@ When fields are constrained, edits which do not satisfy the constraint are rejec
 
 ### Computed Fields
 
-- explain, and push syntax of language further down
+Instead of being input fields, we can have output fields, or computed fields
+
+	1:date_of_birth date
+	2:age number(0) computed_by {
+		return (now - date) in years
+	}
+
+We will discuss the syntax in which expressions can be written in a later section.
 
 ### Versioning
 
-all worksheets are versionned, it's like if all worksheets have
+All worksheets are versionned, with their version number starting a `1`. In a way, all worksheets have a field
 
-    version numeric(0)
+	version numeric(0)
 
-field on them, all edits to worksheets use optimistic locking
+Which is set to `1` upon creation, and incremented on every edit. Versions are used to detect concurrent edits, and abort an edit that was done on an older version of the worksheet than the one it would now be apply to. Edits are discussed in greater detail later.
 
 ### Enums
 
-While the language does not support enums, these can be described easily with the use of single field worksheet
+While the language does not have a specific support for enums, these can be described easily with the use of single field worksheets
 
 	worksheet name_suffixes {
 		1:suffix text constrained_by {
@@ -116,17 +123,33 @@ Which can then be used
 		...
 	}
 
-And the Golang hooks allow handling of single field worksheets in a natural way
+And the Golang hooks allow handling of single field worksheets in a natural way, by automatically 'boxing'
 
 	borrower.SetText("suffix", "Jr.")
 
-Or
+Or 'unboxing'
 
 	borrower.GetText("suffix")
 
 ## Numbers
 
-Since we intent to eventally have a statically typed langugage, 
+Since we intend to eventally have a statically typed langugage, we choose statically determined rules for data flow, though we expect initial implementations to be dynamic.
+
+### Handling Precision, and Rounding
+
+Precision expansion is allowed, such that you can store a `number(n)` into a `number(m)` if `n` is smaller than `m`. In such cases, we simply do a precision expansion.
+
+For instance, if we store `5.2` in a field `number(5)`, this would yield `5.200_00`.
+
+Loss of precision however needs to be explicitely handled.
+
+For instance, with the field `age number(0)`, the expression
+
+	age = 5.200 round down
+
+would yield `5` in the `age` field.
+
+Rounding modes supported are `up`, `down`, `even`.
 
 ### Addition, Substraction
 
@@ -136,34 +159,41 @@ When adding or subtracting numbers, the rule for decimal treatment is
 
 where `op` is either `+` or `-`.
 
-So for instance `5.03` + `6.000` would yield `11.030` as a `number(3)` even though it could be represented as `number(2)`.
+So for instance `5.03 + 6.000` would yield `11.030` as a `number(3)` even though it could be dynamically represented as a `number(2)`.
+
+### Multiplication
+
+When multiplying, the rule for decimal treatment is
+
+`number(n) * number(m)` yields `number(n + m)`
+
+So for instance `5.30 * 6.0` would yield `31.800` as a `number(3)` even though it could be dynamically represented as a `number(1)`.
 
 ### Explicit Rounding When Dividing
 
-e.g. we need to create a map[repayments] which split the cost of taxes, say 700, in 12 (that's 58.3333... if it were evenly split)
+When dividing, a rounding mode must always be provided such that the syntax for division is `v1 / v2 round mode`.
 
-say we have numeric(2)
-force / operator to be postfixed by rounding mode (always!)
+For instance, consider the following example. We need to create a `map[repayment]` to represent repayment of $700 in yearly taxes, over a 12 months period. If we were to split in equal parts, we would need to pay $58.33... which is not feasibly. Instead, here we force ourselves to round to cents, i.e. a `number(2)`.
 
-first_month = month of closing_date + 1
-total_paid := 0
-for current_month := first_month; current_month < first_month + 1 year; current_month++ {
-	mp := yearly_taxes / 12 round down
-	total_paid += mp
-	payment_schedule << payment {
-		month = current_month
-		amount = mp
+	first_month = month of closing_date + 1
+	total_paid := 0
+	for current_month := first_month; current_month < first_month + 1 year; current_month++ {
+		mp := yearly_taxes / 12 round down
+		total_paid += mp
+		payment_schedule << payment {
+			month = current_month
+			amount = mp
+		}
 	}
-}
 
-remainder := yearly_taxes - total_paid
-switch remainder % 2 {
-	case 0:
-		payment_schedule[first_month + 6 months].amount += remainder / 2
-		payment_schedule[first_month + 12 months].amount += remainder / 2
-	case 1:
-		payment_schedule[first_month + 12 months].amount += remainder
-}
+	remainder := yearly_taxes - total_paid
+	switch remainder % 2 {
+		case 0:
+			payment_schedule[first_month + 6 months].amount += remainder / 2
+			payment_schedule[first_month + 12 months].amount += remainder / 2
+		case 1:
+			payment_schedule[first_month + 12 months].amount += remainder
+	}
 
 ## Text
 
