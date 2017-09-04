@@ -294,3 +294,17 @@ ideas from
 - https://en.wikipedia.org/wiki/Topological_sorting
 - https://en.wikipedia.org/wiki/Transaction_log
 - https://thrift.apache.org
+
+## Examples
+
+### Modeling Declarations
+
+TBD
+
+### Modeling Fees
+
+TBD
+
+### Modeling Assets, Debts, and Income
+
+TBD
