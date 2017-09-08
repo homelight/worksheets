@@ -18,7 +18,7 @@ From this definition, we generate Golang hooks to manipulte borrowers' worksheet
 	joey := worksheet.Create("borrower")
 	joey.SetText("first_name", "Joey")
 	joey.SetText("last_name", "Pizzapie")
-	joey.SetDate(1980, 5, 23)
+	joey.SetDate("dob", 1980, 5, 23)
 
 We can query worksheet
 
