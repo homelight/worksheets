@@ -85,11 +85,11 @@ Which is set upon creation, and cannot be ever edited.
 
 ## Versioning
 
-All worksheets are versionned, with their version number starting a `1`. In a way, all worksheets have a field
+All worksheets are versionned, with their version number starting at `1`. The version is stored in a field present on all worksheets
 
 	version numeric(0)
 
-Which is set to `1` upon creation, and incremented on every edit. Versions are used to detect concurrent edits, and abort an edit that was done on an older version of the worksheet than the one it would now be apply to. Edits are discussed in greater detail later.
+This `version` field is set to `1` upon creation, and incremented on every edit. Versions are used to detect concurrent edits, and abort an edit that was done on an older version of the worksheet than the one it would now be applied to. Edits are discussed in greater detail later.
 
 ## Data Representation
 
