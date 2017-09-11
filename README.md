@@ -231,7 +231,9 @@ As we shall see in the next section, worksheets' keys can be one or multiple val
 
 	tuple[T1, ..., Tn]
 
-NOTE: We don't want to allow `tuple[map[foo]]`, so how do we differentiate the simple types, from more complex types like maps? Maps can be the type of fields, but the type which can go in tuples is a subset of that. Maybe 'base type' as `S` and field type `T` is a sufficient distinction? Then maps and tuples would be field types, one over worksheets, the other over only base types.
+NOTE #1: We don't want to allow `tuple[map[foo]]`, so how do we differentiate the simple types, from more complex types like maps? Maps can be the type of fields, but the type which can go in tuples is a subset of that. Maybe 'base type' as `S` and field type `T` is a sufficient distinction? Then maps and tuples would be field types, one over worksheets, the other over only base types.
+
+NOTE #2: It would make sense to have undefindeness defined only over base types, hence a tupe would never itself be `undefined`, rather all of its components can be.
 
 ### Keyed Worksheets
 
@@ -262,12 +264,168 @@ when iterating over maps, iteration order is the order in which items were added
 
 # Editing Worksheets
 
-- can set a field (or set it to undefined, which really unsets)
-- for maps
--- can add <<
--- can remove delete the_map[the_key]
+There are a three basic steps to editing a worksheet
 
-want to be able to build progressive diffs before saving them (e.g. to support 'draft mode' when editing the application)
+1. Proposing an edit (only inputs)
+2. Determining the actual edit (fixed-point calculation)
+3. Applying the actual edit (atomic)
+
+Let's go through them with the help of a contrived example
+
+	worksheet borrower {
+		1:name text
+		2:greeting text computed {
+			return "Hello, " + name
+		}
+	}
+
+We can _propose_ the edit
+
+	set name "Joey"
+
+Which yields the _actual_ edit
+
+	[ on borrower(the-id-here) @ version 5 ]
+	[ set version 6                        ]
+	set name "Joey"
+	set greeting "Hello, Joey"
+
+And when _applied_ mutates the worksheet as intended. (In future examples, we omit the concurrent modification part of edits.)
+
+## Edit Blocks, and Individual Edits
+
+We call the set of edits an _edit block_, which is itself constituted of _individual edits_.
+
+Some of the possible individual edits are
+
+- Setting a field to a specific value
+- Unsettting a field, i.e. settting it to `undefined`
+- Adding, or removing to a map
+
+In a given edit block, fields can be edited only once, and we allow only one operation per map key. (Adding a worksheet into a map with the contains another worksheet with the same key causes a replace.) As such, the order in which edits are applied is semantically irrelevant.
+
+## Proposed Edits, Tentative Edits, and Actual Edits
+
+Proposed edit blocks can modify any number of inputs in a worksheet. However, as described earlier, computed fields cannot be modified directly.
+
+When a proposed edit block is applied to a worksheet, all computed fields whose inputs were modified are re-computed. This yields a new tentative edit block. In the case where computed fields depend on other computed fields, the process may need to be repeated until we reach a 'fixed point' to get the actual edit block.
+
+Let's consider the worksheet
+
+	worksheet borrower {
+		1:name text
+		2:name_short text computed {
+			if len(name) > 5 {
+				return substr(name, 5)
+			}
+			return name
+		}
+		3:greeting text computed {
+			return "Hello, " + name_short
+		}
+	}
+
+And the proposed edit
+
+	set name "Samantha"
+
+The first tentative edit would be
+
+	set name "Samantha"
+	set name_short "Saman"
+
+The second (and final) edit would be
+
+	set name "Samantha"
+	set name_short "Saman"
+	set greeting "Hello, Saman"
+
+## Applying Edits
+
+When edit blocks are applied to a worksheet, all individual edits are applied atomically, i.e. _all_ individual edits succeed or _none_ of the individual edits succeed.
+
+## Edit Reacting Code
+
+We also make it possible for user specified code to intercept the fixed-point calculation introduce any edit. This can be useful for cases where you are unable to express computed fields, or cases where doing so in the worksheet language would be unclear. One example could be setting various dates when certain events occur.
+
+Example
+
+	func (myEditor *) OnEdit(current Worksheet, proposed_edit Edit) (Edit, error) {
+		if current.GetText("name") == "Joey" {
+			return proposed_edit.SetText("name", "Joey Pizzapie"), nil
+		}
+		return proposed_edit, nil
+	}
+
+NOTE: We'd want the `Edit` struct to have sufficient introspection such that we can clearly write cases like the TRID Rule where we need to capture the _first_ time all 6 fields are set on a specific worksheet. Maybe we should also provide a pre/post worksheet with the state before any edit, the state after if the edit were to succeed as is? Need to think through what that code would look like and design the hook with that in mind.
+
+One idea would be to be able to verify 'is any of these six fields being modified?', and 'is the resulting edit one where all six fields are complete?', and 'has the trid rule triggered date been set?'.
+
+	if current.GetDate("trid_rule_triggered").IsUndefined() {
+		if proposed_edit.IsSetting("ssn")
+		proposed_edit.IsSetting("...") ||
+		proposed_edit.IsSetting("...") ||
+		... {
+			if !current.GetText("ssn").IsUndefined() &&
+			... {
+
+			}
+		}
+	}
+
+Though we'd not even need to verify whether these fields are part of the edit, it's implicit, and more 'underlying structure proof' not too. By 'nuderlying structure proof' we mean that the code assumes less about the internal structure of the fields, they could be inputs or computed fields, and we wouldn't really care.
+
+## Preventing Unstable Edits
+
+Assume we have the worksheet
+
+	worksheet cyclic_edits {
+		1:right bool
+		2:wrong computed {
+			return !right
+		}
+	}
+
+And we propose the edit
+
+	set right false
+
+Due to the computed field, this would yield 'actual edit #1'
+
+	set right false
+	set wrong true
+
+Now, assume that we have edit reacting code which flips these fields around
+
+	if wrong {
+		set right true
+	} else {
+		set right false
+	}
+
+We would then yield the 'actual edit #2'
+
+	set right true
+	set wrong true
+
+And, due to the computed field, this would yield 'actual edit #3'
+
+	set right true
+	set wrong false
+
+Further modified via the event reacting code into 'actual edit #4'
+
+	set right false
+	set wrong false
+
+And again, due to the computed field, this would yield 'actual edit #5'
+
+	set right false
+	set wrong true
+
+Which is in fact the same as 'actual edit #1'. We have created an infinite loop in the fixed-point calculation!
+
+To prevent such 'unstable edits', we detect cycles of edits, and error out, hence rejecting the proposed edit as being invalid. (Implementation note: this must be done by comparing worksheets', not edits, since two different edits can yield the same worksheet transformation.)
 
 # Storing Worksheets
 
