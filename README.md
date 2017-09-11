@@ -483,6 +483,24 @@ ideas from
 
 # Examples
 
+## Final Sign-Off
+
+We have a complex sheet requiring a formal sign off by an operator
+
+	worksheet requires_review { ...
+
+We track the version at which the operator signed off in `signed_off_version`, and the property of being `signed_off` is computed
+
+	worksheet sign_off {
+		1:requires_review requires_review
+		2:signed_off_version number(0)
+		3:signed_off computed {
+			return requires_review.version == signed_off_version
+		}
+	}
+
+This ensures that any modification to the sheet `requires_review` nullifies the sign off.
+
 ## Modeling Declarations
 
 TBD
