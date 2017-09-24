@@ -215,7 +215,19 @@ For instance, consider the following example. We need to create a `map[repayment
 
 ### Time and Date
 
-TBD
+* time as instant in time, timezone less concept, only display (because it can be lossy) needs timezone in some cases
+
+* date as a timezone depenedent concept, range of time, so 9/1/2017 ET delineates a specific range
+
+* date without timezone, to represent input of borrowers, needs to then be interpreted in the context of a timezone to be useful
+
+also, how do we convert to date objects
+
+date(yyyy, mm, dd, tz) could be a function taking three numbers (year, month, day) and a timezone and produce a date object
+
+some_time.date(tz) -> yields date in timezone
+
+some_date.year / .month / .day -> yields sub-component (since date is already tz dependent, this is good)
 
 ## Keyed Worksheets, Maps, and Tuples
 
