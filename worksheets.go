@@ -11,3 +11,25 @@
 // limitations under the License.
 
 package worksheets
+
+type astWorksheet struct {
+	name   string
+	fields []astField
+	// may want fieldsByIndex, fieldsByName
+}
+
+type astField struct {
+	index         int
+	name          string
+	typ           astType
+	constrainedBy *astExpression
+	computedBy    *astExpression
+}
+
+// parser: stream of tokens -> ast
+
+// tokenizer: stream of chars -> stream of tokens
+// tokens
+// - keywords (e.g. worksheet, view, text, date, ...)
+// - numbers (e.g. 10, 89.56)
+// - symbols (e.g. :, +, -, {, }, ...)
