@@ -1,6 +1,3 @@
-views
-dates with no timezones
-
 # Overview
 
 Let's start with a motivating example, easily representing a borrower's legal name, date of birth, and determining if they are of legal age to get a mortgage.
@@ -276,6 +273,20 @@ NOTE: To be consistent with above, we could only allow fields of base types to b
 - iterations `for k := range range the_map {` or `for k, v := range the_map`
 
 when iterating over maps, iteration order is the order in which items were added in (essentially a hash map + linked list of the elements)
+
+## Views
+
+have a way to have 'interface' worksheets which expose set of fields, e.g.
+
+	view income {
+		yearly_gross_income number(2)
+	}
+
+and then describe certain worksheets as conforming with these views
+
+	worksheet w2_income implements income {
+		...
+	}
 
 # Editing Worksheets
 
