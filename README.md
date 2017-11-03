@@ -1,3 +1,6 @@
+views
+dates with no timezones
+
 # Overview
 
 Let's start with a motivating example, easily representing a borrower's legal name, date of birth, and determining if they are of legal age to get a mortgage.
