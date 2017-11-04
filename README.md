@@ -229,6 +229,13 @@ some_time.date(tz) -> yields date in timezone
 
 some_date.year / .month / .day -> yields sub-component (since date is already tz dependent, this is good)
 
+## Slices
+
+* have slices too!
+* describe operations on slices, simplified because we don't really care about pre-allocating, so the simplest `slice = append(slice, value)` is enough, the `len(slice)`, then things like `slice[index]` as well as re-slicing `slice[start:]`, `slice[:end]`, or `slice[start:end]`
+* would be have `undefined` for slices, or only empty? having an unknonw number of middle names is different than no middle name for instance, which would push towards having `undefined`
+* likely same consideration as maps in terms of which values can be placed in a slice
+
 ## Keyed Worksheets, Maps, and Tuples
 
 In addition to the structures covered earlier, we have
