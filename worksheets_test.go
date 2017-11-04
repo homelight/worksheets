@@ -24,18 +24,42 @@ type Zuite struct {
 	suite.Suite
 }
 
-func (s *Zuite) TestParser_Worksheet1() {
-	input := `worksheet simple {42:full_name text}`
-	p := newParser(strings.NewReader(input))
+func (s *Zuite) TestParser_parseWorksheet() {
+	cases := map[string]func(*tWorksheet){
+		`worksheet simple {}`: func(ws *tWorksheet) {
+			require.Equal(s.T(), "simple", ws.name)
+			require.Equal(s.T(), 0, len(ws.fields))
+		},
+		`worksheet simple {42:full_name text}`: func(ws *tWorksheet) {
+			require.Equal(s.T(), "simple", ws.name)
+			require.Equal(s.T(), 1, len(ws.fields))
 
-	ws, err := p.parseWorksheet()
-	require.NoError(s.T(), err)
-	require.Equal(s.T(), "simple", ws.name)
-	require.Equal(s.T(), 1, len(ws.fields))
-	field := ws.fields[0]
-	require.Equal(s.T(), 42, field.index)
-	require.Equal(s.T(), "full_name", field.name)
-	require.Equal(s.T(), "text", field.typ)
+			field := ws.fields[0]
+			require.Equal(s.T(), 42, field.index)
+			require.Equal(s.T(), "full_name", field.name)
+			require.Equal(s.T(), "text", field.typ)
+		},
+		`  worksheet simple {42:full_name text 45:happy bool}`: func(ws *tWorksheet) {
+			require.Equal(s.T(), "simple", ws.name)
+			require.Equal(s.T(), 2, len(ws.fields))
+
+			field1 := ws.fields[0]
+			require.Equal(s.T(), 42, field1.index)
+			require.Equal(s.T(), "full_name", field1.name)
+			require.Equal(s.T(), "text", field1.typ)
+
+			field2 := ws.fields[1]
+			require.Equal(s.T(), 45, field2.index)
+			require.Equal(s.T(), "happy", field2.name)
+			require.Equal(s.T(), "bool", field2.typ)
+		},
+	}
+	for input, checks := range cases {
+		p := newParser(strings.NewReader(input))
+		ws, err := p.parseWorksheet()
+		require.NoError(s.T(), err)
+		checks(ws)
+	}
 }
 
 func (s *Zuite) TestTokenizer_Simple() {
