@@ -13,8 +13,10 @@
 package worksheets
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -22,8 +24,39 @@ type Zuite struct {
 	suite.Suite
 }
 
-func (s *Zuite) TestFirst() {
-	s.Equal("foo", "bar")
+func (s *Zuite) TestParser_Worksheet1() {
+	input := `worksheet simple {42:full_name text}`
+	p := newParser(strings.NewReader(input))
+
+	ws, err := p.parseWorksheet()
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), "simple", ws.name)
+	require.Equal(s.T(), 1, len(ws.fields))
+	field := ws.fields[0]
+	require.Equal(s.T(), 42, field.index)
+	require.Equal(s.T(), "full_name", field.name)
+	require.Equal(s.T(), "text", field.typ)
+}
+
+func (s *Zuite) TestTokenizer_Simple() {
+	input := `worksheet simple {1:full_name text}`
+	p := newParser(strings.NewReader(input))
+
+	toks := []string{
+		"worksheet",
+		"simple",
+		"{",
+		"1",
+		":",
+		"full_name",
+		"text",
+		"}",
+	}
+	for _, tok := range toks {
+		require.Equal(s.T(), tok, p.next())
+	}
+	require.Equal(s.T(), "", p.next())
+	require.Equal(s.T(), "", p.next())
 }
 
 func TestRunAllTheTests(t *testing.T) {
