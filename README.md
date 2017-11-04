@@ -37,7 +37,7 @@ And retrieve the worksheet
 All centers around the concept of a `worksheet` which is constituted of typed named fields
 
 	worksheet person {
-		1:age number(0)
+		1:age number[0]
 		2:first_name text
 	}
 
@@ -55,7 +55,7 @@ The simplest fields we have are there to store values. In the example above, bot
 
 We can also constrain fields
 
-	3:social_security_number number(0) constrained_by {
+	3:social_security_number number[0] constrained_by {
 		100_00_0000 <= social_security_number
 		social_security_number <= 999_99_9999
 	}
@@ -67,7 +67,7 @@ When fields are constrained, edits which do not satisfy the constraint are rejec
 Instead of being input fields, we can have output fields, or computed fields
 
 	1:date_of_birth date
-	2:age number(0) computed_by {
+	2:age number[0] computed_by {
 		return (now - date) in years
 	}
 
@@ -101,7 +101,7 @@ The various base types are
 |-------------|------------|
 | `bool`      | Booleans. |
 | `text`      | Text of arbitrary length. |
-| `number(n)` | Numbers with precision of _n_ decimal places. |
+| `number[n]` | Numbers with precision of _n_ decimal places. |
 | `time`      | Instant in time. (Time zone independent.) |
 | `date`      | Specific date like 7/20/1969. (Time zone dependent.) |
 
@@ -153,15 +153,15 @@ Since we intend to eventally have a statically typed langugage, we choose static
 
 Number literals are represented in base 10, and may contain any number of underscores (`_`) to be added for clarity. We can write `123098` or `123_098`, and we could even write `1____2_3______098`.
 
-The decimal portion of number literal is automatically expanded to fit the type it is being assigned to. For instance, if we store `5.2` in a field `number(5)`, this would yield `5.200_00`.
+The decimal portion of number literal is automatically expanded to fit the type it is being assigned to. For instance, if we store `5.2` in a field `number[5]`, this would yield `5.200_00`.
 
 #### Handling Precision, and Rounding
 
-Precision expansion is allowed, such that you can store a `number(n)` into a `number(m)` if `n` is smaller than `m`. In such cases, we simply do a precision expansion.
+Precision expansion is allowed, such that you can store a `number[n]` into a `number[m]` if `n` is smaller than `m`. In such cases, we simply do a precision expansion.
 
 Loss of precision however needs to be explicitely handled.
 
-For instance, with the field `age number(0)`, the expression
+For instance, with the field `age number[0]`, the expression
 
 	age, _ = 5.200 round down
 
@@ -173,25 +173,25 @@ Rounding modes supported are `up`, `down`, `even`.
 
 When adding or subtracting numbers, the rule for decimal treatment is
 
-`number(n) op number(m)` yields `number(max(n, m))`
+`number[n] op number[m]` yields `number[max(n, m)]`
 
 where `op` is either `+` or `-`.
 
-So for instance `5.03 + 6.000` would yield `11.030` as a `number(3)` even though it could be dynamically represented as a `number(2)`.
+So for instance `5.03 + 6.000` would yield `11.030` as a `number[3]` even though it could be dynamically represented as a `number[2]`.
 
 #### Multiplication
 
 When multiplying, the rule for decimal treatment is
 
-`number(n) * number(m)` yields `number(n + m)`
+`number[n] * number[m]` yields `number[n + m]`
 
-So for instance `5.30 * 6.0` would yield `31.800` as a `number(3)` even though it could be dynamically represented as a `number(1)`.
+So for instance `5.30 * 6.0` would yield `31.800` as a `number[3]` even though it could be dynamically represented as a `number[1]`.
 
 #### Explicit Rounding When Dividing
 
 When dividing, a rounding mode must always be provided such that the syntax for division is `v1 / v2 round mode`.
 
-For instance, consider the following example. We need to create a `map[repayment]` to represent repayment of $700 in yearly taxes, over a 12 months period. If we were to split in equal parts, we would need to pay $58.33... which is not feasibly. Instead, here we force ourselves to round to cents, i.e. a `number(2)`.
+For instance, consider the following example. We need to create a `map[repayment]` to represent repayment of $700 in yearly taxes, over a 12 months period. If we were to split in equal parts, we would need to pay $58.33... which is not feasibly. Instead, here we force ourselves to round to cents, i.e. a `number[2]`.
 
 	first_month = month of closing_date + 1
 	total_paid := 0
@@ -504,7 +504,7 @@ ideas from
 
 ## Type System, from Dynamic to Static
 
-- describe how we'd deal with constants like "0", and type number(?)
+- describe how we'd deal with constants like "0", and type number[?]
 - explain how we grow a language to be statically typed
 
 # Examples
@@ -519,7 +519,7 @@ We track the version at which the operator signed off in `signed_off_version`, a
 
 	worksheet sign_off {
 		1:requires_review requires_review
-		2:signed_off_version number(0)
+		2:signed_off_version number[0]
 		3:signed_off computed {
 			return requires_review.version == signed_off_version
 		}
