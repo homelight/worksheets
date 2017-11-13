@@ -24,6 +24,21 @@ type Zuite struct {
 	suite.Suite
 }
 
+func (s *Zuite) TestExample() {
+	wsm, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
+	require.NoError(s.T(), err)
+
+	ws, err := wsm.NewWorksheet("simple")
+	require.NoError(s.T(), err)
+
+	err = ws.SetText("name", "Alice")
+	require.NoError(s.T(), err)
+
+	name, err := ws.GetText("name")
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), "Alice", name)
+}
+
 func (s *Zuite) TestParser_parseWorksheet() {
 	cases := map[string]func(*tWorksheet){
 		`worksheet simple {}`: func(ws *tWorksheet) {

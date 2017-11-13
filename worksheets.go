@@ -20,6 +20,81 @@ import (
 	"text/scanner"
 )
 
+// Definitions encapsulate one or many worksheet definitions, and is the
+// overall entry point into the worksheet framework.
+type Definitions struct {
+	// wss holds all worksheet definitions
+	wss map[string]*tWorksheet
+}
+
+// Worksheet is an instance of a worksheet, which can be manipulated, as well
+// as saved, and restored from a permanent storage.
+type Worksheet struct {
+	// dfn holds the definition of this worksheet
+	tws *tWorksheet
+
+	// data holds all the worksheet data
+	data map[int]interface{}
+}
+
+// NewDefinitions parses a worksheet definition, and creates a worksheet
+// model from it.
+func NewDefinitions(src io.Reader) (*Definitions, error) {
+	// TODO(pascal): support reading multiple worksheet definitions in one file
+	p := newParser(src)
+	tws, err := p.parseWorksheet()
+	if err != nil {
+		return nil, err
+	}
+	return &Definitions{
+		wss: map[string]*tWorksheet{
+			tws.name: tws,
+		},
+	}, nil
+}
+
+func (d *Definitions) NewWorksheet(name string) (*Worksheet, error) {
+	tws, ok := d.wss[name]
+	if !ok {
+		return nil, fmt.Errorf("unknown worksheet %s", name)
+	}
+	return &Worksheet{
+		tws:  tws,
+		data: make(map[int]interface{}),
+	}, nil
+}
+
+func (ws *Worksheet) SetText(name string, value string) error {
+	field, ok := ws.tws.fieldsByName[name]
+	if !ok {
+		return fmt.Errorf("unknown field %s", name)
+	}
+	index := field.index
+
+	// TODO(pascal): check using field.typ
+	ws.data[index] = value
+
+	return nil
+}
+
+func (ws *Worksheet) GetText(name string) (string, error) {
+	field, ok := ws.tws.fieldsByName[name]
+	if !ok {
+		return "", fmt.Errorf("unknown field %s", name)
+	}
+	index := field.index
+
+	value, ok := ws.data[index]
+	if !ok {
+		return "", fmt.Errorf("no value for field %s", name)
+	}
+
+	// TODO(pascal): check using field.typ
+	return value.(string), nil
+}
+
+// ------ parsing ------
+
 type tWorksheet struct {
 	name          string
 	fields        []*tField
