@@ -29,15 +29,21 @@ func (s *Zuite) TestParser_parseWorksheet() {
 		`worksheet simple {}`: func(ws *tWorksheet) {
 			require.Equal(s.T(), "simple", ws.name)
 			require.Equal(s.T(), 0, len(ws.fields))
+			require.Equal(s.T(), 0, len(ws.fieldsByName))
+			require.Equal(s.T(), 0, len(ws.fieldsByIndex))
 		},
 		`worksheet simple {42:full_name text}`: func(ws *tWorksheet) {
 			require.Equal(s.T(), "simple", ws.name)
 			require.Equal(s.T(), 1, len(ws.fields))
+			require.Equal(s.T(), 1, len(ws.fieldsByName))
+			require.Equal(s.T(), 1, len(ws.fieldsByIndex))
 
 			field := ws.fields[0]
 			require.Equal(s.T(), 42, field.index)
 			require.Equal(s.T(), "full_name", field.name)
 			require.Equal(s.T(), "text", field.typ)
+			require.Equal(s.T(), ws.fieldsByName["full_name"], field)
+			require.Equal(s.T(), ws.fieldsByIndex[42], field)
 		},
 		`  worksheet simple {42:full_name text 45:happy bool}`: func(ws *tWorksheet) {
 			require.Equal(s.T(), "simple", ws.name)
@@ -47,11 +53,15 @@ func (s *Zuite) TestParser_parseWorksheet() {
 			require.Equal(s.T(), 42, field1.index)
 			require.Equal(s.T(), "full_name", field1.name)
 			require.Equal(s.T(), "text", field1.typ)
+			require.Equal(s.T(), ws.fieldsByName["full_name"], field1)
+			require.Equal(s.T(), ws.fieldsByIndex[42], field1)
 
 			field2 := ws.fields[1]
 			require.Equal(s.T(), 45, field2.index)
 			require.Equal(s.T(), "happy", field2.name)
 			require.Equal(s.T(), "bool", field2.typ)
+			require.Equal(s.T(), ws.fieldsByName["happy"], field2)
+			require.Equal(s.T(), ws.fieldsByIndex[45], field2)
 		},
 	}
 	for input, checks := range cases {
@@ -59,6 +69,19 @@ func (s *Zuite) TestParser_parseWorksheet() {
 		ws, err := p.parseWorksheet()
 		require.NoError(s.T(), err)
 		checks(ws)
+	}
+}
+
+func (s *Zuite) TestParser_parseWorksheetErrors() {
+	cases := []string{
+		"worksheet simple {\n\t42:full_name\n\ttext 42:happy bool\n}",
+		"worksheet simple {\n\t42:same_name\n\ttext 43:same_name bool\n}",
+	}
+	for _, input := range cases {
+		p := newParser(strings.NewReader(input))
+		_, err := p.parseWorksheet()
+		require.NotNil(s.T(), err)
+		// TODO(pascal): verify error messages are nice
 	}
 }
 

@@ -21,9 +21,10 @@ import (
 )
 
 type tWorksheet struct {
-	name   string
-	fields []*tField
-	// may want fieldsByIndex, fieldsByName
+	name          string
+	fields        []*tField
+	fieldsByName  map[string]*tField
+	fieldsByIndex map[int]*tField
 }
 
 type tField struct {
@@ -67,7 +68,10 @@ var (
 )
 
 func (p *parser) parseWorksheet() (*tWorksheet, error) {
-	ws := tWorksheet{}
+	ws := tWorksheet{
+		fieldsByName:  make(map[string]*tField),
+		fieldsByIndex: make(map[int]*tField),
+	}
 
 	_, err := p.nextAndCheck(pWorksheet)
 	if err != nil {
@@ -91,6 +95,16 @@ func (p *parser) parseWorksheet() (*tWorksheet, error) {
 			return nil, err
 		}
 		ws.fields = append(ws.fields, field)
+
+		if _, ok := ws.fieldsByName[field.name]; ok {
+			return nil, fmt.Errorf("multiple fields with name %s", field.name)
+		}
+		ws.fieldsByName[field.name] = field
+
+		if _, ok := ws.fieldsByIndex[field.index]; ok {
+			return nil, fmt.Errorf("multiple fields with index %d", field.index)
+		}
+		ws.fieldsByIndex[field.index] = field
 	}
 
 	_, err = p.nextAndCheck(pRacco)
