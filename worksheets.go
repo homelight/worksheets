@@ -65,13 +65,21 @@ func (d *Definitions) NewWorksheet(name string) (*Worksheet, error) {
 }
 
 func (ws *Worksheet) SetText(name string, value string) error {
+	// TODO(pascal): create a 'change', and then commit that change, garantee
+	// that commits are atomic, and either win or lose the race by using
+	// optimistic concurrency.
+
 	field, ok := ws.tws.fieldsByName[name]
 	if !ok {
 		return fmt.Errorf("unknown field %s", name)
 	}
 	index := field.index
 
-	// TODO(pascal): check using field.typ
+	// TODO(pascal): simplistic, we could introduce type aliasing later
+	if field.typ != tTypesByName["text"] {
+		return fmt.Errorf("not a text field, was %s", field.typ.name)
+	}
+
 	ws.data[index] = value
 
 	return nil
@@ -89,11 +97,15 @@ func (ws *Worksheet) GetText(name string) (string, error) {
 		return "", fmt.Errorf("no value for field %s", name)
 	}
 
-	// TODO(pascal): check using field.typ
+	// TODO(pascal): simplistic, we could introduce type aliasing later
+	if field.typ != tTypesByName["text"] {
+		return "", fmt.Errorf("not a text field, was %s", field.typ.name)
+	}
+
 	return value.(string), nil
 }
 
-// ------ parsing ------
+// ------ definitions ------
 
 type tWorksheet struct {
 	name          string
@@ -105,10 +117,50 @@ type tWorksheet struct {
 type tField struct {
 	index int
 	name  string
-	typ   string // should be tType
+	typ   *tType
 	// also need constrainedBy *tExpression
 	// also need computedBy    *tExpression
 }
+
+type tType struct {
+	name  string
+	check func(interface{}) error
+}
+
+var tTypes = []*tType{
+	&tType{
+		name: "text",
+		check: func(value interface{}) error {
+			_, ok := value.(string)
+			if !ok {
+				return fmt.Errorf("unable to cast %T to string", value)
+			}
+			return nil
+		},
+	},
+	&tType{
+		name: "bool",
+		check: func(value interface{}) error {
+			_, ok := value.(bool)
+			if !ok {
+				return fmt.Errorf("unable to cast %T to bool", value)
+			}
+			return nil
+		},
+	},
+}
+
+var tTypesByName = tTypesByNameInit()
+
+func tTypesByNameInit() map[string]*tType {
+	m := make(map[string]*tType, len(tTypes))
+	for _, tType := range tTypes {
+		m[tType.name] = tType
+	}
+	return m
+}
+
+// ------ parsing ------
 
 type parser struct {
 	// parser
@@ -216,10 +268,17 @@ func (p *parser) parseField() (*tField, error) {
 		return nil, err
 	}
 
+	// TODO(pascal): simplistic, we'd need to do type resolution on a second
+	// pass, when we have proper scoping.
+	tType, ok := tTypesByName[typ]
+	if !ok {
+		return nil, fmt.Errorf("unknown type %s", typ)
+	}
+
 	f := &tField{
 		index: index,
 		name:  name,
-		typ:   typ,
+		typ:   tType,
 	}
 
 	return f, nil

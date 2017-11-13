@@ -56,7 +56,7 @@ func (s *Zuite) TestParser_parseWorksheet() {
 			field := ws.fields[0]
 			require.Equal(s.T(), 42, field.index)
 			require.Equal(s.T(), "full_name", field.name)
-			require.Equal(s.T(), "text", field.typ)
+			require.Equal(s.T(), tTypesByName["text"], field.typ)
 			require.Equal(s.T(), ws.fieldsByName["full_name"], field)
 			require.Equal(s.T(), ws.fieldsByIndex[42], field)
 		},
@@ -67,14 +67,14 @@ func (s *Zuite) TestParser_parseWorksheet() {
 			field1 := ws.fields[0]
 			require.Equal(s.T(), 42, field1.index)
 			require.Equal(s.T(), "full_name", field1.name)
-			require.Equal(s.T(), "text", field1.typ)
+			require.Equal(s.T(), tTypesByName["text"], field1.typ)
 			require.Equal(s.T(), ws.fieldsByName["full_name"], field1)
 			require.Equal(s.T(), ws.fieldsByIndex[42], field1)
 
 			field2 := ws.fields[1]
 			require.Equal(s.T(), 45, field2.index)
 			require.Equal(s.T(), "happy", field2.name)
-			require.Equal(s.T(), "bool", field2.typ)
+			require.Equal(s.T(), tTypesByName["bool"], field2.typ)
 			require.Equal(s.T(), ws.fieldsByName["happy"], field2)
 			require.Equal(s.T(), ws.fieldsByIndex[45], field2)
 		},
