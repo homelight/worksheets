@@ -31,8 +31,16 @@ func (s *Zuite) TestExample() {
 	ws, err := wsm.NewWorksheet("simple")
 	require.NoError(s.T(), err)
 
-	err = ws.SetText("name", "Alice")
+	isSet, err := ws.IsSet("name")
 	require.NoError(s.T(), err)
+	require.Equal(s.T(), false, isSet)
+
+	err = ws.Set("name", "Alice")
+	require.NoError(s.T(), err)
+
+	isSet, err = ws.IsSet("name")
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), true, isSet)
 
 	name, err := ws.GetText("name")
 	require.NoError(s.T(), err)

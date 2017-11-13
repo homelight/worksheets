@@ -64,45 +64,77 @@ func (d *Definitions) NewWorksheet(name string) (*Worksheet, error) {
 	}, nil
 }
 
-func (ws *Worksheet) SetText(name string, value string) error {
+func (ws *Worksheet) Set(name string, value interface{}) error {
 	// TODO(pascal): create a 'change', and then commit that change, garantee
 	// that commits are atomic, and either win or lose the race by using
-	// optimistic concurrency.
+	// optimistic concurrency. Change must be a a Definition level, since it
+	// could span multiple worksheets at once.
 
+	// lookup field by name
 	field, ok := ws.tws.fieldsByName[name]
 	if !ok {
 		return fmt.Errorf("unknown field %s", name)
 	}
 	index := field.index
 
-	// TODO(pascal): simplistic, we could introduce type aliasing later
-	if field.typ != tTypesByName["text"] {
-		return fmt.Errorf("not a text field, was %s", field.typ.name)
+	// type check
+	if err := field.typ.check(value); err != nil {
+		return err
 	}
 
+	// store
 	ws.data[index] = value
 
 	return nil
 }
 
-func (ws *Worksheet) GetText(name string) (string, error) {
+func (ws *Worksheet) IsSet(name string) (bool, error) {
+	// lookup field by name
 	field, ok := ws.tws.fieldsByName[name]
 	if !ok {
-		return "", fmt.Errorf("unknown field %s", name)
+		return false, fmt.Errorf("unknown field %s", name)
 	}
 	index := field.index
 
+	// check presence of value
+	_, isSet := ws.data[index]
+
+	return isSet, nil
+}
+
+func (ws *Worksheet) Get(name string) (interface{}, error) {
+	// lookup field by name
+	field, ok := ws.tws.fieldsByName[name]
+	if !ok {
+		return nil, fmt.Errorf("unknown field %s", name)
+	}
+	index := field.index
+
+	// is a value set for this field?
 	value, ok := ws.data[index]
 	if !ok {
-		return "", fmt.Errorf("no value for field %s", name)
+		return nil, fmt.Errorf("no value for field %s", name)
 	}
 
-	// TODO(pascal): simplistic, we could introduce type aliasing later
-	if field.typ != tTypesByName["text"] {
-		return "", fmt.Errorf("not a text field, was %s", field.typ.name)
+	// type check
+	if err := field.typ.check(value); err != nil {
+		return nil, err
 	}
 
-	return value.(string), nil
+	return value, nil
+}
+
+func (ws *Worksheet) GetText(name string) (string, error) {
+	value, err := ws.Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	sValue, ok := value.(string)
+	if !ok {
+		return "", fmt.Errorf("field %s cannot be converted to text (type is %T)", name, value)
+	}
+	return sValue, nil
 }
 
 // ------ definitions ------
@@ -127,6 +159,7 @@ type tType struct {
 	check func(interface{}) error
 }
 
+// tTypes holds system defined types
 var tTypes = []*tType{
 	&tType{
 		name: "text",
@@ -150,6 +183,7 @@ var tTypes = []*tType{
 	},
 }
 
+// tTypesByName holds system defined types by name
 var tTypesByName = tTypesByNameInit()
 
 func tTypesByNameInit() map[string]*tType {
