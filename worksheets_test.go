@@ -45,6 +45,13 @@ func (s *Zuite) TestExample() {
 	name, err := ws.GetText("name")
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), "Alice", name)
+
+	err = ws.Unset("name")
+	require.NoError(s.T(), err)
+
+	isSet, err = ws.IsSet("name")
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), false, isSet)
 }
 
 func (s *Zuite) TestParser_parseWorksheet() {

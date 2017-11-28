@@ -88,6 +88,20 @@ func (ws *Worksheet) Set(name string, value interface{}) error {
 	return nil
 }
 
+func (ws *Worksheet) Unset(name string) error {
+	// lookup field by name
+	field, ok := ws.tws.fieldsByName[name]
+	if !ok {
+		return fmt.Errorf("unknown field %s", name)
+	}
+	index := field.index
+
+	// store
+	delete(ws.data, index)
+
+	return nil
+}
+
 func (ws *Worksheet) IsSet(name string) (bool, error) {
 	// lookup field by name
 	field, ok := ws.tws.fieldsByName[name]
