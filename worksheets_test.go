@@ -115,6 +115,21 @@ func (s *Zuite) TestParser_parseWorksheetErrors() {
 	}
 }
 
+func (s *Zuite) TestParser_parseLiteralFromString() {
+	cases := map[string]interface{}{
+		`undefined`: &tLiteral{&vUndefined{}},
+		`1`:         &tLiteral{&vNumber{1, 0}},
+		`-123.67`:   &tLiteral{&vNumber{-12367, 2}},
+		`"foo"`:     &tLiteral{&vString{"foo"}},
+		`true`:      &tLiteral{&vBool{true}},
+	}
+	for input, expected := range cases {
+		actual, err := parseLiteralFromString(input)
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), expected, actual)
+	}
+}
+
 func (s *Zuite) TestTokenizer_Simple() {
 	input := `worksheet simple {1:full_name text}`
 	p := newParser(strings.NewReader(input))

@@ -17,6 +17,7 @@ import (
 	"io"
 	"regexp"
 	"strconv"
+	"strings"
 	"text/scanner"
 )
 
@@ -168,9 +169,39 @@ type tField struct {
 	// also need computedBy    *tExpression
 }
 
+type tLiteral struct {
+	value vValue
+}
+
 type tType struct {
 	name  string
 	check func(interface{}) error
+}
+
+type vValue interface {
+}
+
+type vUndefined struct{}
+
+type vNumber struct {
+	value int64
+	scale int
+}
+
+type vString struct {
+	value string
+}
+
+type vBool struct {
+	value bool
+}
+
+// Assert that all values are vValue.
+var _ []vValue = []vValue{
+	&vUndefined{},
+	&vNumber{},
+	&vString{},
+	&vBool{},
 }
 
 // tTypes holds system defined types
@@ -240,6 +271,7 @@ var (
 	pName   = newTokenPattern("name", "[a-z]")
 	pIndex  = newTokenPattern("index", "[0-9]+")
 	pNumber = newTokenPattern("number", "[0-9]+(\\.[0-9]+)?")
+	pString = newTokenPattern("string", "\".*\"")
 )
 
 func (p *parser) parseWorksheet() (*tWorksheet, error) {
@@ -330,6 +362,64 @@ func (p *parser) parseField() (*tField, error) {
 	}
 
 	return f, nil
+}
+
+func parseLiteralFromString(input string) (*tLiteral, error) {
+	reader := strings.NewReader(input)
+	p := newParser(reader)
+	lit, err := p.parseLiteral()
+	if err != nil {
+		return nil, err
+	}
+	if reader.Len() != 0 {
+		return nil, fmt.Errorf("expecting eof")
+	}
+	return lit, nil
+}
+
+func (p *parser) parseLiteral() (*tLiteral, error) {
+	var err error
+	var negNumber bool
+	token := p.next()
+	switch token {
+	case "undefined":
+		return &tLiteral{&vUndefined{}}, nil
+	case "true":
+		return &tLiteral{&vBool{true}}, nil
+	case "false":
+		return &tLiteral{&vBool{false}}, nil
+	case "-":
+		negNumber = true
+		token, err = p.nextAndCheck(pNumber)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if pNumber.re.MatchString(token) {
+		dot := strings.Index(token, ".")
+		value, err := strconv.ParseInt(strings.Replace(token, ".", "", 1), 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		var scale int
+		if dot < 0 {
+			scale = 0
+		} else {
+			scale = len(token) - dot - 1
+		}
+		if negNumber {
+			value = -value
+		}
+		return &tLiteral{&vNumber{value, scale}}, nil
+	}
+	if pString.re.MatchString(token) {
+		value, err := strconv.Unquote(token)
+		if err != nil {
+			return nil, err
+		}
+		return &tLiteral{&vString{value}}, nil
+	}
+	return nil, nil
 }
 
 type tokenPattern struct {
