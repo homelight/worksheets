@@ -35,7 +35,7 @@ type Worksheet struct {
 	tws *tWorksheet
 
 	// data holds all the worksheet data
-	data map[int]interface{}
+	data map[int]rValue
 }
 
 // NewDefinitions parses a worksheet definition, and creates a worksheet
@@ -61,15 +61,21 @@ func (d *Definitions) NewWorksheet(name string) (*Worksheet, error) {
 	}
 	return &Worksheet{
 		tws:  tws,
-		data: make(map[int]interface{}),
+		data: make(map[int]rValue),
 	}, nil
 }
 
-func (ws *Worksheet) Set(name string, value interface{}) error {
+func (ws *Worksheet) Set(name string, value string) error {
 	// TODO(pascal): create a 'change', and then commit that change, garantee
 	// that commits are atomic, and either win or lose the race by using
 	// optimistic concurrency. Change must be a a Definition level, since it
 	// could span multiple worksheets at once.
+
+	// parse literal
+	lit, err := parseLiteralFromString(value)
+	if err != nil {
+		return err
+	}
 
 	// lookup field by name
 	field, ok := ws.tws.fieldsByName[name]
@@ -79,12 +85,14 @@ func (ws *Worksheet) Set(name string, value interface{}) error {
 	index := field.index
 
 	// type check
-	if err := field.typ.check(value); err != nil {
-		return err
+	fmt.Printf("%v\n", lit)
+	litType := lit.value.Type()
+	if ok := litType.AssignableTo(field.typ); !ok {
+		return fmt.Errorf("cannot assign %s to %s", lit.value, field.typ)
 	}
 
 	// store
-	ws.data[index] = value
+	ws.data[index] = lit.value
 
 	return nil
 }
@@ -117,7 +125,8 @@ func (ws *Worksheet) IsSet(name string) (bool, error) {
 	return isSet, nil
 }
 
-func (ws *Worksheet) Get(name string) (interface{}, error) {
+// TODO(pascal): need to think about proper return type here, should be consistent with Set
+func (ws *Worksheet) Get(name string) (rValue, error) {
 	// lookup field by name
 	field, ok := ws.tws.fieldsByName[name]
 	if !ok {
@@ -132,27 +141,18 @@ func (ws *Worksheet) Get(name string) (interface{}, error) {
 	}
 
 	// type check
-	if err := field.typ.check(value); err != nil {
-		return nil, err
+	if ok := value.Type().AssignableTo(field.typ); !ok {
+		return nil, fmt.Errorf("cannot assign %s to %s", value, field.typ)
 	}
 
 	return value, nil
 }
 
-func (ws *Worksheet) GetText(name string) (string, error) {
-	value, err := ws.Get(name)
-	if err != nil {
-		return "", err
-	}
-
-	sValue, ok := value.(string)
-	if !ok {
-		return "", fmt.Errorf("field %s cannot be converted to text (type is %T)", name, value)
-	}
-	return sValue, nil
-}
-
 // ------ definitions ------
+
+// Naming conventsions:
+// - t prefix (e.g. tWorksheet) is for AST related converns
+// - r prefix (e.g. rString) is for runtime concerns
 
 type tWorksheet struct {
 	name          string
@@ -164,79 +164,123 @@ type tWorksheet struct {
 type tField struct {
 	index int
 	name  string
-	typ   *tType
+	typ   rType
 	// also need constrainedBy *tExpression
 	// also need computedBy    *tExpression
 }
 
+// TODO(pascal): do we need a *tLiteral, or can we just use an rValue in the tree?
 type tLiteral struct {
-	value vValue
+	value rValue
 }
 
-type tType struct {
-	name  string
-	check func(interface{}) error
-}
+type tUndefinedType struct{}
 
-type vValue interface {
-}
+type tTextType struct{}
 
-type vUndefined struct{}
+type tBoolType struct{}
 
-type vNumber struct {
-	value int64
+type tNumberType struct {
 	scale int
 }
 
-type vString struct {
+// Assert that all type literals are rType.
+var _ []rType = []rType{
+	&tUndefinedType{},
+	&tTextType{},
+	&tBoolType{},
+	&tNumberType{},
+}
+
+func (typ *tUndefinedType) AssignableTo(_ rType) bool {
+	return true
+}
+
+func (typ *tUndefinedType) String() string {
+	return "undefined"
+}
+
+func (typ *tTextType) AssignableTo(u rType) bool {
+	_, ok := u.(*tTextType)
+	return ok
+}
+
+func (typ *tTextType) String() string {
+	return "text"
+}
+
+func (typ *tBoolType) AssignableTo(u rType) bool {
+	_, ok := u.(*tBoolType)
+	return ok
+}
+
+func (typ *tBoolType) String() string {
+	return "bool"
+}
+
+func (typ *tNumberType) AssignableTo(u rType) bool {
+	uNum, ok := u.(*tNumberType)
+	return ok && typ.scale <= uNum.scale
+}
+
+func (typ *tNumberType) String() string {
+	return fmt.Sprintf("number(%d)", typ.scale)
+}
+
+type tUndefined struct{}
+
+type tNumber struct {
+	value int64
+	typ   *tNumberType
+}
+
+type tText struct {
 	value string
 }
 
-type vBool struct {
+type tBool struct {
 	value bool
 }
 
-// Assert that all values are vValue.
-var _ []vValue = []vValue{
-	&vUndefined{},
-	&vNumber{},
-	&vString{},
-	&vBool{},
+// Assert that all value literals are rValue.
+var _ []rValue = []rValue{
+	&tUndefined{},
+	&tNumber{},
+	&tText{},
+	&tBool{},
 }
 
-// tTypes holds system defined types
-var tTypes = []*tType{
-	&tType{
-		name: "text",
-		check: func(value interface{}) error {
-			_, ok := value.(string)
-			if !ok {
-				return fmt.Errorf("unable to cast %T to string", value)
-			}
-			return nil
-		},
-	},
-	&tType{
-		name: "bool",
-		check: func(value interface{}) error {
-			_, ok := value.(bool)
-			if !ok {
-				return fmt.Errorf("unable to cast %T to bool", value)
-			}
-			return nil
-		},
-	},
+func (value *tUndefined) Type() rType {
+	return &tUndefinedType{}
 }
 
-// tTypesByName holds system defined types by name
-var tTypesByName = tTypesByNameInit()
+func (value *tUndefined) String() string {
+	return "undefined"
+}
 
-func tTypesByNameInit() map[string]*tType {
-	m := make(map[string]*tType, len(tTypes))
-	for _, tType := range tTypes {
-		m[tType.name] = tType
-	}
-	return m
+func (value *tNumber) Type() rType {
+	return value.typ
+}
+
+func (value *tNumber) String() string {
+	// TODO(pascal): print with proper scale
+	return fmt.Sprintf("%d", value.value)
+}
+
+func (value *tText) Type() rType {
+	return &tTextType{}
+}
+
+func (value *tText) String() string {
+	return value.value
+}
+
+func (value *tBool) Type() rType {
+	return &tBoolType{}
+}
+
+func (value *tBool) String() string {
+	return fmt.Sprintf("%b", value.value)
 }
 
 // ------ parsing ------
@@ -265,6 +309,8 @@ var (
 	pWorksheet = newTokenPattern("worksheet", "worksheet")
 	pLacco     = newTokenPattern("{", "\\{")
 	pRacco     = newTokenPattern("}", "\\}")
+	pLparen    = newTokenPattern("(", "\\(")
+	pRparen    = newTokenPattern(")", "\\)")
 	pColon     = newTokenPattern(":", ":")
 
 	// token patterns
@@ -343,25 +389,55 @@ func (p *parser) parseField() (*tField, error) {
 		return nil, err
 	}
 
-	typ, err := p.nextAndCheck(pName)
+	typ, err := p.parseType()
 	if err != nil {
 		return nil, err
-	}
-
-	// TODO(pascal): simplistic, we'd need to do type resolution on a second
-	// pass, when we have proper scoping.
-	tType, ok := tTypesByName[typ]
-	if !ok {
-		return nil, fmt.Errorf("unknown type %s", typ)
 	}
 
 	f := &tField{
 		index: index,
 		name:  name,
-		typ:   tType,
+		typ:   typ,
 	}
 
 	return f, nil
+}
+
+func (p *parser) parseType() (rType, error) {
+	name, err := p.nextAndCheck(pName)
+	if err != nil {
+		return nil, err
+	}
+
+	switch name {
+	case "text":
+		return &tTextType{}, nil
+	case "bool":
+		return &tBoolType{}, nil
+	case "undefined":
+		return &tUndefinedType{}, nil
+	case "number":
+		_, err := p.nextAndCheck(pLparen)
+		if err != nil {
+			return nil, err
+		}
+		sScale, err := p.nextAndCheck(pIndex)
+		if err != nil {
+			return nil, err
+		}
+		scale, err := strconv.Atoi(sScale)
+		if err != nil {
+			// unexpected since sIndex should conform to pIndex
+			panic(err)
+		}
+		_, err = p.nextAndCheck(pRparen)
+		if err != nil {
+			return nil, err
+		}
+		return &tNumberType{scale}, nil
+	}
+
+	return nil, fmt.Errorf("unknown type %s", name)
 }
 
 func parseLiteralFromString(input string) (*tLiteral, error) {
@@ -383,11 +459,11 @@ func (p *parser) parseLiteral() (*tLiteral, error) {
 	token := p.next()
 	switch token {
 	case "undefined":
-		return &tLiteral{&vUndefined{}}, nil
+		return &tLiteral{&tUndefined{}}, nil
 	case "true":
-		return &tLiteral{&vBool{true}}, nil
+		return &tLiteral{&tBool{true}}, nil
 	case "false":
-		return &tLiteral{&vBool{false}}, nil
+		return &tLiteral{&tBool{false}}, nil
 	case "-":
 		negNumber = true
 		token, err = p.nextAndCheck(pNumber)
@@ -410,16 +486,16 @@ func (p *parser) parseLiteral() (*tLiteral, error) {
 		if negNumber {
 			value = -value
 		}
-		return &tLiteral{&vNumber{value, scale}}, nil
+		return &tLiteral{&tNumber{value, &tNumberType{scale}}}, nil
 	}
 	if pString.re.MatchString(token) {
 		value, err := strconv.Unquote(token)
 		if err != nil {
 			return nil, err
 		}
-		return &tLiteral{&vString{value}}, nil
+		return &tLiteral{&tText{value}}, nil
 	}
-	return nil, nil
+	return nil, fmt.Errorf("unknown literal")
 }
 
 type tokenPattern struct {
