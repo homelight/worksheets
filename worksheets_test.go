@@ -55,6 +55,22 @@ func (s *Zuite) TestExample() {
 	require.Equal(s.T(), false, isSet)
 }
 
+func (s *Zuite) TestNewWorksheet_uuidAndVersion() {
+	wsm, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
+	require.NoError(s.T(), err)
+
+	ws, err := wsm.NewWorksheet("simple")
+	require.NoError(s.T(), err)
+
+	id, err := ws.Get("id")
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), 36, len(id.String()))
+
+	version, err := ws.Get("version")
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), "1", version.String())
+}
+
 func (s *Zuite) TestRuntime_AssignableTo() {
 	cases := []struct {
 		left, right rType
@@ -103,17 +119,17 @@ func (s *Zuite) TestParser_parseWorksheet() {
 	cases := map[string]func(*tWorksheet){
 		`worksheet simple {}`: func(ws *tWorksheet) {
 			require.Equal(s.T(), "simple", ws.name)
-			require.Equal(s.T(), 0, len(ws.fields))
-			require.Equal(s.T(), 0, len(ws.fieldsByName))
-			require.Equal(s.T(), 0, len(ws.fieldsByIndex))
+			require.Equal(s.T(), 2+0, len(ws.fields))
+			require.Equal(s.T(), 2+0, len(ws.fieldsByName))
+			require.Equal(s.T(), 2+0, len(ws.fieldsByIndex))
 		},
 		`worksheet simple {42:full_name text}`: func(ws *tWorksheet) {
 			require.Equal(s.T(), "simple", ws.name)
-			require.Equal(s.T(), 1, len(ws.fields))
-			require.Equal(s.T(), 1, len(ws.fieldsByName))
-			require.Equal(s.T(), 1, len(ws.fieldsByIndex))
+			require.Equal(s.T(), 2+1, len(ws.fields))
+			require.Equal(s.T(), 2+1, len(ws.fieldsByName))
+			require.Equal(s.T(), 2+1, len(ws.fieldsByIndex))
 
-			field := ws.fields[0]
+			field := ws.fieldsByName["full_name"]
 			require.Equal(s.T(), 42, field.index)
 			require.Equal(s.T(), "full_name", field.name)
 			require.Equal(s.T(), &tTextType{}, field.typ)
@@ -122,16 +138,16 @@ func (s *Zuite) TestParser_parseWorksheet() {
 		},
 		`  worksheet simple {42:full_name text 45:happy bool}`: func(ws *tWorksheet) {
 			require.Equal(s.T(), "simple", ws.name)
-			require.Equal(s.T(), 2, len(ws.fields))
+			require.Equal(s.T(), 2+2, len(ws.fields))
 
-			field1 := ws.fields[0]
+			field1 := ws.fieldsByName["full_name"]
 			require.Equal(s.T(), 42, field1.index)
 			require.Equal(s.T(), "full_name", field1.name)
 			require.Equal(s.T(), &tTextType{}, field1.typ)
 			require.Equal(s.T(), ws.fieldsByName["full_name"], field1)
 			require.Equal(s.T(), ws.fieldsByIndex[42], field1)
 
-			field2 := ws.fields[1]
+			field2 := ws.fieldsByName["happy"]
 			require.Equal(s.T(), 45, field2.index)
 			require.Equal(s.T(), "happy", field2.name)
 			require.Equal(s.T(), &tBoolType{}, field2.typ)
@@ -169,6 +185,7 @@ func (s *Zuite) TestParser_parseLiteral() {
 		`1.000`:   &tLiteral{&tNumber{1000, &tNumberType{3}}},
 
 		`"foo"`: &tLiteral{&tText{"foo"}},
+		`"456"`: &tLiteral{&tText{"456"}},
 
 		`true`: &tLiteral{&tBool{true}},
 	}

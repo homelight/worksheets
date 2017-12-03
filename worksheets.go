@@ -19,6 +19,8 @@ import (
 	"strconv"
 	"strings"
 	"text/scanner"
+
+	"github.com/satori/go.uuid"
 )
 
 // Definitions encapsulate one or many worksheet definitions, and is the
@@ -59,10 +61,25 @@ func (d *Definitions) NewWorksheet(name string) (*Worksheet, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown worksheet %s", name)
 	}
-	return &Worksheet{
+
+	// create worksheet
+	ws := &Worksheet{
 		tws:  tws,
 		data: make(map[int]rValue),
-	}, nil
+	}
+
+	// uuid
+	id := uuid.NewV4()
+	if err := ws.Set("id", fmt.Sprintf(`"%s"`, id)); err != nil {
+		panic(fmt.Sprintf("unexpected %s", err))
+	}
+
+	// version
+	if err := ws.Set("version", strconv.Itoa(1)); err != nil {
+		panic("unexpected")
+	}
+
+	return ws, nil
 }
 
 func (ws *Worksheet) Set(name string, value string) error {
@@ -85,7 +102,6 @@ func (ws *Worksheet) Set(name string, value string) error {
 	index := field.index
 
 	// type check
-	fmt.Printf("%v\n", lit)
 	litType := lit.value.Type()
 	if ok := litType.AssignableTo(field.typ); !ok {
 		return fmt.Errorf("cannot assign %s to %s", lit.value, field.typ)
@@ -153,6 +169,22 @@ type tWorksheet struct {
 	fields        []*tField
 	fieldsByName  map[string]*tField
 	fieldsByIndex map[int]*tField
+}
+
+func (ws *tWorksheet) addField(field *tField) error {
+	if _, ok := ws.fieldsByName[field.name]; ok {
+		return fmt.Errorf("multiple fields with name %s", field.name)
+	}
+
+	if _, ok := ws.fieldsByIndex[field.index]; ok {
+		return fmt.Errorf("multiple fields with index %d", field.index)
+	}
+
+	ws.fields = append(ws.fields, field)
+	ws.fieldsByName[field.name] = field
+	ws.fieldsByIndex[field.index] = field
+
+	return nil
 }
 
 type tField struct {
@@ -308,16 +340,31 @@ var (
 	pColon     = newTokenPattern(":", ":")
 
 	// token patterns
-	pName   = newTokenPattern("name", "[a-z]")
+	pName   = newTokenPattern("name", "[a-z]+([a-z_]*[a-z])?")
 	pIndex  = newTokenPattern("index", "[0-9]+")
 	pNumber = newTokenPattern("number", "[0-9]+(\\.[0-9]+)?")
 	pString = newTokenPattern("string", "\".*\"")
 )
 
 func (p *parser) parseWorksheet() (*tWorksheet, error) {
+	// initialize tWorksheet
 	ws := tWorksheet{
 		fieldsByName:  make(map[string]*tField),
 		fieldsByIndex: make(map[int]*tField),
+	}
+	if err := ws.addField(&tField{
+		index: -1,
+		name:  "id",
+		typ:   &tTextType{},
+	}); err != nil {
+		panic("unexpected")
+	}
+	if err := ws.addField(&tField{
+		index: -2,
+		name:  "version",
+		typ:   &tNumberType{},
+	}); err != nil {
+		panic("unexpected")
 	}
 
 	_, err := p.nextAndCheck(pWorksheet)
@@ -341,17 +388,9 @@ func (p *parser) parseWorksheet() (*tWorksheet, error) {
 		if err != nil {
 			return nil, err
 		}
-		ws.fields = append(ws.fields, field)
-
-		if _, ok := ws.fieldsByName[field.name]; ok {
-			return nil, fmt.Errorf("multiple fields with name %s", field.name)
+		if err := ws.addField(field); err != nil {
+			return nil, err
 		}
-		ws.fieldsByName[field.name] = field
-
-		if _, ok := ws.fieldsByIndex[field.index]; ok {
-			return nil, fmt.Errorf("multiple fields with index %d", field.index)
-		}
-		ws.fieldsByIndex[field.index] = field
 	}
 
 	_, err = p.nextAndCheck(pRacco)
@@ -500,7 +539,7 @@ type tokenPattern struct {
 func newTokenPattern(name, regex string) *tokenPattern {
 	return &tokenPattern{
 		name: name,
-		re:   regexp.MustCompile(regex),
+		re:   regexp.MustCompile("^" + regex + "$"),
 	}
 }
 
