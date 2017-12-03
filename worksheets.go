@@ -92,23 +92,17 @@ func (ws *Worksheet) Set(name string, value string) error {
 	}
 
 	// store
-	ws.data[index] = lit.value
+	if lit.value.Type().AssignableTo(&tUndefinedType{}) {
+		delete(ws.data, index)
+	} else {
+		ws.data[index] = lit.value
+	}
 
 	return nil
 }
 
 func (ws *Worksheet) Unset(name string) error {
-	// lookup field by name
-	field, ok := ws.tws.fieldsByName[name]
-	if !ok {
-		return fmt.Errorf("unknown field %s", name)
-	}
-	index := field.index
-
-	// store
-	delete(ws.data, index)
-
-	return nil
+	return ws.Set(name, "undefined")
 }
 
 func (ws *Worksheet) IsSet(name string) (bool, error) {
