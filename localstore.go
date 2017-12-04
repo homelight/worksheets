@@ -34,13 +34,9 @@ func newLocalStore(defs *Definitions, filename string) *localStore {
 	}
 }
 
-type byName struct {
-	ByName map[string]byId
-}
+type byName map[string]byId
 
-type byId struct {
-	ById map[string]map[string]string
-}
+type byId map[string]map[string]string
 
 func (s *localStore) Load(name, id string) (*Worksheet, error) {
 	data, err := ioutil.ReadFile(s.filename)
@@ -54,12 +50,12 @@ func (s *localStore) Load(name, id string) (*Worksheet, error) {
 		return nil, err
 	}
 
-	byId, ok := byName.ByName[name]
+	byId, ok := byName[name]
 	if !ok {
 		return nil, fmt.Errorf("worksheet not found %s:%s", name, id)
 	}
 
-	wsData, ok := byId.ById[id]
+	wsData, ok := byId[id]
 	if !ok {
 		return nil, fmt.Errorf("worksheet not found %s:%s", name, id)
 	}
