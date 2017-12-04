@@ -45,7 +45,7 @@ func (s *Zuite) TestExample() {
 
 	name, err := ws.Get("name")
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), "Alice", name.String())
+	require.Equal(s.T(), `"Alice"`, name.String())
 
 	err = ws.Unset("name")
 	require.NoError(s.T(), err)
@@ -64,7 +64,7 @@ func (s *Zuite) TestNewWorksheet_uuidAndVersion() {
 
 	id, err := ws.Get("id")
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), 36, len(id.String()))
+	require.Equal(s.T(), 36+2, len(id.String()))
 
 	version, err := ws.Get("version")
 	require.NoError(s.T(), err)
@@ -112,6 +112,26 @@ func (s *Zuite) TestRuntime_NotAssignableTo() {
 	}
 	for _, ex := range cases {
 		assert.False(s.T(), ex.left.AssignableTo(ex.right), "%s should not be assignable to %s", ex.left, ex.right)
+	}
+}
+
+func (s *Zuite) TestRuntime_String() {
+	cases := map[rValue]string{
+		&tUndefined{}: "undefined",
+
+		&tText{`Hello, "World"!`}: `"Hello, \"World\"!"`,
+
+		&tBool{true}: "true",
+
+		&tNumber{1, &tNumberType{0}}:     "1",
+		&tNumber{10000, &tNumberType{4}}: "1.0000",
+		&tNumber{123, &tNumberType{1}}:   "12.3",
+		&tNumber{123, &tNumberType{2}}:   "1.23",
+		&tNumber{123, &tNumberType{3}}:   "0.123",
+		&tNumber{123, &tNumberType{4}}:   "0.0123",
+	}
+	for value, expected := range cases {
+		assert.Equal(s.T(), expected, value.String())
 	}
 }
 

@@ -13,6 +13,7 @@
 package worksheets
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"regexp"
@@ -289,8 +290,38 @@ func (value *tNumber) Type() rType {
 }
 
 func (value *tNumber) String() string {
-	// TODO(pascal): print with proper scale
-	return fmt.Sprintf("%d", value.value)
+	s := strconv.FormatInt(value.value, 10)
+	scale := value.typ.scale
+	if scale == 0 {
+		return s
+	}
+
+	// We count down from most significant digit in the number we are generating.
+	// For instance 123 with scale 3 means 0.123 so the most significant digit
+	// is 0 (at index 4), then 1 (at index 3), and so on. While counting down,
+	// we generate the correct representation, by using the digits of the value
+	// or introducing 0s as necessery. We also add the period at the appropriate
+	// place while iterating.
+	var (
+		i      = scale + 1
+		l      = len(s)
+		buffer bytes.Buffer
+	)
+	if l > i {
+		i = l
+	}
+	for i > 0 {
+		if i == scale {
+			buffer.WriteRune('.')
+		}
+		if i > l {
+			buffer.WriteRune('0')
+		} else {
+			buffer.WriteByte(s[l-i])
+		}
+		i--
+	}
+	return buffer.String()
 }
 
 func (value *tText) Type() rType {
@@ -298,7 +329,7 @@ func (value *tText) Type() rType {
 }
 
 func (value *tText) String() string {
-	return value.value
+	return strconv.Quote(value.value)
 }
 
 func (value *tBool) Type() rType {
@@ -306,7 +337,7 @@ func (value *tBool) Type() rType {
 }
 
 func (value *tBool) String() string {
-	return fmt.Sprintf("%b", value.value)
+	return strconv.FormatBool(value.value)
 }
 
 // ------ parsing ------
