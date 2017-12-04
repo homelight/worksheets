@@ -1,4 +1,7 @@
-# Overview
+# Worksheets -- Overview
+
+[![CircleCI](https://circleci.com/gh/helloeave/worksheets.svg?style=svg&circle-token=273512d656713e7f4a7ed0d464aa297999c54f0b)](https://circleci.com/gh/helloeave/worksheets)
+[![GoDoc](https://godoc.org/github.com/helloeave/worksheets?status.svg)](https://godoc.org/github.com/helloeave/worksheets)
 
 Let's start with a motivating example, easily representing a borrower's legal name, date of birth, and determining if they are of legal age to get a mortgage.
 
