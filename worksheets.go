@@ -24,6 +24,15 @@ import (
 	"github.com/satori/go.uuid"
 )
 
+// Store ... TODO(pascal): write about abstraction.
+type Store interface {
+	// Load loads the worksheet with identifier `id` from the store.
+	Load(name, id string) (*Worksheet, error)
+
+	// Save saves the worksheet to the store.
+	Save(*Worksheet) error
+}
+
 // Definitions encapsulate one or many worksheet definitions, and is the
 // overall entry point into the worksheet framework.
 type Definitions struct {
@@ -41,6 +50,14 @@ type Worksheet struct {
 	data map[int]rValue
 }
 
+const (
+	// indexId is the reserved index to store a worksheet's identifier.
+	indexId = -1
+
+	// indexVersion is the reserved index to store a worksheet's version.
+	indexVersion = -2
+)
+
 // NewDefinitions parses a worksheet definition, and creates a worksheet
 // model from it.
 func NewDefinitions(src io.Reader) (*Definitions, error) {
@@ -57,16 +74,10 @@ func NewDefinitions(src io.Reader) (*Definitions, error) {
 	}, nil
 }
 
-func (d *Definitions) NewWorksheet(name string) (*Worksheet, error) {
-	tws, ok := d.wss[name]
-	if !ok {
-		return nil, fmt.Errorf("unknown worksheet %s", name)
-	}
-
-	// create worksheet
-	ws := &Worksheet{
-		tws:  tws,
-		data: make(map[int]rValue),
+func (defs *Definitions) NewWorksheet(name string) (*Worksheet, error) {
+	ws, err := defs.newUninitializedWorksheet(name)
+	if err != nil {
+		return nil, err
 	}
 
 	// uuid
@@ -77,10 +88,52 @@ func (d *Definitions) NewWorksheet(name string) (*Worksheet, error) {
 
 	// version
 	if err := ws.Set("version", strconv.Itoa(1)); err != nil {
-		panic("unexpected")
+		panic(fmt.Sprintf("unexpected %s", err))
+	}
+
+	// validate
+	if err := ws.validate(); err != nil {
+		panic(fmt.Sprintf("unexpected %s", err))
 	}
 
 	return ws, nil
+}
+
+func (defs *Definitions) newUninitializedWorksheet(name string) (*Worksheet, error) {
+	tws, ok := defs.wss[name]
+	if !ok {
+		return nil, fmt.Errorf("unknown worksheet %s", name)
+	}
+
+	ws := &Worksheet{
+		tws:  tws,
+		data: make(map[int]rValue),
+	}
+
+	return ws, nil
+}
+
+func (ws *Worksheet) validate() error {
+	// ensure we have an id and a version
+	if _, ok := ws.data[indexId]; !ok {
+		return fmt.Errorf("missing id")
+	}
+	if _, ok := ws.data[indexVersion]; !ok {
+		return fmt.Errorf("missing version")
+	}
+
+	// ensure all values are of the proper type
+	for index, value := range ws.data {
+		field, ok := ws.tws.fieldsByIndex[index]
+		if !ok {
+			return fmt.Errorf("value present for unknown field index %d", index)
+		}
+		if ok := value.Type().AssignableTo(field.typ); !ok {
+			return fmt.Errorf("value present with unassignable type for field index %d", index)
+		}
+	}
+
+	return nil
 }
 
 func (ws *Worksheet) Set(name string, value string) error {
@@ -384,14 +437,14 @@ func (p *parser) parseWorksheet() (*tWorksheet, error) {
 		fieldsByIndex: make(map[int]*tField),
 	}
 	if err := ws.addField(&tField{
-		index: -1,
+		index: indexId,
 		name:  "id",
 		typ:   &tTextType{},
 	}); err != nil {
 		panic("unexpected")
 	}
 	if err := ws.addField(&tField{
-		index: -2,
+		index: indexVersion,
 		name:  "version",
 		typ:   &tNumberType{},
 	}); err != nil {
@@ -559,7 +612,7 @@ func (p *parser) parseLiteral() (*tLiteral, error) {
 		}
 		return &tLiteral{&tText{value}}, nil
 	}
-	return nil, fmt.Errorf("unknown literal")
+	return nil, fmt.Errorf("unknown literal, found %s", token)
 }
 
 type tokenPattern struct {

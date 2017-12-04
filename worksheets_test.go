@@ -14,22 +14,16 @@ package worksheets
 
 import (
 	"strings"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
 
-type Zuite struct {
-	suite.Suite
-}
-
 func (s *Zuite) TestExample() {
-	wsm, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
+	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
 	require.NoError(s.T(), err)
 
-	ws, err := wsm.NewWorksheet("simple")
+	ws, err := defs.NewWorksheet("simple")
 	require.NoError(s.T(), err)
 
 	isSet, err := ws.IsSet("name")
@@ -56,10 +50,10 @@ func (s *Zuite) TestExample() {
 }
 
 func (s *Zuite) TestNewWorksheet_uuidAndVersion() {
-	wsm, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
+	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
 	require.NoError(s.T(), err)
 
-	ws, err := wsm.NewWorksheet("simple")
+	ws, err := defs.NewWorksheet("simple")
 	require.NoError(s.T(), err)
 
 	id, err := ws.Get("id")
@@ -251,8 +245,4 @@ func (s *Zuite) TestTokenizer_Simple() {
 	}
 	require.Equal(s.T(), "", p.next())
 	require.Equal(s.T(), "", p.next())
-}
-
-func TestRunAllTheTests(t *testing.T) {
-	suite.Run(t, new(Zuite))
 }
