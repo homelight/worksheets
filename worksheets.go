@@ -36,15 +36,15 @@ type Store interface {
 // Definitions encapsulate one or many worksheet definitions, and is the
 // overall entry point into the worksheet framework.
 type Definitions struct {
-	// wss holds all worksheet definitions
-	wss map[string]*tWorksheet
+	// defs holds all worksheet definitions
+	defs map[string]*tWorksheet
 }
 
 // Worksheet is an instance of a worksheet, which can be manipulated, as well
 // as saved, and restored from a permanent storage.
 type Worksheet struct {
 	// dfn holds the definition of this worksheet
-	tws *tWorksheet
+	def *tWorksheet
 
 	// data holds all the worksheet data
 	data map[int]rValue
@@ -63,13 +63,13 @@ const (
 func NewDefinitions(src io.Reader) (*Definitions, error) {
 	// TODO(pascal): support reading multiple worksheet definitions in one file
 	p := newParser(src)
-	tws, err := p.parseWorksheet()
+	def, err := p.parseWorksheet()
 	if err != nil {
 		return nil, err
 	}
 	return &Definitions{
-		wss: map[string]*tWorksheet{
-			tws.name: tws,
+		defs: map[string]*tWorksheet{
+			def.name: def,
 		},
 	}, nil
 }
@@ -100,13 +100,13 @@ func (defs *Definitions) NewWorksheet(name string) (*Worksheet, error) {
 }
 
 func (defs *Definitions) newUninitializedWorksheet(name string) (*Worksheet, error) {
-	tws, ok := defs.wss[name]
+	def, ok := defs.defs[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown worksheet %s", name)
 	}
 
 	ws := &Worksheet{
-		tws:  tws,
+		def:  def,
 		data: make(map[int]rValue),
 	}
 
@@ -124,7 +124,7 @@ func (ws *Worksheet) validate() error {
 
 	// ensure all values are of the proper type
 	for index, value := range ws.data {
-		field, ok := ws.tws.fieldsByIndex[index]
+		field, ok := ws.def.fieldsByIndex[index]
 		if !ok {
 			return fmt.Errorf("value present for unknown field index %d", index)
 		}
@@ -149,7 +149,7 @@ func (ws *Worksheet) Set(name string, value string) error {
 	}
 
 	// lookup field by name
-	field, ok := ws.tws.fieldsByName[name]
+	field, ok := ws.def.fieldsByName[name]
 	if !ok {
 		return fmt.Errorf("unknown field %s", name)
 	}
@@ -177,7 +177,7 @@ func (ws *Worksheet) Unset(name string) error {
 
 func (ws *Worksheet) IsSet(name string) (bool, error) {
 	// lookup field by name
-	field, ok := ws.tws.fieldsByName[name]
+	field, ok := ws.def.fieldsByName[name]
 	if !ok {
 		return false, fmt.Errorf("unknown field %s", name)
 	}
@@ -192,7 +192,7 @@ func (ws *Worksheet) IsSet(name string) (bool, error) {
 // TODO(pascal): need to think about proper return type here, should be consistent with Set
 func (ws *Worksheet) Get(name string) (rValue, error) {
 	// lookup field by name
-	field, ok := ws.tws.fieldsByName[name]
+	field, ok := ws.def.fieldsByName[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown field %s", name)
 	}
