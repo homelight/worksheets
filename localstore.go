@@ -78,7 +78,7 @@ func (s *localStore) Load(name, id string) (*Worksheet, error) {
 		if err != nil {
 			panic(fmt.Sprintf("unexpected %s", err))
 		}
-		ws.data[index] = lit.value
+		ws.data[index] = lit
 	}
 
 	if err := ws.validate(); err != nil {

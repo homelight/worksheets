@@ -191,17 +191,17 @@ func (s *Zuite) TestParser_parseWorksheetErrors() {
 }
 
 func (s *Zuite) TestParser_parseLiteral() {
-	cases := map[string]*tLiteral{
-		`undefined`: &tLiteral{&tUndefined{}},
+	cases := map[string]rValue{
+		`undefined`: &tUndefined{},
 
-		`1`:       &tLiteral{&tNumber{1, &tNumberType{0}}},
-		`-123.67`: &tLiteral{&tNumber{-12367, &tNumberType{2}}},
-		`1.000`:   &tLiteral{&tNumber{1000, &tNumberType{3}}},
+		`1`:       &tNumber{1, &tNumberType{0}},
+		`-123.67`: &tNumber{-12367, &tNumberType{2}},
+		`1.000`:   &tNumber{1000, &tNumberType{3}},
 
-		`"foo"`: &tLiteral{&tText{"foo"}},
-		`"456"`: &tLiteral{&tText{"456"}},
+		`"foo"`: &tText{"foo"},
+		`"456"`: &tText{"456"},
 
-		`true`: &tLiteral{&tBool{true}},
+		`true`: &tBool{true},
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))

@@ -156,16 +156,16 @@ func (ws *Worksheet) Set(name string, value string) error {
 	index := field.index
 
 	// type check
-	litType := lit.value.Type()
+	litType := lit.Type()
 	if ok := litType.AssignableTo(field.typ); !ok {
-		return fmt.Errorf("cannot assign %s to %s", lit.value, field.typ)
+		return fmt.Errorf("cannot assign %s to %s", lit, field.typ)
 	}
 
 	// store
-	if lit.value.Type().AssignableTo(&tUndefinedType{}) {
+	if lit.Type().AssignableTo(&tUndefinedType{}) {
 		delete(ws.data, index)
 	} else {
-		ws.data[index] = lit.value
+		ws.data[index] = lit
 	}
 
 	return nil
@@ -247,11 +247,6 @@ type tField struct {
 	typ   rType
 	// also need constrainedBy *tExpression
 	// also need computedBy    *tExpression
-}
-
-// TODO(pascal): do we need a *tLiteral, or can we just use an rValue in the tree?
-type tLiteral struct {
-	value rValue
 }
 
 type tUndefinedType struct{}
@@ -557,7 +552,7 @@ func (p *parser) parseType() (rType, error) {
 	return nil, fmt.Errorf("unknown type %s", name)
 }
 
-func parseLiteralFromString(input string) (*tLiteral, error) {
+func parseLiteralFromString(input string) (rValue, error) {
 	reader := strings.NewReader(input)
 	p := newParser(reader)
 	lit, err := p.parseLiteral()
@@ -570,17 +565,17 @@ func parseLiteralFromString(input string) (*tLiteral, error) {
 	return lit, nil
 }
 
-func (p *parser) parseLiteral() (*tLiteral, error) {
+func (p *parser) parseLiteral() (rValue, error) {
 	var err error
 	var negNumber bool
 	token := p.next()
 	switch token {
 	case "undefined":
-		return &tLiteral{&tUndefined{}}, nil
+		return &tUndefined{}, nil
 	case "true":
-		return &tLiteral{&tBool{true}}, nil
+		return &tBool{true}, nil
 	case "false":
-		return &tLiteral{&tBool{false}}, nil
+		return &tBool{false}, nil
 	case "-":
 		negNumber = true
 		token, err = p.nextAndCheck(pNumber)
@@ -603,14 +598,14 @@ func (p *parser) parseLiteral() (*tLiteral, error) {
 		if negNumber {
 			value = -value
 		}
-		return &tLiteral{&tNumber{value, &tNumberType{scale}}}, nil
+		return &tNumber{value, &tNumberType{scale}}, nil
 	}
 	if pString.re.MatchString(token) {
 		value, err := strconv.Unquote(token)
 		if err != nil {
 			return nil, err
 		}
-		return &tLiteral{&tText{value}}, nil
+		return &tText{value}, nil
 	}
 	return nil, fmt.Errorf("unknown literal, found %s", token)
 }
