@@ -49,6 +49,17 @@ func (s *Zuite) TestExample() {
 	require.Equal(s.T(), false, isSet)
 }
 
+func (s *Zuite) TestGet_undefinedIfNoValue() {
+	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
+	require.NoError(s.T(), err)
+
+	ws, err := defs.NewWorksheet("simple")
+	require.NoError(s.T(), err)
+
+	value := ws.MustGet("name")
+	require.Equal(s.T(), "undefined", value.String())
+}
+
 func (s *Zuite) TestNewWorksheet_uuidAndVersion() {
 	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
 	require.NoError(s.T(), err)
@@ -67,7 +78,7 @@ func (s *Zuite) TestNewWorksheet_uuidAndVersion() {
 
 func (s *Zuite) TestRuntime_AssignableTo() {
 	cases := []struct {
-		left, right rType
+		left, right Type
 	}{
 		{&tUndefinedType{}, &tTextType{}},
 		{&tUndefinedType{}, &tBoolType{}},
@@ -88,7 +99,7 @@ func (s *Zuite) TestRuntime_AssignableTo() {
 
 func (s *Zuite) TestRuntime_NotAssignableTo() {
 	cases := []struct {
-		left, right rType
+		left, right Type
 	}{
 		{&tTextType{}, &tUndefinedType{}},
 		{&tBoolType{}, &tUndefinedType{}},
@@ -110,7 +121,7 @@ func (s *Zuite) TestRuntime_NotAssignableTo() {
 }
 
 func (s *Zuite) TestRuntime_String() {
-	cases := map[rValue]string{
+	cases := map[Value]string{
 		&tUndefined{}: "undefined",
 
 		&tText{`Hello, "World"!`}: `"Hello, \"World\"!"`,
@@ -191,7 +202,7 @@ func (s *Zuite) TestParser_parseWorksheetErrors() {
 }
 
 func (s *Zuite) TestParser_parseLiteral() {
-	cases := map[string]rValue{
+	cases := map[string]Value{
 		`undefined`: &tUndefined{},
 
 		`1`:       &tNumber{1, &tNumberType{0}},
@@ -212,7 +223,7 @@ func (s *Zuite) TestParser_parseLiteral() {
 }
 
 func (s *Zuite) TestParser_parseType() {
-	cases := map[string]rType{
+	cases := map[string]Type{
 		`undefined`: &tUndefinedType{},
 		`text`:      &tTextType{},
 		`bool`:      &tBoolType{},

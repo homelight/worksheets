@@ -60,7 +60,7 @@ func (s *localStore) Load(name, id string) (*Worksheet, error) {
 		return nil, fmt.Errorf("worksheet not found %s:%s", name, id)
 	}
 
-	ws, err := s.defs.newUninitializedWorksheet(name)
+	ws, err := s.defs.UnsafeNewUninitializedWorksheet(name)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func (s *localStore) Load(name, id string) (*Worksheet, error) {
 		if err != nil {
 			panic(fmt.Sprintf("unexpected %s", err))
 		}
-		lit, err := parseLiteralFromString(value)
+		lit, err := NewValue(value)
 		if err != nil {
 			panic(fmt.Sprintf("unexpected %s", err))
 		}
