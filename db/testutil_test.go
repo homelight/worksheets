@@ -37,7 +37,7 @@ worksheet simple {
 
 func (s *Zuite) SetupSuite() {
 	// db
-	dbUrl := "postgres://pascal:@localhost/worksheets_test?sslmode=disable"
+	dbUrl := "postgres://ws_user:@localhost/ws_test?sslmode=disable"
 	db, err := sql.Open("postgres", dbUrl)
 	if err != nil {
 		panic(err)
