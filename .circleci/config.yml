@@ -14,6 +14,11 @@ jobs:
     steps:
       - checkout
 
+      # wait on postgres sql to start
+      - run:
+          command: while ! nc -z localhost 5432; do echo "postgres not ready"; sleep 0.1; done
+          timeout: 5
+
       # postgres
       - run: sudo apt install postgresql-client
       - run: psql ws_test ws_user -h localhost -p 5432 -f /go/src/github.com/helloeave/worksheets/db/schema.sql
