@@ -63,6 +63,11 @@ type rValue struct {
 	Value       string `db:"value"`
 }
 
+var tableToEntities = map[string]interface{}{
+	"worksheets":       &rWorksheet{},
+	"worksheet_values": &rWorksheet{},
+}
+
 func (s *Session) Load(name, id string) (*worksheets.Worksheet, error) {
 	ws, err := s.defs.UnsafeNewUninitializedWorksheet(name)
 	if err != nil {
@@ -81,7 +86,7 @@ func (s *Session) Load(name, id string) (*worksheets.Worksheet, error) {
 		return nil, fmt.Errorf("unknown worksheet %s:%s", name, id)
 	}
 
-	var valuesRecs []*rValue
+	var valuesRecs []rValue
 	err = s.tx.
 		Select("*").
 		From("worksheet_values").

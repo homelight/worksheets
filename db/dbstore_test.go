@@ -13,10 +13,13 @@
 package db
 
 import (
-	"github.com/helloeave/worksheets"
+	"fmt"
+	"math"
 
 	"github.com/stretchr/testify/require"
 	"gopkg.in/mgutz/dat.v2/sqlx-runner"
+
+	"github.com/helloeave/worksheets"
 )
 
 func (s *Zuite) TestExample() {
@@ -42,22 +45,89 @@ func (s *Zuite) TestExample() {
 	require.Equal(s.T(), `"Alice"`, wsFromStore.MustGet("name").String())
 }
 
+func (s *Zuite) TestSave_new() {
+	ws, err := s.store.defs.NewWorksheet("simple")
+	require.NoError(s.T(), err)
+
+	err = ws.Set("name", `"Alice"`)
+	require.NoError(s.T(), err)
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	wsRecs, valuesRecs := s.DbState()
+
+	require.Equal(s.T(), []rWorksheet{
+		{
+			Id:      ws.Id(),
+			Version: 1,
+			Name:    "simple",
+		},
+	}, wsRecs)
+
+	require.Equal(s.T(), []rValue{
+		{
+			Id:          IdAt(valuesRecs, 0),
+			WorksheetId: ws.Id(),
+			Index:       worksheets.IndexVersion,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `1`,
+		},
+		{
+			Id:          IdAt(valuesRecs, 1),
+			WorksheetId: ws.Id(),
+			Index:       worksheets.IndexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+		},
+		{
+			Id:          IdAt(valuesRecs, 2),
+			WorksheetId: ws.Id(),
+			Index:       83,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `"Alice"`,
+		},
+	}, valuesRecs)
+}
+
+func IdAt(s []rValue, index int) int64 {
+	if 0 <= index && index < len(s) {
+		return s[index].Id
+	}
+	return 0
+}
+
 func (s *Zuite) MustRunTransaction(fn func(tx *runner.Tx) error) {
 	err := RunTransaction(s.db, fn)
 	require.NoError(s.T(), err)
 }
 
-func RunTransaction(db *runner.DB, fn func(tx *runner.Tx) error) error {
-	tx, err := db.Begin()
-	if err != nil {
-		return err
+func (s *Zuite) DbState() ([]rWorksheet, []rValue) {
+	var (
+		wsRecs     []rWorksheet
+		valuesRecs []rValue
+	)
+
+	if err := s.db.
+		Select("*").
+		From("worksheets").
+		OrderBy("id").
+		QueryStructs(&wsRecs); err != nil {
+		require.NoError(s.T(), err)
 	}
 
-	err = fn(tx)
-	if err != nil {
-		defer tx.Rollback()
-		return err
+	if err := s.db.
+		Select("*").
+		From("worksheet_values").
+		OrderBy("worksheet_id, index, from_version").
+		QueryStructs(&valuesRecs); err != nil {
+		require.NoError(s.T(), err)
 	}
 
-	return tx.Commit()
+	return wsRecs, valuesRecs
 }

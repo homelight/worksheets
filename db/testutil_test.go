@@ -14,6 +14,7 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -31,8 +32,8 @@ type Zuite struct {
 
 const definitions = `
 worksheet simple {
-	1:name text
-	2:age  number(0)
+	83:name text
+	91:age  number(0)
 }`
 
 func (s *Zuite) SetupSuite() {
@@ -50,6 +51,14 @@ func (s *Zuite) SetupSuite() {
 		panic(err)
 	}
 	s.store = NewStore(defs)
+}
+func (s *Zuite) SetupTest() {
+	for table := range tableToEntities {
+		_, err := s.db.Exec(fmt.Sprintf("truncate %s", table))
+		if err != nil {
+			panic(err)
+		}
+	}
 }
 
 func (s *Zuite) TearDownSuite() {

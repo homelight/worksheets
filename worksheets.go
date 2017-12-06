@@ -49,11 +49,11 @@ type Worksheet struct {
 }
 
 const (
-	// indexId is the reserved index to store a worksheet's identifier.
-	indexId = -1
+	// IndexId is the reserved index to store a worksheet's identifier.
+	IndexId = -1
 
-	// indexVersion is the reserved index to store a worksheet's version.
-	indexVersion = -2
+	// IndexVersion is the reserved index to store a worksheet's version.
+	IndexVersion = -2
 )
 
 // NewDefinitions parses a worksheet definition, and creates a worksheet
@@ -113,10 +113,10 @@ func (defs *Definitions) UnsafeNewUninitializedWorksheet(name string) (*Workshee
 
 func (ws *Worksheet) validate() error {
 	// ensure we have an id and a version
-	if _, ok := ws.data[indexId]; !ok {
+	if _, ok := ws.data[IndexId]; !ok {
 		return fmt.Errorf("missing id")
 	}
-	if _, ok := ws.data[indexVersion]; !ok {
+	if _, ok := ws.data[IndexVersion]; !ok {
 		return fmt.Errorf("missing version")
 	}
 
@@ -135,11 +135,11 @@ func (ws *Worksheet) validate() error {
 }
 
 func (ws *Worksheet) Id() string {
-	return ws.data[indexId].(*tText).value
+	return ws.data[IndexId].(*tText).value
 }
 
 func (ws *Worksheet) Version() int {
-	return int(ws.data[indexVersion].(*tNumber).value)
+	return int(ws.data[IndexVersion].(*tNumber).value)
 }
 
 func (ws *Worksheet) Name() string {
