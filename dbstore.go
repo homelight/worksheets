@@ -10,21 +10,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package db
+package worksheets
 
 import (
 	"fmt"
 	"math"
 
-	"github.com/helloeave/worksheets"
 	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
 
-type DbStore struct {
-	defs *worksheets.Definitions
+// Store ... TODO(pascal): write about abstraction.
+type Store interface {
+	// Load loads the worksheet with identifier `id` from the store.
+	Load(name, id string) (*Worksheet, error)
+
+	// Save saves a new worksheet to the store.
+	Save(ws *Worksheet) error
+
+	// Update updates an existing worksheet in the store.
+	Update(ws *Worksheet) error
 }
 
-func NewStore(defs *worksheets.Definitions) *DbStore {
+type DbStore struct {
+	defs *Definitions
+}
+
+func NewStore(defs *Definitions) *DbStore {
 	return &DbStore{
 		defs: defs,
 	}
@@ -43,8 +54,8 @@ type Session struct {
 	tx *runner.Tx
 }
 
-// Assert Session implements worksheets.Store interface.
-var _ worksheets.Store = &Session{}
+// Assert Session implements Store interface.
+var _ Store = &Session{}
 
 // rWorksheet represents a record of the worksheets table.
 type rWorksheet struct {
@@ -68,8 +79,8 @@ var tableToEntities = map[string]interface{}{
 	"worksheet_values": &rWorksheet{},
 }
 
-func (s *Session) Load(name, id string) (*worksheets.Worksheet, error) {
-	ws, err := s.defs.UnsafeNewUninitializedWorksheet(name)
+func (s *Session) Load(name, id string) (*Worksheet, error) {
+	ws, err := s.defs.newUninitializedWorksheet(name)
 	if err != nil {
 		return nil, err
 	}
@@ -97,17 +108,17 @@ func (s *Session) Load(name, id string) (*worksheets.Worksheet, error) {
 	}
 	fmt.Printf("%v\n", valuesRecs)
 	for _, valueRec := range valuesRecs {
-		value, err := worksheets.NewValue(valueRec.Value)
+		value, err := NewValue(valueRec.Value)
 		if err != nil {
 			return nil, err
 		}
-		ws.UnsafeSet(valueRec.Index, value)
+		ws.setAtIndex(valueRec.Index, value)
 	}
 
 	return ws, nil
 }
 
-func (s *Session) Save(ws *worksheets.Worksheet) error {
+func (s *Session) Save(ws *Worksheet) error {
 	_, err := s.tx.
 		InsertInto("worksheets").
 		Columns("*").
@@ -122,7 +133,7 @@ func (s *Session) Save(ws *worksheets.Worksheet) error {
 	}
 
 	insert := s.tx.InsertInto("worksheet_values").Columns("*").Blacklist("id")
-	ws.UnsafeRangeOverData(func(index int, value worksheets.Value) {
+	for index, value := range ws.data {
 		insert.Record(rValue{
 			WorksheetId: ws.Id(),
 			Index:       index,
@@ -130,10 +141,14 @@ func (s *Session) Save(ws *worksheets.Worksheet) error {
 			ToVersion:   math.MaxInt32,
 			Value:       value.String(),
 		})
-	})
+	}
 	if _, err := insert.Exec(); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (s *Session) Update(ws *Worksheet) error {
+	return fmt.Errorf("not implemented yet")
 }

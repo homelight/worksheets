@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package db
+package worksheets
 
 import (
 	"fmt"
@@ -18,11 +18,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gopkg.in/mgutz/dat.v2/sqlx-runner"
-
-	"github.com/helloeave/worksheets"
 )
 
-func (s *Zuite) TestExample() {
+func (s *DbZuite) TestExample() {
 	ws, err := s.store.defs.NewWorksheet("simple")
 	require.NoError(s.T(), err)
 
@@ -34,7 +32,7 @@ func (s *Zuite) TestExample() {
 		return session.Save(ws)
 	})
 
-	var wsFromStore *worksheets.Worksheet
+	var wsFromStore *Worksheet
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
 		var err error
@@ -45,7 +43,7 @@ func (s *Zuite) TestExample() {
 	require.Equal(s.T(), `"Alice"`, wsFromStore.MustGet("name").String())
 }
 
-func (s *Zuite) TestSave_new() {
+func (s *DbZuite) TestSave_new() {
 	ws, err := s.store.defs.NewWorksheet("simple")
 	require.NoError(s.T(), err)
 
@@ -71,7 +69,7 @@ func (s *Zuite) TestSave_new() {
 		{
 			Id:          IdAt(valuesRecs, 0),
 			WorksheetId: ws.Id(),
-			Index:       worksheets.IndexVersion,
+			Index:       IndexVersion,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       `1`,
@@ -79,7 +77,7 @@ func (s *Zuite) TestSave_new() {
 		{
 			Id:          IdAt(valuesRecs, 1),
 			WorksheetId: ws.Id(),
-			Index:       worksheets.IndexId,
+			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
@@ -95,7 +93,7 @@ func (s *Zuite) TestSave_new() {
 	}, valuesRecs)
 }
 
-func (s *Zuite) TestUpdate() {
+func (s *DbZuite) TestUpdate() {
 	ws, err := s.store.defs.NewWorksheet("simple")
 	require.NoError(s.T(), err)
 
@@ -129,7 +127,7 @@ func (s *Zuite) TestUpdate() {
 		{
 			Id:          IdAt(valuesRecs, 0),
 			WorksheetId: ws.Id(),
-			Index:       worksheets.IndexVersion,
+			Index:       IndexVersion,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       `1`,
@@ -137,7 +135,7 @@ func (s *Zuite) TestUpdate() {
 		{
 			Id:          IdAt(valuesRecs, 1),
 			WorksheetId: ws.Id(),
-			Index:       worksheets.IndexId,
+			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
@@ -160,12 +158,12 @@ func IdAt(s []rValue, index int) int64 {
 	return 0
 }
 
-func (s *Zuite) MustRunTransaction(fn func(tx *runner.Tx) error) {
+func (s *DbZuite) MustRunTransaction(fn func(tx *runner.Tx) error) {
 	err := RunTransaction(s.db, fn)
 	require.NoError(s.T(), err)
 }
 
-func (s *Zuite) DbState() ([]rWorksheet, []rValue) {
+func (s *DbZuite) DbState() ([]rWorksheet, []rValue) {
 	var (
 		wsRecs     []rWorksheet
 		valuesRecs []rValue

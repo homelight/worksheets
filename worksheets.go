@@ -20,18 +20,6 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-// Store ... TODO(pascal): write about abstraction.
-type Store interface {
-	// Load loads the worksheet with identifier `id` from the store.
-	Load(name, id string) (*Worksheet, error)
-
-	// Save saves a new worksheet to the store.
-	Save(ws *Worksheet) error
-
-	// Update updates an existing worksheet in the store.
-	Update(ws *Worksheet) error
-}
-
 // Definitions encapsulate one or many worksheet definitions, and is the
 // overall entry point into the worksheet framework.
 //
@@ -76,7 +64,7 @@ func NewDefinitions(src io.Reader) (*Definitions, error) {
 }
 
 func (defs *Definitions) NewWorksheet(name string) (*Worksheet, error) {
-	ws, err := defs.UnsafeNewUninitializedWorksheet(name)
+	ws, err := defs.newUninitializedWorksheet(name)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +88,7 @@ func (defs *Definitions) NewWorksheet(name string) (*Worksheet, error) {
 	return ws, nil
 }
 
-func (defs *Definitions) UnsafeNewUninitializedWorksheet(name string) (*Worksheet, error) {
+func (defs *Definitions) newUninitializedWorksheet(name string) (*Worksheet, error) {
 	def, ok := defs.defs[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown worksheet %s", name)
@@ -176,12 +164,12 @@ func (ws *Worksheet) Set(name string, value string) error {
 	}
 
 	// store
-	ws.UnsafeSet(index, lit)
+	ws.setAtIndex(index, lit)
 
 	return nil
 }
 
-func (ws *Worksheet) UnsafeSet(index int, value Value) {
+func (ws *Worksheet) setAtIndex(index int, value Value) {
 	if value.Type().AssignableTo(&tUndefinedType{}) {
 		delete(ws.data, index)
 	} else {
@@ -236,10 +224,4 @@ func (ws *Worksheet) Get(name string) (Value, error) {
 	}
 
 	return value, nil
-}
-
-func (ws *Worksheet) UnsafeRangeOverData(fn func(index int, value Value)) {
-	for index, value := range ws.data {
-		fn(index, value)
-	}
 }
