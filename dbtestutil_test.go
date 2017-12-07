@@ -10,20 +10,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package db
+package worksheets
 
 import (
 	"database/sql"
+	"fmt"
 	"strings"
 	"testing"
 
-	"github.com/helloeave/worksheets"
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/suite"
 	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
 
-type Zuite struct {
+type DbZuite struct {
 	suite.Suite
 	db    *runner.DB
 	store *DbStore
@@ -31,11 +31,11 @@ type Zuite struct {
 
 const definitions = `
 worksheet simple {
-	1:name text
-	2:age  number(0)
+	83:name text
+	91:age  number(0)
 }`
 
-func (s *Zuite) SetupSuite() {
+func (s *DbZuite) SetupSuite() {
 	// db
 	dbUrl := "postgres://ws_user:@localhost/ws_test?sslmode=disable"
 	db, err := sql.Open("postgres", dbUrl)
@@ -45,20 +45,29 @@ func (s *Zuite) SetupSuite() {
 	s.db = runner.NewDB(db, "postgres")
 
 	// store
-	defs, err := worksheets.NewDefinitions(strings.NewReader(definitions))
+	defs, err := NewDefinitions(strings.NewReader(definitions))
 	if err != nil {
 		panic(err)
 	}
 	s.store = NewStore(defs)
 }
 
-func (s *Zuite) TearDownSuite() {
+func (s *DbZuite) SetupTest() {
+	for table := range tableToEntities {
+		_, err := s.db.Exec(fmt.Sprintf("truncate %s", table))
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
+func (s *DbZuite) TearDownSuite() {
 	err := s.db.DB.Close()
 	if err != nil {
 		panic(err)
 	}
 }
 
-func TestRunAllTheTests(t *testing.T) {
-	suite.Run(t, new(Zuite))
+func TestRunAllTheDbTests(t *testing.T) {
+	suite.Run(t, new(DbZuite))
 }

@@ -21,7 +21,7 @@ jobs:
 
       # postgres
       - run: sudo apt install postgresql-client
-      - run: psql ws_test ws_user -h localhost -p 5432 -f /go/src/github.com/helloeave/worksheets/db/schema.sql
+      - run: psql ws_test ws_user -h localhost -p 5432 -f /go/src/github.com/helloeave/worksheets/schema.sql
 
       # golang
       - run: go get -v -t -d ./...

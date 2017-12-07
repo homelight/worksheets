@@ -13,21 +13,20 @@
 package worksheets
 
 import (
-	"strings"
-
-	"github.com/stretchr/testify/require"
+	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
 
-func (s *Zuite) TestLocalStore_Load() {
-	wsm, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
-	require.NoError(s.T(), err)
+func RunTransaction(db *runner.DB, fn func(tx *runner.Tx) error) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
 
-	store := newLocalStore(wsm, "localstore_test.json")
+	err = fn(tx)
+	if err != nil {
+		defer tx.Rollback()
+		return err
+	}
 
-	ws, err := store.Load("simple", "ebb03a7f-8466-43fa-b2b8-2f0095304424")
-	require.NoError(s.T(), err)
-
-	name, err := ws.Get("name")
-	require.NoError(s.T(), err)
-	require.Equal(s.T(), `"Alice"`, name.String())
+	return tx.Commit()
 }

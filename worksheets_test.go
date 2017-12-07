@@ -15,7 +15,6 @@ package worksheets
 import (
 	"strings"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,7 +48,20 @@ func (s *Zuite) TestExample() {
 	require.Equal(s.T(), false, isSet)
 }
 
-func (s *Zuite) TestGet_undefinedIfNoValue() {
+func (s *Zuite) TestWorksheetNew_origEmpty() {
+	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
+	require.NoError(s.T(), err)
+
+	ws, err := defs.NewWorksheet("simple")
+	require.NoError(s.T(), err)
+
+	// We need to ensure orig is empty since this is a fresh worksheet, and
+	// even the special values (e.g. version, id) must be taken into
+	// consideration upon save.
+	require.Empty(s.T(), ws.orig)
+}
+
+func (s *Zuite) TestWorksheetGet_undefinedIfNoValue() {
 	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
 	require.NoError(s.T(), err)
 
@@ -60,7 +72,7 @@ func (s *Zuite) TestGet_undefinedIfNoValue() {
 	require.Equal(s.T(), "undefined", value.String())
 }
 
-func (s *Zuite) TestNewWorksheet_uuidAndVersion() {
+func (s *Zuite) TestWorksheet_idAndVersion() {
 	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
 	require.NoError(s.T(), err)
 
@@ -76,184 +88,49 @@ func (s *Zuite) TestNewWorksheet_uuidAndVersion() {
 	require.Equal(s.T(), "1", version.String())
 }
 
-func (s *Zuite) TestRuntime_AssignableTo() {
-	cases := []struct {
-		left, right Type
-	}{
-		{&tUndefinedType{}, &tTextType{}},
-		{&tUndefinedType{}, &tBoolType{}},
-		{&tUndefinedType{}, &tNumberType{0}},
-		{&tUndefinedType{}, &tNumberType{1}},
+func (s *Zuite) TestWorksheet_diff() {
+	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
+	require.NoError(s.T(), err)
 
-		{&tTextType{}, &tTextType{}},
+	ws, err := defs.NewWorksheet("simple")
+	require.NoError(s.T(), err)
 
-		{&tBoolType{}, &tBoolType{}},
+	// initial diff
+	require.Equal(s.T(), map[int]Value{
+		IndexId:      NewText(ws.Id()),
+		IndexVersion: MustNewValue("1"),
+	}, ws.diff())
 
-		{&tNumberType{0}, &tNumberType{0}},
-		{&tNumberType{1}, &tNumberType{1}},
-	}
-	for _, ex := range cases {
-		require.True(s.T(), ex.left.AssignableTo(ex.right), "%s should be assignable to %s", ex.left, ex.right)
-	}
-}
+	// set name to Alice
+	err = ws.Set("name", `"Alice"`)
+	require.NoError(s.T(), err)
 
-func (s *Zuite) TestRuntime_NotAssignableTo() {
-	cases := []struct {
-		left, right Type
-	}{
-		{&tTextType{}, &tUndefinedType{}},
-		{&tBoolType{}, &tUndefinedType{}},
-		{&tNumberType{0}, &tUndefinedType{}},
-		{&tNumberType{1}, &tUndefinedType{}},
+	// now, also expecting Alice
+	require.Equal(s.T(), map[int]Value{
+		IndexId:      NewText(ws.Id()),
+		IndexVersion: MustNewValue("1"),
+		1:            NewText("Alice"),
+	}, ws.diff())
 
-		{&tBoolType{}, &tTextType{}},
-		{&tNumberType{9}, &tTextType{}},
+	// Alice is now Bob
+	err = ws.Set("name", `"Bob"`)
+	require.NoError(s.T(), err)
 
-		{&tTextType{}, &tBoolType{}},
-		{&tNumberType{9}, &tBoolType{}},
+	require.Equal(s.T(), map[int]Value{
+		IndexId:      NewText(ws.Id()),
+		IndexVersion: MustNewValue("1"),
+		1:            NewText("Bob"),
+	}, ws.diff())
 
-		{&tTextType{}, &tNumberType{1}},
-		{&tNumberType{2}, &tNumberType{1}},
-	}
-	for _, ex := range cases {
-		assert.False(s.T(), ex.left.AssignableTo(ex.right), "%s should not be assignable to %s", ex.left, ex.right)
-	}
-}
+	// let's fake Bob being there before, and not anymore
+	ws.orig[1] = ws.data[1]
+	err = ws.Unset("name")
+	require.NoError(s.T(), err)
 
-func (s *Zuite) TestRuntime_String() {
-	cases := map[Value]string{
-		&tUndefined{}: "undefined",
-
-		&tText{`Hello, "World"!`}: `"Hello, \"World\"!"`,
-
-		&tBool{true}: "true",
-
-		&tNumber{1, &tNumberType{0}}:     "1",
-		&tNumber{10000, &tNumberType{4}}: "1.0000",
-		&tNumber{123, &tNumberType{1}}:   "12.3",
-		&tNumber{123, &tNumberType{2}}:   "1.23",
-		&tNumber{123, &tNumberType{3}}:   "0.123",
-		&tNumber{123, &tNumberType{4}}:   "0.0123",
-	}
-	for value, expected := range cases {
-		assert.Equal(s.T(), expected, value.String())
-	}
-}
-
-func (s *Zuite) TestParser_parseWorksheet() {
-	cases := map[string]func(*tWorksheet){
-		`worksheet simple {}`: func(ws *tWorksheet) {
-			require.Equal(s.T(), "simple", ws.name)
-			require.Equal(s.T(), 2+0, len(ws.fields))
-			require.Equal(s.T(), 2+0, len(ws.fieldsByName))
-			require.Equal(s.T(), 2+0, len(ws.fieldsByIndex))
-		},
-		`worksheet simple {42:full_name text}`: func(ws *tWorksheet) {
-			require.Equal(s.T(), "simple", ws.name)
-			require.Equal(s.T(), 2+1, len(ws.fields))
-			require.Equal(s.T(), 2+1, len(ws.fieldsByName))
-			require.Equal(s.T(), 2+1, len(ws.fieldsByIndex))
-
-			field := ws.fieldsByName["full_name"]
-			require.Equal(s.T(), 42, field.index)
-			require.Equal(s.T(), "full_name", field.name)
-			require.Equal(s.T(), &tTextType{}, field.typ)
-			require.Equal(s.T(), ws.fieldsByName["full_name"], field)
-			require.Equal(s.T(), ws.fieldsByIndex[42], field)
-		},
-		`  worksheet simple {42:full_name text 45:happy bool}`: func(ws *tWorksheet) {
-			require.Equal(s.T(), "simple", ws.name)
-			require.Equal(s.T(), 2+2, len(ws.fields))
-
-			field1 := ws.fieldsByName["full_name"]
-			require.Equal(s.T(), 42, field1.index)
-			require.Equal(s.T(), "full_name", field1.name)
-			require.Equal(s.T(), &tTextType{}, field1.typ)
-			require.Equal(s.T(), ws.fieldsByName["full_name"], field1)
-			require.Equal(s.T(), ws.fieldsByIndex[42], field1)
-
-			field2 := ws.fieldsByName["happy"]
-			require.Equal(s.T(), 45, field2.index)
-			require.Equal(s.T(), "happy", field2.name)
-			require.Equal(s.T(), &tBoolType{}, field2.typ)
-			require.Equal(s.T(), ws.fieldsByName["happy"], field2)
-			require.Equal(s.T(), ws.fieldsByIndex[45], field2)
-		},
-	}
-	for input, checks := range cases {
-		p := newParser(strings.NewReader(input))
-		ws, err := p.parseWorksheet()
-		require.NoError(s.T(), err)
-		checks(ws)
-	}
-}
-
-func (s *Zuite) TestParser_parseWorksheetErrors() {
-	cases := []string{
-		"worksheet simple {\n\t42:full_name\n\ttext 42:happy bool\n}",
-		"worksheet simple {\n\t42:same_name\n\ttext 43:same_name bool\n}",
-	}
-	for _, input := range cases {
-		p := newParser(strings.NewReader(input))
-		_, err := p.parseWorksheet()
-		require.NotNil(s.T(), err)
-		// TODO(pascal): verify error messages are nice
-	}
-}
-
-func (s *Zuite) TestParser_parseLiteral() {
-	cases := map[string]Value{
-		`undefined`: &tUndefined{},
-
-		`1`:       &tNumber{1, &tNumberType{0}},
-		`-123.67`: &tNumber{-12367, &tNumberType{2}},
-		`1.000`:   &tNumber{1000, &tNumberType{3}},
-
-		`"foo"`: &tText{"foo"},
-		`"456"`: &tText{"456"},
-
-		`true`: &tBool{true},
-	}
-	for input, expected := range cases {
-		p := newParser(strings.NewReader(input))
-		actual, err := p.parseLiteral()
-		require.NoError(s.T(), err)
-		require.Equal(s.T(), expected, actual)
-	}
-}
-
-func (s *Zuite) TestParser_parseType() {
-	cases := map[string]Type{
-		`undefined`: &tUndefinedType{},
-		`text`:      &tTextType{},
-		`bool`:      &tBoolType{},
-		`number(5)`: &tNumberType{5},
-	}
-	for input, expected := range cases {
-		p := newParser(strings.NewReader(input))
-		actual, err := p.parseType()
-		require.NoError(s.T(), err)
-		require.Equal(s.T(), expected, actual)
-	}
-}
-
-func (s *Zuite) TestTokenizer_Simple() {
-	input := `worksheet simple {1:full_name text}`
-	p := newParser(strings.NewReader(input))
-
-	toks := []string{
-		"worksheet",
-		"simple",
-		"{",
-		"1",
-		":",
-		"full_name",
-		"text",
-		"}",
-	}
-	for _, tok := range toks {
-		require.Equal(s.T(), tok, p.next())
-	}
-	require.Equal(s.T(), "", p.next())
-	require.Equal(s.T(), "", p.next())
+	// now, name should go to an explicit undefine
+	require.Equal(s.T(), map[int]Value{
+		IndexId:      NewText(ws.Id()),
+		IndexVersion: MustNewValue("1"),
+		1:            MustNewValue("undefined"),
+	}, ws.diff())
 }

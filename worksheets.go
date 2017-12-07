@@ -20,15 +20,6 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-// Store ... TODO(pascal): write about abstraction.
-type Store interface {
-	// Load loads the worksheet with identifier `id` from the store.
-	Load(name, id string) (*Worksheet, error)
-
-	// Save saves the worksheet to the store.
-	Save(ws *Worksheet) error
-}
-
 // Definitions encapsulate one or many worksheet definitions, and is the
 // overall entry point into the worksheet framework.
 //
@@ -38,22 +29,24 @@ type Definitions struct {
 	defs map[string]*tWorksheet
 }
 
-// Worksheet is an instance of a worksheet, which can be manipulated, as well
-// as saved, and restored from a permanent storage.
+// Worksheet is ... TODO(pascal): documentation binge
 type Worksheet struct {
-	// dfn holds the definition of this worksheet
+	// def holds the definition of this worksheet.
 	def *tWorksheet
 
-	// data holds all the worksheet data
+	// orig holds the worksheet data as it was when it was initially loaded.
+	orig map[int]Value
+
+	// data holds all the worksheet data.
 	data map[int]Value
 }
 
 const (
-	// indexId is the reserved index to store a worksheet's identifier.
-	indexId = -1
+	// IndexId is the reserved index to store a worksheet's identifier.
+	IndexId = -2
 
-	// indexVersion is the reserved index to store a worksheet's version.
-	indexVersion = -2
+	// IndexVersion is the reserved index to store a worksheet's version.
+	IndexVersion = -1
 )
 
 // NewDefinitions parses a worksheet definition, and creates a worksheet
@@ -73,7 +66,7 @@ func NewDefinitions(src io.Reader) (*Definitions, error) {
 }
 
 func (defs *Definitions) NewWorksheet(name string) (*Worksheet, error) {
-	ws, err := defs.UnsafeNewUninitializedWorksheet(name)
+	ws, err := defs.newUninitializedWorksheet(name)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +90,7 @@ func (defs *Definitions) NewWorksheet(name string) (*Worksheet, error) {
 	return ws, nil
 }
 
-func (defs *Definitions) UnsafeNewUninitializedWorksheet(name string) (*Worksheet, error) {
+func (defs *Definitions) newUninitializedWorksheet(name string) (*Worksheet, error) {
 	def, ok := defs.defs[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown worksheet %s", name)
@@ -105,6 +98,7 @@ func (defs *Definitions) UnsafeNewUninitializedWorksheet(name string) (*Workshee
 
 	ws := &Worksheet{
 		def:  def,
+		orig: make(map[int]Value),
 		data: make(map[int]Value),
 	}
 
@@ -113,10 +107,10 @@ func (defs *Definitions) UnsafeNewUninitializedWorksheet(name string) (*Workshee
 
 func (ws *Worksheet) validate() error {
 	// ensure we have an id and a version
-	if _, ok := ws.data[indexId]; !ok {
+	if _, ok := ws.data[IndexId]; !ok {
 		return fmt.Errorf("missing id")
 	}
-	if _, ok := ws.data[indexVersion]; !ok {
+	if _, ok := ws.data[IndexVersion]; !ok {
 		return fmt.Errorf("missing version")
 	}
 
@@ -135,11 +129,11 @@ func (ws *Worksheet) validate() error {
 }
 
 func (ws *Worksheet) Id() string {
-	return ws.data[indexId].(*tText).value
+	return ws.data[IndexId].(*tText).value
 }
 
 func (ws *Worksheet) Version() int {
-	return int(ws.data[indexVersion].(*tNumber).value)
+	return int(ws.data[IndexVersion].(*tNumber).value)
 }
 
 func (ws *Worksheet) Name() string {
@@ -173,17 +167,13 @@ func (ws *Worksheet) Set(name string, value string) error {
 	}
 
 	// store
-	ws.UnsafeSet(index, lit)
-
-	return nil
-}
-
-func (ws *Worksheet) UnsafeSet(index int, value Value) {
-	if value.Type().AssignableTo(&tUndefinedType{}) {
+	if lit.Type().AssignableTo(&tUndefinedType{}) {
 		delete(ws.data, index)
 	} else {
-		ws.data[index] = value
+		ws.data[index] = lit
 	}
+
+	return nil
 }
 
 func (ws *Worksheet) Unset(name string) error {
@@ -235,8 +225,32 @@ func (ws *Worksheet) Get(name string) (Value, error) {
 	return value, nil
 }
 
-func (ws *Worksheet) UnsafeRangeOverData(fn func(index int, value Value)) {
-	for index, value := range ws.data {
-		fn(index, value)
+func (ws *Worksheet) diff() map[int]Value {
+	fmt.Printf("ws.orig = %v\n", ws.orig)
+	fmt.Printf("ws.data = %v\n", ws.data)
+
+	allIndexes := make(map[int]bool)
+	for index := range ws.orig {
+		allIndexes[index] = true
 	}
+	for index := range ws.data {
+		allIndexes[index] = true
+	}
+
+	diff := make(map[int]Value)
+	for index := range allIndexes {
+		orig, hasOrig := ws.orig[index]
+		data, hasData := ws.data[index]
+		if hasOrig && !hasData {
+			diff[index] = &tUndefined{}
+		} else if !hasOrig && hasData {
+			diff[index] = data
+		} else if !orig.Equals(data) {
+			diff[index] = data
+		}
+	}
+
+	fmt.Printf("diff    = %v\n", diff)
+
+	return diff
 }
