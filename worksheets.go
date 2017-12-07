@@ -25,8 +25,11 @@ type Store interface {
 	// Load loads the worksheet with identifier `id` from the store.
 	Load(name, id string) (*Worksheet, error)
 
-	// Save saves the worksheet to the store.
+	// Save saves a new worksheet to the store.
 	Save(ws *Worksheet) error
+
+	// Update updates an existing worksheet in the store.
+	Update(ws *Worksheet) error
 }
 
 // Definitions encapsulate one or many worksheet definitions, and is the

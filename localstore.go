@@ -87,3 +87,7 @@ func (s *localStore) Load(name, id string) (*Worksheet, error) {
 func (s *localStore) Save(ws *Worksheet) error {
 	return fmt.Errorf("not implemented")
 }
+
+func (s *localStore) Update(ws *Worksheet) error {
+	return fmt.Errorf("not implemented")
+}

@@ -108,8 +108,6 @@ func (s *Session) Load(name, id string) (*worksheets.Worksheet, error) {
 }
 
 func (s *Session) Save(ws *worksheets.Worksheet) error {
-	// TODO(pascal): handle save of worksheets we already have in the db!
-
 	_, err := s.tx.
 		InsertInto("worksheets").
 		Columns("*").

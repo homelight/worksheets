@@ -95,6 +95,64 @@ func (s *Zuite) TestSave_new() {
 	}, valuesRecs)
 }
 
+func (s *Zuite) TestUpdate() {
+	ws, err := s.store.defs.NewWorksheet("simple")
+	require.NoError(s.T(), err)
+
+	err = ws.Set("name", `"Alice"`)
+	require.NoError(s.T(), err)
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	err = ws.Set("name", `"Bob"`)
+	require.NoError(s.T(), err)
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	wsRecs, valuesRecs := s.DbState()
+
+	require.Equal(s.T(), []rWorksheet{
+		{
+			Id:      ws.Id(),
+			Version: 1,
+			Name:    "simple",
+		},
+	}, wsRecs)
+
+	require.Equal(s.T(), []rValue{
+		{
+			Id:          IdAt(valuesRecs, 0),
+			WorksheetId: ws.Id(),
+			Index:       worksheets.IndexVersion,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `1`,
+		},
+		{
+			Id:          IdAt(valuesRecs, 1),
+			WorksheetId: ws.Id(),
+			Index:       worksheets.IndexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+		},
+		{
+			Id:          IdAt(valuesRecs, 2),
+			WorksheetId: ws.Id(),
+			Index:       83,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `"Alice"`,
+		},
+	}, valuesRecs)
+}
+
 func IdAt(s []rValue, index int) int64 {
 	if 0 <= index && index < len(s) {
 		return s[index].Id
