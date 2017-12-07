@@ -15,6 +15,8 @@ package worksheets
 import (
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 
 	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
@@ -101,24 +103,27 @@ func (s *Session) Load(name, id string) (*Worksheet, error) {
 	err = s.tx.
 		Select("*").
 		From("worksheet_values").
-		Where("worksheet_id = $1 and from_version <= $2 and $2 <= to_version", id, wsRec.Version).
+		Where("worksheet_id = $1", id).
+		Where("from_version <= $1 and $1 <= to_version", wsRec.Version).
 		QueryStructs(&valuesRecs)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("%v\n", valuesRecs)
 	for _, valueRec := range valuesRecs {
 		value, err := NewValue(valueRec.Value)
 		if err != nil {
 			return nil, err
 		}
-		ws.setAtIndex(valueRec.Index, value)
+		index := valueRec.Index
+		ws.orig[index] = value
+		ws.data[index] = value
 	}
 
 	return ws, nil
 }
 
 func (s *Session) Save(ws *Worksheet) error {
+	// insert rWorksheet
 	_, err := s.tx.
 		InsertInto("worksheets").
 		Columns("*").
@@ -132,6 +137,7 @@ func (s *Session) Save(ws *Worksheet) error {
 		return err
 	}
 
+	// insert rValues
 	insert := s.tx.InsertInto("worksheet_values").Columns("*").Blacklist("id")
 	for index, value := range ws.data {
 		insert.Record(rValue{
@@ -146,9 +152,91 @@ func (s *Session) Save(ws *Worksheet) error {
 		return err
 	}
 
+	// now we can update ws itself to reflect the save
+	for index, value := range ws.data {
+		ws.orig[index] = value
+	}
+
 	return nil
 }
 
 func (s *Session) Update(ws *Worksheet) error {
-	return fmt.Errorf("not implemented yet")
+	oldVersion := ws.Version()
+	newVersion := oldVersion + 1
+	newVersionValue := MustNewValue(strconv.Itoa(newVersion))
+
+	// diff
+	diff := func() map[int]Value {
+		oldVersionValue := ws.data[IndexVersion]
+		ws.data[IndexVersion] = MustNewValue(strconv.Itoa(newVersion))
+		d := ws.diff()
+		ws.data[IndexVersion] = oldVersionValue
+		return d
+	}()
+
+	// diff indexes
+	allDiffIndexes := make([]interface{}, len(diff))
+	for index := range diff {
+		allDiffIndexes = append(allDiffIndexes, index)
+	}
+	allDiffIndexes = append(allDiffIndexes, IndexVersion)
+
+	// update old rValues
+	result, err := s.tx.
+		Update("worksheet_values").
+		Set("to_version", oldVersion).
+		Where("worksheet_id = $1", ws.Id()).
+		Where("from_version <= $1 and $1 <= to_version", oldVersion).
+		Where(inClause("index", len(allDiffIndexes)), allDiffIndexes...).
+		Exec()
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected != int64(len(diff)) {
+		return fmt.Errorf("unable to update old values")
+	}
+
+	// insert new rValues
+	insert := s.tx.InsertInto("worksheet_values").Columns("*").Blacklist("id")
+	for index, value := range diff {
+		insert.Record(rValue{
+			WorksheetId: ws.Id(),
+			Index:       index,
+			FromVersion: newVersion,
+			ToVersion:   math.MaxInt32,
+			Value:       value.String(),
+		})
+	}
+	if _, err := insert.Exec(); err != nil {
+		return err
+	}
+
+	// update rWorksheet
+	result, err = s.tx.
+		Update("worksheets").
+		Set("version", newVersion).
+		Where("id = $1 and version = $2", ws.Id(), oldVersion).
+		Exec()
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected != 1 {
+		return fmt.Errorf("concurrent update detected")
+	}
+
+	// now we can update ws itself to reflect the store
+	ws.data[IndexVersion] = newVersionValue
+	for index, value := range ws.data {
+		ws.orig[index] = value
+	}
+
+	return nil
+}
+
+func inClause(column string, num int) string {
+	vars := make([]string, num)
+	for i := 0; i < num; i++ {
+		vars[i] = fmt.Sprintf("$%d", i+1)
+	}
+	return fmt.Sprintf("%s in (%s)", column, strings.Join(vars, ", "))
 }

@@ -29,22 +29,24 @@ type Definitions struct {
 	defs map[string]*tWorksheet
 }
 
-// Worksheet is an instance of a worksheet, which can be manipulated, as well
-// as saved, and restored from a permanent storage.
+// Worksheet is ... TODO(pascal): documentation binge
 type Worksheet struct {
-	// dfn holds the definition of this worksheet
+	// def holds the definition of this worksheet.
 	def *tWorksheet
 
-	// data holds all the worksheet data
+	// orig holds the worksheet data as it was when it was initially loaded.
+	orig map[int]Value
+
+	// data holds all the worksheet data.
 	data map[int]Value
 }
 
 const (
 	// IndexId is the reserved index to store a worksheet's identifier.
-	IndexId = -1
+	IndexId = -2
 
 	// IndexVersion is the reserved index to store a worksheet's version.
-	IndexVersion = -2
+	IndexVersion = -1
 )
 
 // NewDefinitions parses a worksheet definition, and creates a worksheet
@@ -96,6 +98,7 @@ func (defs *Definitions) newUninitializedWorksheet(name string) (*Worksheet, err
 
 	ws := &Worksheet{
 		def:  def,
+		orig: make(map[int]Value),
 		data: make(map[int]Value),
 	}
 
@@ -164,17 +167,13 @@ func (ws *Worksheet) Set(name string, value string) error {
 	}
 
 	// store
-	ws.setAtIndex(index, lit)
-
-	return nil
-}
-
-func (ws *Worksheet) setAtIndex(index int, value Value) {
-	if value.Type().AssignableTo(&tUndefinedType{}) {
+	if lit.Type().AssignableTo(&tUndefinedType{}) {
 		delete(ws.data, index)
 	} else {
-		ws.data[index] = value
+		ws.data[index] = lit
 	}
+
+	return nil
 }
 
 func (ws *Worksheet) Unset(name string) error {
@@ -224,4 +223,34 @@ func (ws *Worksheet) Get(name string) (Value, error) {
 	}
 
 	return value, nil
+}
+
+func (ws *Worksheet) diff() map[int]Value {
+	fmt.Printf("ws.orig = %v\n", ws.orig)
+	fmt.Printf("ws.data = %v\n", ws.data)
+
+	allIndexes := make(map[int]bool)
+	for index := range ws.orig {
+		allIndexes[index] = true
+	}
+	for index := range ws.data {
+		allIndexes[index] = true
+	}
+
+	diff := make(map[int]Value)
+	for index := range allIndexes {
+		orig, hasOrig := ws.orig[index]
+		data, hasData := ws.data[index]
+		if hasOrig && !hasData {
+			diff[index] = &tUndefined{}
+		} else if !hasOrig && hasData {
+			diff[index] = data
+		} else if !orig.Equals(data) {
+			diff[index] = data
+		}
+	}
+
+	fmt.Printf("diff    = %v\n", diff)
+
+	return diff
 }

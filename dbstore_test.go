@@ -43,7 +43,7 @@ func (s *DbZuite) TestExample() {
 	require.Equal(s.T(), `"Alice"`, wsFromStore.MustGet("name").String())
 }
 
-func (s *DbZuite) TestSave_new() {
+func (s *DbZuite) TestSave() {
 	ws, err := s.store.defs.NewWorksheet("simple")
 	require.NoError(s.T(), err)
 
@@ -69,18 +69,18 @@ func (s *DbZuite) TestSave_new() {
 		{
 			Id:          IdAt(valuesRecs, 0),
 			WorksheetId: ws.Id(),
-			Index:       IndexVersion,
-			FromVersion: 1,
-			ToVersion:   math.MaxInt32,
-			Value:       `1`,
-		},
-		{
-			Id:          IdAt(valuesRecs, 1),
-			WorksheetId: ws.Id(),
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+		},
+		{
+			Id:          IdAt(valuesRecs, 1),
+			WorksheetId: ws.Id(),
+			Index:       IndexVersion,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `1`,
 		},
 		{
 			Id:          IdAt(valuesRecs, 2),
@@ -91,6 +91,9 @@ func (s *DbZuite) TestSave_new() {
 			Value:       `"Alice"`,
 		},
 	}, valuesRecs)
+
+	// Upon Save, orig needs to be set to data.
+	require.Empty(s.T(), ws.diff())
 }
 
 func (s *DbZuite) TestUpdate() {
@@ -110,7 +113,7 @@ func (s *DbZuite) TestUpdate() {
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		return session.Update(ws)
 	})
 
 	wsRecs, valuesRecs := s.DbState()
@@ -118,7 +121,7 @@ func (s *DbZuite) TestUpdate() {
 	require.Equal(s.T(), []rWorksheet{
 		{
 			Id:      ws.Id(),
-			Version: 1,
+			Version: 2,
 			Name:    "simple",
 		},
 	}, wsRecs)
@@ -127,28 +130,50 @@ func (s *DbZuite) TestUpdate() {
 		{
 			Id:          IdAt(valuesRecs, 0),
 			WorksheetId: ws.Id(),
-			Index:       IndexVersion,
-			FromVersion: 1,
-			ToVersion:   math.MaxInt32,
-			Value:       `1`,
-		},
-		{
-			Id:          IdAt(valuesRecs, 1),
-			WorksheetId: ws.Id(),
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
 		},
 		{
+			Id:          IdAt(valuesRecs, 1),
+			WorksheetId: ws.Id(),
+			Index:       IndexVersion,
+			FromVersion: 1,
+			ToVersion:   1,
+			Value:       `1`,
+		},
+		{
 			Id:          IdAt(valuesRecs, 2),
+			WorksheetId: ws.Id(),
+			Index:       IndexVersion,
+			FromVersion: 2,
+			ToVersion:   math.MaxInt32,
+			Value:       `2`,
+		},
+		{
+			Id:          IdAt(valuesRecs, 3),
 			WorksheetId: ws.Id(),
 			Index:       83,
 			FromVersion: 1,
-			ToVersion:   math.MaxInt32,
+			ToVersion:   1,
 			Value:       `"Alice"`,
 		},
+		{
+			Id:          IdAt(valuesRecs, 4),
+			WorksheetId: ws.Id(),
+			Index:       83,
+			FromVersion: 2,
+			ToVersion:   math.MaxInt32,
+			Value:       `"Bob"`,
+		},
 	}, valuesRecs)
+
+	// Upon update, version must increase
+	require.Equal(s.T(), 2, ws.Version())
+
+	// Upon Update, orig needs to be set to data.
+	require.Empty(s.T(), ws.diff())
 }
 
 func IdAt(s []rValue, index int) int64 {
