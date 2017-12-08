@@ -76,7 +76,7 @@ func runFeature(filename string) bool {
 		case *gherkin.Scenario:
 			runner := &runner{
 				currentDir: currentDir,
-				scenario:   child,
+				steps:      child.Steps,
 				sheets:     make(map[string]*worksheets.Worksheet),
 			}
 			err := runner.run()
@@ -96,14 +96,14 @@ func runFeature(filename string) bool {
 
 type runner struct {
 	currentDir string
-	scenario   *gherkin.Scenario
+	steps      []*gherkin.Step
 	defs       *worksheets.Definitions
 	sheets     map[string]*worksheets.Worksheet
 }
 
 func (r *runner) run() error {
 onto_next_step:
-	for _, step := range r.scenario.Steps {
+	for _, step := range r.steps {
 		for re, fn := range stepFuncs {
 			args := re.FindStringSubmatch(step.Text)
 			if args == nil {
