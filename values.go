@@ -144,6 +144,10 @@ func (value *tText) Equals(that Value) bool {
 	return value.value == typed.value
 }
 
+func NewBool(value bool) Value {
+	return &tBool{value}
+}
+
 func (value *tBool) Type() Type {
 	return &tBoolType{}
 }

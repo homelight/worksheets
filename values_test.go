@@ -40,6 +40,10 @@ func (s *Zuite) TestValueEquals() {
 	// a.k.a. congruence classes
 	buckets := [][]Value{
 		{
+			NewUndefined(),
+			NewUndefined(),
+		},
+		{
 			MustNewValue("1"),
 			MustNewValue("1"),
 		},
@@ -50,6 +54,18 @@ func (s *Zuite) TestValueEquals() {
 		{
 			NewText("Alice"),
 			NewText("Alice"),
+		},
+		{
+			NewText("Bob"),
+			NewText("Bob"),
+		},
+		{
+			NewBool(true),
+			NewBool(true),
+		},
+		{
+			NewBool(false),
+			NewBool(false),
 		},
 	}
 
@@ -68,5 +84,15 @@ func (s *Zuite) TestValueEquals() {
 	}
 
 	// across buckets, all values must not be equal
-	// TODO(pascal): todo
+	for i = 0; i < len(buckets); i++ {
+		for j = i + 1; j < len(buckets); j++ {
+			thisBucket := buckets[i]
+			thatBucket := buckets[j]
+			for _, this := range thisBucket {
+				for _, that := range thatBucket {
+					assert.True(s.T(), !this.Equals(that), "%s != %s", this, that)
+				}
+			}
+		}
+	}
 }
