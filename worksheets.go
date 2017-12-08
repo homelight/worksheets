@@ -51,9 +51,9 @@ const (
 
 // NewDefinitions parses a worksheet definition, and creates a worksheet
 // model from it.
-func NewDefinitions(src io.Reader) (*Definitions, error) {
+func NewDefinitions(reader io.Reader) (*Definitions, error) {
 	// TODO(pascal): support reading multiple worksheet definitions in one file
-	p := newParser(src)
+	p := newParser(reader)
 	def, err := p.parseWorksheet()
 	if err != nil {
 		return nil, err
@@ -73,12 +73,12 @@ func (defs *Definitions) NewWorksheet(name string) (*Worksheet, error) {
 
 	// uuid
 	id := uuid.NewV4()
-	if err := ws.Set("id", fmt.Sprintf(`"%s"`, id)); err != nil {
+	if err := ws.Set("id", NewText(id.String())); err != nil {
 		panic(fmt.Sprintf("unexpected %s", err))
 	}
 
 	// version
-	if err := ws.Set("version", strconv.Itoa(1)); err != nil {
+	if err := ws.Set("version", MustNewValue(strconv.Itoa(1))); err != nil {
 		panic(fmt.Sprintf("unexpected %s", err))
 	}
 
@@ -141,17 +141,11 @@ func (ws *Worksheet) Name() string {
 	return ws.def.name
 }
 
-func (ws *Worksheet) Set(name string, value string) error {
+func (ws *Worksheet) Set(name string, value Value) error {
 	// TODO(pascal): create a 'change', and then commit that change, garantee
 	// that commits are atomic, and either win or lose the race by using
 	// optimistic concurrency. Change must be a a Definition level, since it
 	// could span multiple worksheets at once.
-
-	// parse literal
-	lit, err := NewValue(value)
-	if err != nil {
-		return err
-	}
 
 	// lookup field by name
 	field, ok := ws.def.fieldsByName[name]
@@ -161,23 +155,23 @@ func (ws *Worksheet) Set(name string, value string) error {
 	index := field.index
 
 	// type check
-	litType := lit.Type()
+	litType := value.Type()
 	if ok := litType.AssignableTo(field.typ); !ok {
-		return fmt.Errorf("cannot assign %s to %s", lit, field.typ)
+		return fmt.Errorf("cannot assign %s to %s", value, field.typ)
 	}
 
 	// store
-	if lit.Type().AssignableTo(&tUndefinedType{}) {
+	if value.Type().AssignableTo(&tUndefinedType{}) {
 		delete(ws.data, index)
 	} else {
-		ws.data[index] = lit
+		ws.data[index] = value
 	}
 
 	return nil
 }
 
 func (ws *Worksheet) Unset(name string) error {
-	return ws.Set(name, "undefined")
+	return ws.Set(name, NewUndefined())
 }
 
 func (ws *Worksheet) IsSet(name string) (bool, error) {
@@ -226,9 +220,6 @@ func (ws *Worksheet) Get(name string) (Value, error) {
 }
 
 func (ws *Worksheet) diff() map[int]Value {
-	fmt.Printf("ws.orig = %v\n", ws.orig)
-	fmt.Printf("ws.data = %v\n", ws.data)
-
 	allIndexes := make(map[int]bool)
 	for index := range ws.orig {
 		allIndexes[index] = true
@@ -249,8 +240,6 @@ func (ws *Worksheet) diff() map[int]Value {
 			diff[index] = data
 		}
 	}
-
-	fmt.Printf("diff    = %v\n", diff)
 
 	return diff
 }

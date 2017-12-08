@@ -29,7 +29,7 @@ func (s *Zuite) TestExample() {
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), false, isSet)
 
-	err = ws.Set("name", `"Alice"`)
+	err = ws.Set("name", NewText("Alice"))
 	require.NoError(s.T(), err)
 
 	isSet, err = ws.IsSet("name")
@@ -102,7 +102,7 @@ func (s *Zuite) TestWorksheet_diff() {
 	}, ws.diff())
 
 	// set name to Alice
-	err = ws.Set("name", `"Alice"`)
+	err = ws.Set("name", NewText("Alice"))
 	require.NoError(s.T(), err)
 
 	// now, also expecting Alice
@@ -113,7 +113,7 @@ func (s *Zuite) TestWorksheet_diff() {
 	}, ws.diff())
 
 	// Alice is now Bob
-	err = ws.Set("name", `"Bob"`)
+	err = ws.Set("name", NewText("Bob"))
 	require.NoError(s.T(), err)
 
 	require.Equal(s.T(), map[int]Value{

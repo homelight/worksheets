@@ -60,6 +60,10 @@ func MustNewValue(value string) Value {
 	return lit
 }
 
+func NewUndefined() Value {
+	return &tUndefined{}
+}
+
 func (value *tUndefined) Type() Type {
 	return &tUndefinedType{}
 }

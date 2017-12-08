@@ -24,7 +24,7 @@ func (s *DbZuite) TestExample() {
 	ws, err := s.store.defs.NewWorksheet("simple")
 	require.NoError(s.T(), err)
 
-	err = ws.Set("name", `"Alice"`)
+	err = ws.Set("name", NewText("Alice"))
 	require.NoError(s.T(), err)
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -47,7 +47,7 @@ func (s *DbZuite) TestSave() {
 	ws, err := s.store.defs.NewWorksheet("simple")
 	require.NoError(s.T(), err)
 
-	err = ws.Set("name", `"Alice"`)
+	err = ws.Set("name", NewText("Alice"))
 	require.NoError(s.T(), err)
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -100,7 +100,7 @@ func (s *DbZuite) TestUpdate() {
 	ws, err := s.store.defs.NewWorksheet("simple")
 	require.NoError(s.T(), err)
 
-	err = ws.Set("name", `"Alice"`)
+	err = ws.Set("name", NewText("Alice"))
 	require.NoError(s.T(), err)
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -108,7 +108,7 @@ func (s *DbZuite) TestUpdate() {
 		return session.Save(ws)
 	})
 
-	err = ws.Set("name", `"Bob"`)
+	err = ws.Set("name", NewText("Bob"))
 	require.NoError(s.T(), err)
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
