@@ -76,7 +76,7 @@ func runFeature(filename string) bool {
 		case *gherkin.Scenario:
 			runner := &runner{
 				currentDir: currentDir,
-				scenario:   child,
+				steps:      child.Steps,
 				sheets:     make(map[string]*worksheets.Worksheet),
 			}
 			err := runner.run()
@@ -96,14 +96,14 @@ func runFeature(filename string) bool {
 
 type runner struct {
 	currentDir string
-	scenario   *gherkin.Scenario
+	steps      []*gherkin.Step
 	defs       *worksheets.Definitions
 	sheets     map[string]*worksheets.Worksheet
 }
 
 func (r *runner) run() error {
 onto_next_step:
-	for _, step := range r.scenario.Steps {
+	for _, step := range r.steps {
 		for re, fn := range stepFuncs {
 			args := re.FindStringSubmatch(step.Text)
 			if args == nil {
@@ -144,7 +144,7 @@ var stepFuncs = map[*regexp.Regexp]func(*runner, []string, interface{}) error{
 		return nil
 	},
 
-	re(`{name} = worksheet\({name}\)`): func(r *runner, args []string, extra interface{}) error {
+	re(`{name}|=|worksheet|\(|{name}|\)`): func(r *runner, args []string, extra interface{}) error {
 		varname, name := args[0], args[1]
 
 		var contents map[string]worksheets.Value
@@ -175,7 +175,7 @@ var stepFuncs = map[*regexp.Regexp]func(*runner, []string, interface{}) error{
 		return nil
 	},
 
-	re(`{name}\.{name} = {value}`): func(r *runner, args []string, _ interface{}) error {
+	re(`{name}|\.|{name}|=|{value}`): func(r *runner, args []string, _ interface{}) error {
 		varname, key, v := args[0], args[1], args[2]
 
 		ws, ok := r.sheets[varname]
@@ -213,7 +213,7 @@ var stepFuncs = map[*regexp.Regexp]func(*runner, []string, interface{}) error{
 			if err != nil {
 				return err
 			} else if !value.Equals(actual) {
-				return fmt.Errorf("%s: %s != %s", key, value, actual)
+				return fmt.Errorf("%s.%s expected %s, actual %s", varname, key, value, actual)
 			}
 		}
 
@@ -226,6 +226,7 @@ func re(s string) *regexp.Regexp {
 		`{name}`:  `([a-z](?:[a-z_]*[a-z])?)`,
 		`{value}`: `(.*)`,
 		` `:       `\s+`,
+		`|`:       `\s*`,
 	}
 	for from, to := range replacements {
 		s = strings.Replace(s, from, to, -1)

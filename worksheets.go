@@ -170,8 +170,22 @@ func (ws *Worksheet) Set(name string, value Value) error {
 	return nil
 }
 
+func (ws *Worksheet) MustUnset(name string) {
+	if err := ws.Unset(name); err != nil {
+		panic(err)
+	}
+}
+
 func (ws *Worksheet) Unset(name string) error {
 	return ws.Set(name, NewUndefined())
+}
+
+func (ws *Worksheet) MustIsSet(name string) bool {
+	isSet, err := ws.IsSet(name)
+	if err != nil {
+		panic(err)
+	}
+	return isSet
 }
 
 func (ws *Worksheet) IsSet(name string) (bool, error) {
