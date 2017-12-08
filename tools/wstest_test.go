@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/cucumber/gherkin-go"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/helloeave/worksheets"
@@ -43,17 +44,64 @@ func TestStep_instantiate(t *testing.T) {
 func TestStep_instantiateWithTable(t *testing.T) {
 	runner := newRunner([]*gherkin.Step{
 		{Text: "definitions example.ws"},
-		{
-			Text: "foo = worksheet(simple)",
-			Argument: newDataTable([][]string{
-				{"age", "78"},
-			}),
-		},
+		{Text: "foo = worksheet(simple)", Argument: newDataTable([][]string{
+			{"age", "78"},
+		})},
 	})
 	require.NoError(t, runner.run())
 
 	require.NotNil(t, runner.sheets["foo"])
 	require.Equal(t, "78", runner.sheets["foo"].MustGet("age").String())
+}
+
+func TestStep_set(t *testing.T) {
+	runner := newRunner([]*gherkin.Step{
+		{Text: "definitions example.ws"},
+		{Text: "foo = worksheet(simple)"},
+		{Text: "foo .age= 6"},
+	})
+	require.NoError(t, runner.run())
+
+	require.NotNil(t, runner.sheets["foo"])
+	require.Equal(t, "6", runner.sheets["foo"].MustGet("age").String())
+}
+
+func TestStep_setUnknownField(t *testing.T) {
+	runner := newRunner([]*gherkin.Step{
+		{Text: "definitions example.ws"},
+		{Text: "foo = worksheet(simple)"},
+		{Text: "foo.agge = 6"},
+	})
+	if err := runner.run(); assert.Error(t, err) {
+		require.Equal(t, "unknown field agge", err.Error())
+	}
+}
+
+func TestStep_unset(t *testing.T) {
+	runner := newRunner([]*gherkin.Step{
+		{Text: "definitions example.ws"},
+		{Text: "foo = worksheet(simple)"},
+		{Text: "foo.age = 6"},
+		{Text: "foo.age = undefined"},
+	})
+	require.NoError(t, runner.run())
+
+	require.NotNil(t, runner.sheets["foo"])
+	require.False(t, runner.sheets["foo"].MustIsSet("age"))
+}
+
+func TestStep_assert(t *testing.T) {
+	runner := newRunner([]*gherkin.Step{
+		{Text: "definitions example.ws"},
+		{Text: "foo = worksheet(simple)"},
+		{Text: "foo.age = 6"},
+		{Text: "foo", Argument: newDataTable([][]string{
+			{"age", "78"},
+		})},
+	})
+	if err := runner.run(); assert.Error(t, err) {
+		require.Equal(t, "foo.age expected 78, actual 6", err.Error())
+	}
 }
 
 func newRunner(steps []*gherkin.Step) *runner {
