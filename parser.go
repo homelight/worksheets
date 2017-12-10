@@ -99,6 +99,8 @@ var (
 	pRacco     = newTokenPattern("}", "\\}")
 	pLparen    = newTokenPattern("(", "\\(")
 	pRparen    = newTokenPattern(")", "\\)")
+	pLbracket  = newTokenPattern("[", "\\[")
+	pRbracket  = newTokenPattern("]", "\\]")
 	pColon     = newTokenPattern(":", ":")
 
 	// token patterns
@@ -212,7 +214,7 @@ func (p *parser) parseType() (Type, error) {
 	case "undefined":
 		return &tUndefinedType{}, nil
 	case "number":
-		_, err := p.nextAndCheck(pLparen)
+		_, err := p.nextAndCheck(pLbracket)
 		if err != nil {
 			return nil, err
 		}
@@ -225,7 +227,7 @@ func (p *parser) parseType() (Type, error) {
 			// unexpected since sIndex should conform to pIndex
 			panic(err)
 		}
-		_, err = p.nextAndCheck(pRparen)
+		_, err = p.nextAndCheck(pRbracket)
 		if err != nil {
 			return nil, err
 		}

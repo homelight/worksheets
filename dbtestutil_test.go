@@ -32,7 +32,7 @@ type DbZuite struct {
 const definitions = `
 worksheet simple {
 	83:name text
-	91:age  number(0)
+	91:age  number[0]
 }`
 
 func (s *DbZuite) SetupSuite() {

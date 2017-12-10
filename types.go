@@ -65,5 +65,5 @@ func (typ *tNumberType) AssignableTo(u Type) bool {
 }
 
 func (typ *tNumberType) String() string {
-	return fmt.Sprintf("number(%d)", typ.scale)
+	return fmt.Sprintf("number[%d]", typ.scale)
 }

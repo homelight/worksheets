@@ -105,7 +105,7 @@ func (s *Zuite) TestParser_parseType() {
 		`undefined`: &tUndefinedType{},
 		`text`:      &tTextType{},
 		`bool`:      &tBoolType{},
-		`number(5)`: &tNumberType{5},
+		`number[5]`: &tNumberType{5},
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))

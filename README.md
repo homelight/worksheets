@@ -289,7 +289,7 @@ when iterating over maps, iteration order is the order in which items were added
 have a way to have 'interface' worksheets which expose set of fields, e.g.
 
 	view income {
-		yearly_gross_income number(2)
+		yearly_gross_income number[2]
 	}
 
 and then describe certain worksheets as conforming with these views
