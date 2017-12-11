@@ -36,7 +36,7 @@ func (s *Zuite) TestValueString() {
 	}
 }
 
-func (s *Zuite) TestValueEquals() {
+func (s *Zuite) TestValueEqual() {
 	// a.k.a. congruence classes
 	buckets := [][]Value{
 		{
@@ -78,7 +78,7 @@ func (s *Zuite) TestValueEquals() {
 			for j = i + 1; j < len(bucket); j++ {
 				this := bucket[i]
 				that := bucket[j]
-				assert.True(s.T(), this.Equals(that), "%s == %s", this, that)
+				assert.True(s.T(), this.Equal(that), "%s == %s", this, that)
 			}
 		}
 	}
@@ -90,7 +90,7 @@ func (s *Zuite) TestValueEquals() {
 			thatBucket := buckets[j]
 			for _, this := range thisBucket {
 				for _, that := range thatBucket {
-					assert.True(s.T(), !this.Equals(that), "%s != %s", this, that)
+					assert.True(s.T(), !this.Equal(that), "%s != %s", this, that)
 				}
 			}
 		}

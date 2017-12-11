@@ -24,8 +24,8 @@ type Value interface {
 	// Type returns this value's type.
 	Type() Type
 
-	// Equals returns a comparison on this value against that value.
-	Equals(that Value) bool
+	// Equal returns a comparison on this value against that value.
+	Equal(that Value) bool
 
 	// String returns a string representation of the value.
 	String() string
@@ -68,7 +68,7 @@ func (value *tUndefined) Type() Type {
 	return &tUndefinedType{}
 }
 
-func (value *tUndefined) Equals(that Value) bool {
+func (value *tUndefined) Equal(that Value) bool {
 	_, ok := that.(*tUndefined)
 	return ok
 }
@@ -81,7 +81,7 @@ func (value *tNumber) Type() Type {
 	return value.typ
 }
 
-func (value *tNumber) Equals(that Value) bool {
+func (value *tNumber) Equal(that Value) bool {
 	typed, ok := that.(*tNumber)
 	if !ok {
 		return false
@@ -136,7 +136,7 @@ func (value *tText) String() string {
 	return strconv.Quote(value.value)
 }
 
-func (value *tText) Equals(that Value) bool {
+func (value *tText) Equal(that Value) bool {
 	typed, ok := that.(*tText)
 	if !ok {
 		return false
@@ -152,7 +152,7 @@ func (value *tBool) Type() Type {
 	return &tBoolType{}
 }
 
-func (value *tBool) Equals(that Value) bool {
+func (value *tBool) Equal(that Value) bool {
 	typed, ok := that.(*tBool)
 	if !ok {
 		return false

@@ -212,7 +212,7 @@ var stepFuncs = map[*regexp.Regexp]func(*runner, []string, interface{}) error{
 			actual, err := ws.Get(key)
 			if err != nil {
 				return err
-			} else if !value.Equals(actual) {
+			} else if !value.Equal(actual) {
 				return fmt.Errorf("%s.%s expected %s, actual %s", varname, key, value, actual)
 			}
 		}

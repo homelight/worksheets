@@ -264,7 +264,7 @@ func (ws *Worksheet) diff() map[int]Value {
 			diff[index] = &tUndefined{}
 		} else if !hasOrig && hasData {
 			diff[index] = data
-		} else if !orig.Equals(data) {
+		} else if !orig.Equal(data) {
 			diff[index] = data
 		}
 	}
