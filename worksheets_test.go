@@ -22,8 +22,7 @@ func (s *Zuite) TestExample() {
 	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
 	require.NoError(s.T(), err)
 
-	ws, err := defs.NewWorksheet("simple")
-	require.NoError(s.T(), err)
+	ws := defs.MustNewWorksheet("simple")
 
 	isSet, err := ws.IsSet("name")
 	require.NoError(s.T(), err)

@@ -21,11 +21,8 @@ import (
 )
 
 func (s *DbZuite) TestExample() {
-	ws, err := s.store.defs.NewWorksheet("simple")
-	require.NoError(s.T(), err)
-
-	err = ws.Set("name", NewText("Alice"))
-	require.NoError(s.T(), err)
+	ws := s.store.defs.MustNewWorksheet("simple")
+	ws.MustSet("name", NewText("Alice"))
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)

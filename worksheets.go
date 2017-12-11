@@ -65,6 +65,14 @@ func NewDefinitions(reader io.Reader) (*Definitions, error) {
 	}, nil
 }
 
+func (defs *Definitions) MustNewWorksheet(name string) *Worksheet {
+	ws, err := defs.NewWorksheet(name)
+	if err != nil {
+		panic(err)
+	}
+	return ws
+}
+
 func (defs *Definitions) NewWorksheet(name string) (*Worksheet, error) {
 	ws, err := defs.newUninitializedWorksheet(name)
 	if err != nil {
@@ -139,6 +147,12 @@ func (ws *Worksheet) Version() int {
 func (ws *Worksheet) Name() string {
 	// TODO(pascal): consider having ws.Type().Name() instead
 	return ws.def.name
+}
+
+func (ws *Worksheet) MustSet(name string, value Value) {
+	if err := ws.Set(name, value); err != nil {
+		panic(err)
+	}
 }
 
 func (ws *Worksheet) Set(name string, value Value) error {
