@@ -15,6 +15,7 @@ package worksheets
 import (
 	"strings"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -50,13 +51,16 @@ func (s *Zuite) TestExample() {
 func (s *Zuite) TestWorksheetNew_zeroDefs() {
 	wsDefs := []string{
 		``,
+		` `,
 		`some text`,
 		`not a worksheet`,
 		`work sheet`,
 	}
 	for _, def := range wsDefs {
 		_, err := NewDefinitions(strings.NewReader(def))
-		require.Error(s.T(), err)
+		if assert.Error(s.T(), err) {
+			require.Equal(s.T(), "no worksheets defined", err.Error())
+		}
 	}
 }
 
@@ -64,24 +68,20 @@ func (s *Zuite) TestWorksheetNew_multipleDefs() {
 	wsDefs := `worksheet one {1:name text} worksheet two {1:occupation text}`
 	defs, err := NewDefinitions(strings.NewReader(wsDefs))
 	require.NoError(s.T(), err)
+	require.Equal(s.T(), 2, len(defs.defs))
 
-	ws, err := defs.NewWorksheet("one")
-	require.NoError(s.T(), err)
-	isSet, err := ws.IsSet("name")
-	require.NoError(s.T(), err)
-	require.False(s.T(), isSet)
-
-	ws, err = defs.NewWorksheet("two")
-	require.NoError(s.T(), err)
-	isSet, err = ws.IsSet("occupation")
-	require.NoError(s.T(), err)
-	require.False(s.T(), isSet)
+	for _, wsName := range []string{"one", "two"} {
+		_, ok := defs.defs[wsName]
+		require.True(s.T(), ok)
+	}
 }
 
 func (s *Zuite) TestWorksheetNew_multipleDefsSameName() {
 	wsDefs := `worksheet simple {1:name text} worksheet simple {1:occupation text}`
 	_, err := NewDefinitions(strings.NewReader(wsDefs))
-	require.Error(s.T(), err)
+	if assert.Error(s.T(), err) {
+		require.Equal(s.T(), "multiple worksheets with name simple", err.Error())
+	}
 }
 
 func (s *Zuite) TestWorksheetNew_origEmpty() {
