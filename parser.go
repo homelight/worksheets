@@ -94,14 +94,16 @@ type tBool struct {
 
 var (
 	// tokens
-	pWorksheet = newTokenPattern("worksheet", "worksheet")
-	pLacco     = newTokenPattern("{", "\\{")
-	pRacco     = newTokenPattern("}", "\\}")
-	pLparen    = newTokenPattern("(", "\\(")
-	pRparen    = newTokenPattern(")", "\\)")
-	pLbracket  = newTokenPattern("[", "\\[")
-	pRbracket  = newTokenPattern("]", "\\]")
-	pColon     = newTokenPattern(":", ":")
+	pLacco      = newTokenPattern("{", "\\{")
+	pRacco      = newTokenPattern("}", "\\}")
+	pLparen     = newTokenPattern("(", "\\(")
+	pRparen     = newTokenPattern(")", "\\)")
+	pLbracket   = newTokenPattern("[", "\\[")
+	pRbracket   = newTokenPattern("]", "\\]")
+	pColon      = newTokenPattern(":", ":")
+	pWorksheet  = newTokenPattern("worksheet", "worksheet")
+	pComputedBy = newTokenPattern("computed_by", "computed_by")
+	pExternal   = newTokenPattern("external", "external")
 
 	// token patterns
 	pName   = newTokenPattern("name", "[a-z]+([a-z_]*[a-z])?")
@@ -167,7 +169,7 @@ func (p *parser) parseWorksheet() (*tWorksheet, error) {
 		return nil, err
 	}
 
-	for token := p.peek(); token != "}"; token = p.peek() {
+	for !p.peek(pRacco) {
 		field, err := p.parseField()
 		if err != nil {
 			return nil, err
@@ -211,6 +213,25 @@ func (p *parser) parseField() (*tField, error) {
 		return nil, err
 	}
 
+	if p.peek(pComputedBy) {
+		_, err = p.nextAndCheck(pComputedBy)
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = p.nextAndCheck(pLacco)
+		if err != nil {
+			return nil, err
+		}
+
+		p.parseExpression()
+
+		_, err = p.nextAndCheck(pRacco)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	f := &tField{
 		index: index,
 		name:  name,
@@ -218,6 +239,24 @@ func (p *parser) parseField() (*tField, error) {
 	}
 
 	return f, nil
+}
+
+type tExpression interface{}
+
+// Assert that all expression struct are tExpressions.
+var _ = []tExpression{
+	&tExternal{},
+}
+
+type tExternal struct{}
+
+func (p *parser) parseExpression() (tExpression, error) {
+	_, err := p.nextAndCheck(pExternal)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tExternal{}, nil
 }
 
 func (p *parser) parseType() (Type, error) {
@@ -337,8 +376,15 @@ func (p *parser) next() string {
 	}
 }
 
-func (p *parser) peek() string {
+func (p *parser) peek(maybes ...*tokenPattern) bool {
 	token := p.next()
 	p.toks = append(p.toks, token)
-	return token
+
+	for _, maybe := range maybes {
+		if maybe.re.MatchString(token) {
+			return true
+		}
+	}
+
+	return false
 }

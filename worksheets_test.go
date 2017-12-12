@@ -84,6 +84,14 @@ func (s *Zuite) TestWorksheetNew_multipleDefsSameName() {
 	}
 }
 
+func (s *Zuite) TestExample_externalComputedBy() {
+	_, err := NewDefinitions(strings.NewReader(`worksheet simple {
+		1:name text
+		2:hello_name text computed_by { external }
+	}`))
+	require.NoError(s.T(), err)
+}
+
 func (s *Zuite) TestWorksheetNew_origEmpty() {
 	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
 	require.NoError(s.T(), err)
