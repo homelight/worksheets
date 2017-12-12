@@ -53,12 +53,12 @@ const (
 // model from it.
 func NewDefinitions(reader io.Reader) (*Definitions, error) {
 	p := newParser(reader)
-	wsDefs, err := p.parseWorksheets()
+	defs, err := p.parseWorksheets()
 	if err != nil {
 		return nil, err
 	}
 	return &Definitions{
-		defs: wsDefs,
+		defs: defs,
 	}, nil
 }
 

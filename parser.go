@@ -113,7 +113,7 @@ var (
 func (p *parser) parseWorksheets() (map[string]*tWorksheet, error) {
 	wsDefs := make(map[string]*tWorksheet)
 
-	for p.peek() == "worksheet" { // TODO: jjw: use actual token
+	for p.peek() == pWorksheet.name {
 		def, err := p.parseWorksheet()
 		if err != nil {
 			return nil, err
