@@ -317,6 +317,17 @@ func (p *parser) next() string {
 	}
 }
 
+func (p *parser) peekAndCheck(expected *tokenPattern) (string, error) {
+	token := p.peek()
+
+	var err error
+	if !expected.re.MatchString(token) {
+		err = fmt.Errorf("expected %s, found %s", expected.name, token)
+	}
+
+	return token, err
+}
+
 func (p *parser) peek() string {
 	token := p.next()
 	p.toks = append(p.toks, token)

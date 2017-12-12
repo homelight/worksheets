@@ -49,19 +49,27 @@ const (
 	IndexVersion = -1
 )
 
-// NewDefinitions parses a worksheet definition, and creates a worksheet
+// NewDefinitions parses a worksheet definition file, and creates a worksheet
 // model from it.
 func NewDefinitions(reader io.Reader) (*Definitions, error) {
-	// TODO(pascal): support reading multiple worksheet definitions in one file
+	wsNameToDef := make(map[string]*tWorksheet)
+
 	p := newParser(reader)
-	def, err := p.parseWorksheet()
-	if err != nil {
-		return nil, err
+
+	// TODO: jjw: move to parser.go as parseWorksheets, then call here
+	for p.peek() == "worksheet" { // TODO: jjw: use tok instead of string
+		def, err := p.parseWorksheet()
+		if err != nil {
+			return nil, err
+		}
+		if _, exists := wsNameToDef[def.name]; exists {
+			return nil, fmt.Errorf("multiple worksheets with name %s", def.name)
+		}
+		wsNameToDef[def.name] = def
 	}
+
 	return &Definitions{
-		defs: map[string]*tWorksheet{
-			def.name: def,
-		},
+		defs: wsNameToDef,
 	}, nil
 }
 
