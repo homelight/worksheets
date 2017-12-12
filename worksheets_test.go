@@ -47,6 +47,14 @@ func (s *Zuite) TestExample() {
 	require.Equal(s.T(), false, isSet)
 }
 
+func (s *Zuite) TestWorksheetNew_zeroDefs() {
+	_, err := NewDefinitions(strings.NewReader(``))
+	require.Error(s.T(), err)
+
+	_, err = NewDefinitions(strings.NewReader(`not a worksheet`))
+	require.Error(s.T(), err)
+}
+
 func (s *Zuite) TestWorksheetNew_multipleDefs() {
 	wsDefs := `worksheet one {1:name text} worksheet two {1:occupation text}`
 	defs, err := NewDefinitions(strings.NewReader(wsDefs))

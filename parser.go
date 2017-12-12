@@ -110,6 +110,26 @@ var (
 	pString = newTokenPattern("string", "\".*\"")
 )
 
+func (p *parser) parseWorksheets() (map[string]*tWorksheet, error) {
+	wsDefs := make(map[string]*tWorksheet)
+
+	for p.peek() == "worksheet" { // TODO: jjw: use actual token
+		def, err := p.parseWorksheet()
+		if err != nil {
+			return nil, err
+		}
+		if _, exists := wsDefs[def.name]; exists {
+			return nil, fmt.Errorf("multiple worksheets with name %s", def.name)
+		}
+		wsDefs[def.name] = def
+	}
+	if len(wsDefs) == 0 {
+		return nil, fmt.Errorf("no worksheets defined")
+	}
+
+	return wsDefs, nil
+}
+
 func (p *parser) parseWorksheet() (*tWorksheet, error) {
 	// initialize tWorksheet
 	ws := tWorksheet{

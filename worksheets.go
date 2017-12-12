@@ -52,24 +52,13 @@ const (
 // NewDefinitions parses a worksheet definition file, and creates a worksheet
 // model from it.
 func NewDefinitions(reader io.Reader) (*Definitions, error) {
-	wsNameToDef := make(map[string]*tWorksheet)
-
 	p := newParser(reader)
-
-	// TODO: jjw: move to parser.go as parseWorksheets, then call here
-	for p.peek() == "worksheet" { // TODO: jjw: use tok instead of string
-		def, err := p.parseWorksheet()
-		if err != nil {
-			return nil, err
-		}
-		if _, exists := wsNameToDef[def.name]; exists {
-			return nil, fmt.Errorf("multiple worksheets with name %s", def.name)
-		}
-		wsNameToDef[def.name] = def
+	wsDefs, err := p.parseWorksheets()
+	if err != nil {
+		return nil, err
 	}
-
 	return &Definitions{
-		defs: wsNameToDef,
+		defs: wsDefs,
 	}, nil
 }
 
