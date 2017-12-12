@@ -27,14 +27,14 @@ func (s *Zuite) TestExample() {
 
 	isSet, err := ws.IsSet("name")
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), false, isSet)
+	require.False(s.T(), isSet)
 
 	err = ws.Set("name", NewText("Alice"))
 	require.NoError(s.T(), err)
 
 	isSet, err = ws.IsSet("name")
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), true, isSet)
+	require.True(s.T(), isSet)
 
 	name, err := ws.Get("name")
 	require.NoError(s.T(), err)
@@ -45,7 +45,7 @@ func (s *Zuite) TestExample() {
 
 	isSet, err = ws.IsSet("name")
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), false, isSet)
+	require.False(s.T(), isSet)
 }
 
 func (s *Zuite) TestWorksheetNew_zeroDefs() {
