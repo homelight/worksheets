@@ -47,6 +47,30 @@ func (s *Zuite) TestExample() {
 	require.Equal(s.T(), false, isSet)
 }
 
+func (s *Zuite) TestWorksheetNew_multipleDefs() {
+	wsDefs := `worksheet one {1:name text} worksheet two {1:occupation text}`
+	defs, err := NewDefinitions(strings.NewReader(wsDefs))
+	require.NoError(s.T(), err)
+
+	ws, err := defs.NewWorksheet("one")
+	require.NoError(s.T(), err)
+	isSet, err := ws.IsSet("name")
+	require.NoError(s.T(), err)
+	require.False(s.T(), isSet)
+
+	ws, err = defs.NewWorksheet("two")
+	require.NoError(s.T(), err)
+	isSet, err = ws.IsSet("occupation")
+	require.NoError(s.T(), err)
+	require.False(s.T(), isSet)
+}
+
+func (s *Zuite) TestWorksheetNew_multipleDefsRepeatedName() {
+	wsDefs := `worksheet simple {1:name text} worksheet simple {1:occupation text}`
+	_, err := NewDefinitions(strings.NewReader(wsDefs))
+	require.Error(s.T(), err)
+}
+
 func (s *Zuite) TestWorksheetNew_origEmpty() {
 	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
 	require.NoError(s.T(), err)
