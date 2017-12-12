@@ -39,11 +39,11 @@ And retrieve the worksheet
 
 If you want to contribute, you can get tests running locally as follows:
 
-1. `cd path/to/worksheets/repo`
+1. `$ cd path/to/worksheets`
 2. `$ createuser --createdb ws_user`
 3. `$ createdb --username=ws_user ws_test`
 4. `$ psql -U ws_user ws_test -f schema.sql`
-5. `$ go test -v`
+5. `$ go test -v ./...` (for all tests), or `$ go test -v ./... -testify.m <TestName>` (for individual tests)
 
 # Worksheet Definition
 
