@@ -48,11 +48,16 @@ func (s *Zuite) TestExample() {
 }
 
 func (s *Zuite) TestWorksheetNew_zeroDefs() {
-	_, err := NewDefinitions(strings.NewReader(``))
-	require.Error(s.T(), err)
-
-	_, err = NewDefinitions(strings.NewReader(`not a worksheet`))
-	require.Error(s.T(), err)
+	wsDefs := []string{
+		``,
+		`some text`,
+		`not a worksheet`,
+		`work sheet`,
+	}
+	for _, def := range wsDefs {
+		_, err := NewDefinitions(strings.NewReader(def))
+		require.Error(s.T(), err)
+	}
 }
 
 func (s *Zuite) TestWorksheetNew_multipleDefs() {
@@ -73,7 +78,7 @@ func (s *Zuite) TestWorksheetNew_multipleDefs() {
 	require.False(s.T(), isSet)
 }
 
-func (s *Zuite) TestWorksheetNew_multipleDefsRepeatedName() {
+func (s *Zuite) TestWorksheetNew_multipleDefsSameName() {
 	wsDefs := `worksheet simple {1:name text} worksheet simple {1:occupation text}`
 	_, err := NewDefinitions(strings.NewReader(wsDefs))
 	require.Error(s.T(), err)
