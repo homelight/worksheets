@@ -41,6 +41,10 @@ type tWorksheet struct {
 	fields        []*tField
 	fieldsByName  map[string]*tField
 	fieldsByIndex map[int]*tField
+
+	// derived values handling
+	externals  map[int]ComputedBy
+	dependants map[int][]int
 }
 
 func (ws *tWorksheet) addField(field *tField) error {
@@ -60,11 +64,11 @@ func (ws *tWorksheet) addField(field *tField) error {
 }
 
 type tField struct {
-	index int
-	name  string
-	typ   Type
+	index      int
+	name       string
+	typ        Type
+	computedBy expression
 	// also need constrainedBy *tExpression
-	// also need computedBy    *tExpression
 }
 
 type tUndefinedType struct{}
@@ -213,6 +217,7 @@ func (p *parser) parseField() (*tField, error) {
 		return nil, err
 	}
 
+	var computedBy expression
 	if p.peek(pComputedBy) {
 		_, err = p.nextAndCheck(pComputedBy)
 		if err != nil {
@@ -224,7 +229,10 @@ func (p *parser) parseField() (*tField, error) {
 			return nil, err
 		}
 
-		p.parseExpression()
+		computedBy, err = p.parseExpression()
+		if err != nil {
+			return nil, err
+		}
 
 		_, err = p.nextAndCheck(pRacco)
 		if err != nil {
@@ -233,24 +241,18 @@ func (p *parser) parseField() (*tField, error) {
 	}
 
 	f := &tField{
-		index: index,
-		name:  name,
-		typ:   typ,
+		index:      index,
+		name:       name,
+		typ:        typ,
+		computedBy: computedBy,
 	}
 
 	return f, nil
 }
 
-type tExpression interface{}
-
-// Assert that all expression struct are tExpressions.
-var _ = []tExpression{
-	&tExternal{},
-}
-
 type tExternal struct{}
 
-func (p *parser) parseExpression() (tExpression, error) {
+func (p *parser) parseExpression() (expression, error) {
 	_, err := p.nextAndCheck(pExternal)
 	if err != nil {
 		return nil, err

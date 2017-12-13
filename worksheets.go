@@ -49,14 +49,79 @@ const (
 	IndexVersion = -1
 )
 
-// NewDefinitions parses a worksheet definition file, and creates a worksheet
+type ComputedBy interface {
+	Args() []string
+	Compute(...Value) Value
+}
+
+type Options struct {
+	// Plugins is a map of workshet names, to field names, to plugins for
+	// externally computed fields.
+	Plugins map[string]map[string]ComputedBy
+}
+
+// NewDefinitions parses a worksheet definition, and creates a worksheet
 // model from it.
-func NewDefinitions(reader io.Reader) (*Definitions, error) {
+func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
+	if 1 < len(opts) {
+		return nil, fmt.Errorf("too many options provided")
+	}
+
+	// TODO(pascal): support reading multiple worksheet definitions in one file
 	p := newParser(reader)
 	defs, err := p.parseWorksheets()
 	if err != nil {
 		return nil, err
 	}
+	defs := map[string]*tWorksheet{
+		def.name: def,
+	}
+
+	if len(opts) == 1 {
+		opt := opts[0]
+		for name, plugins := range opt.Plugins {
+			def, ok := defs[name]
+			if !ok {
+				return nil, fmt.Errorf("plugins: unknown worksheet(%s)", name)
+			}
+			def.dependants = make(map[int][]int)
+			for fieldName, plugin := range plugins {
+				field, ok := def.fieldsByName[fieldName]
+				if !ok {
+					return nil, fmt.Errorf("plugins: unknown field %s.%s", name, fieldName)
+				}
+				if _, ok := field.computedBy.(*tExternal); !ok {
+					return nil, fmt.Errorf("plugins: field %s.%s not externally defined", name, fieldName)
+				}
+				args := plugin.Args()
+				if len(args) == 0 {
+					return nil, fmt.Errorf("plugins: %s.%s plugin has no dependencies", name, fieldName)
+				}
+				for _, argName := range args {
+					dependant, ok := def.fieldsByName[argName]
+					if !ok {
+						return nil, fmt.Errorf("plugins: %s.%s plugin has incorrect arg %s", name, fieldName, argName)
+					}
+					if _, ok := def.dependants[dependant.index]; !ok {
+						def.dependants[dependant.index] = make([]int, 0)
+					}
+					def.dependants[dependant.index] = append(def.dependants[dependant.index], field.index)
+
+				}
+				field.computedBy = &ePlugin{plugin}
+			}
+		}
+	}
+
+	// Any unresolved externals?
+	for _, def := range defs {
+		for _, field := range def.fields {
+			if _, ok := field.computedBy.(*tExternal); ok {
+				return nil, fmt.Errorf("plugins: missing plugin for %s.%s", def.name, field.name)
+			}
+		}
+	}
+
 	return &Definitions{
 		defs: defs,
 	}, nil
@@ -163,6 +228,15 @@ func (ws *Worksheet) Set(name string, value Value) error {
 	if !ok {
 		return fmt.Errorf("unknown field %s", name)
 	}
+
+	// make sure we're not setting a derived field
+	// TODO(alex): test and all
+
+	err := ws.set(field, value)
+	return err
+}
+
+func (ws *Worksheet) set(field *tField, value Value) error {
 	index := field.index
 
 	// type check
@@ -176,6 +250,15 @@ func (ws *Worksheet) Set(name string, value Value) error {
 		delete(ws.data, index)
 	} else {
 		ws.data[index] = value
+	}
+
+	// if this field is an ascendant to any other, recompute them
+	for _, dependantIndex := range ws.def.dependants[index] {
+		dependant := ws.def.fieldsByIndex[dependantIndex]
+		updatedValue := dependant.computedBy.Compute(ws)
+		if err := ws.set(dependant, updatedValue); err != nil {
+			return err
+		}
 	}
 
 	return nil
