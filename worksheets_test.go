@@ -13,6 +13,8 @@
 package worksheets
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/stretchr/testify/assert"
@@ -149,6 +151,54 @@ func (sa sayAlice) Compute(...Value) Value {
 	return NewText("Alice")
 }
 
+type fullName []string
+
+var _ ComputedBy = fullName([]string{})
+
+func (fn fullName) Args() []string {
+	return fn
+}
+
+func (fn fullName) Compute(values ...Value) Value {
+	firstName := values[0].String()
+	lastName := values[1].String()
+	firstName = firstName[1 : len(firstName)-1]
+	lastName = lastName[1 : len(lastName)-1]
+	return NewText(fmt.Sprintf("%s %s", firstName, lastName))
+}
+
+type age []string
+
+var _ ComputedBy = age([]string{})
+
+func (fn age) Args() []string {
+	return fn
+}
+
+func (fn age) Compute(values ...Value) Value {
+	birthYearStr := values[0].String()
+	birthYear, _ := strconv.ParseInt(birthYearStr, 10, 32)
+	value, _ := NewValue(strconv.FormatInt(2018-birthYear, 10))
+	return value
+}
+
+type bio []string
+
+var _ ComputedBy = bio([]string{})
+
+func (fn bio) Args() []string {
+	return fn
+}
+
+func (fn bio) Compute(values ...Value) Value {
+	fullName := values[0].String()
+	birthYear := values[1].String()
+	age := values[2].String()
+	fullName = fullName[1 : len(fullName)-1]
+
+	return NewText(fmt.Sprintf("%s, age %s, born in %s", fullName, age, birthYear))
+}
+
 func (s *Zuite) TestExample_externalComputedBy4point5() {
 	opt := Options{
 		Plugins: map[string]map[string]ComputedBy{
@@ -203,6 +253,36 @@ func (s *Zuite) TestExternalComputedBy_good() {
 
 	ws.MustSet("age", MustNewValue("73"))
 	require.Equal(s.T(), `"Alice"`, ws.MustGet("name").String())
+}
+
+func (s *Zuite) TestExternalComputedBy_goodComplicated() {
+	opt := Options{
+		Plugins: map[string]map[string]ComputedBy{
+			"complicated": map[string]ComputedBy{
+				"full_name": fullName([]string{"first_name", "last_name"}),
+				"age":       age([]string{"birth_year"}),
+				"bio":       bio([]string{"full_name", "birth_year", "age"}),
+			},
+		},
+	}
+	defs, err := NewDefinitions(strings.NewReader(`worksheet complicated {
+		1:first_name text
+		2:last_name text
+		3:full_name text computed_by { external }
+		4:birth_year number[0]
+		5:age number[0] computed_by { external }
+		6:bio text computed_by { external }
+	}`), opt)
+	require.NoError(s.T(), err)
+
+	ws := defs.MustNewWorksheet("complicated")
+
+	require.False(s.T(), ws.MustIsSet("full_name"))
+
+	ws.MustSet("first_name", NewText("Alice"))
+	ws.MustSet("last_name", NewText("Maters"))
+	ws.MustSet("birth_year", MustNewValue("1945"))
+	require.Equal(s.T(), `"Alice Maters, age 73, born in 1945"`, ws.MustGet("bio").String())
 }
 
 func (s *Zuite) TestWorksheetNew_origEmpty() {
