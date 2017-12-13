@@ -229,8 +229,9 @@ func (ws *Worksheet) Set(name string, value Value) error {
 		return fmt.Errorf("unknown field %s", name)
 	}
 
-	// make sure we're not setting a derived field
-	// TODO(alex): test and all
+	if field.computedBy != nil {
+		return fmt.Errorf("cannot assign to computed field %s", name)
+	}
 
 	err := ws.set(field, value)
 	return err

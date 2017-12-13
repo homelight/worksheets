@@ -139,6 +139,28 @@ func (s *Zuite) TestExample_externalComputedBy4() {
 	}
 }
 
+func (s *Zuite) TestExample_externalComputedBy6() {
+	opt := Options{
+		Plugins: map[string]map[string]ComputedBy{
+			"simple": map[string]ComputedBy{
+				"name": sayAlice([]string{"age"}),
+			},
+		},
+	}
+	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {
+		1:name text computed_by { external }
+		2:age number[0]
+	}`), opt)
+	require.NoError(s.T(), err)
+
+	ws := defs.MustNewWorksheet("simple")
+
+	err = ws.Set("name", NewText("Alex"))
+	if assert.Error(s.T(), err) {
+		require.Equal(s.T(), "cannot assign to computed field name", err.Error())
+	}
+}
+
 type sayAlice []string
 
 var _ ComputedBy = sayAlice([]string{})
