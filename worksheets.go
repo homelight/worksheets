@@ -67,14 +67,10 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 		return nil, fmt.Errorf("too many options provided")
 	}
 
-	// TODO(pascal): support reading multiple worksheet definitions in one file
 	p := newParser(reader)
 	defs, err := p.parseWorksheets()
 	if err != nil {
 		return nil, err
-	}
-	defs := map[string]*tWorksheet{
-		def.name: def,
 	}
 
 	if len(opts) == 1 {
