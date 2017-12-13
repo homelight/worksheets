@@ -202,7 +202,7 @@ func (s *Zuite) TestExternalComputedBy_good() {
 	require.False(s.T(), ws.MustIsSet("name"))
 
 	ws.MustSet("age", MustNewValue("73"))
-	require.Equal(s.T(), "Alice", ws.MustGet("name").String())
+	require.Equal(s.T(), `"Alice"`, ws.MustGet("name").String())
 }
 
 func (s *Zuite) TestWorksheetNew_origEmpty() {

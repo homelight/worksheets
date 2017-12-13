@@ -27,6 +27,11 @@ type ePlugin struct {
 func (e *ePlugin) Compute(ws *Worksheet) Value {
 	args := e.computedBy.Args()
 	values := make([]Value, len(args), len(args))
+	for i, arg := range args {
+		value := ws.MustGet(arg)
+		values[i] = value
+	}
+	return e.computedBy.Compute(values...)
 }
 
 // Assert that all expression struct are tExpressions.
