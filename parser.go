@@ -44,7 +44,7 @@ type tWorksheet struct {
 
 	// derived values handling
 	externals  map[int]ComputedBy
-	dependants map[int][]int
+	dependents map[int][]int
 }
 
 func (ws *tWorksheet) addField(field *tField) error {

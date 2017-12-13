@@ -84,7 +84,7 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 			if !ok {
 				return nil, fmt.Errorf("plugins: unknown worksheet(%s)", name)
 			}
-			def.dependants = make(map[int][]int)
+			def.dependents = make(map[int][]int)
 			for fieldName, plugin := range plugins {
 				field, ok := def.fieldsByName[fieldName]
 				if !ok {
@@ -98,14 +98,14 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 					return nil, fmt.Errorf("plugins: %s.%s plugin has no dependencies", name, fieldName)
 				}
 				for _, argName := range args {
-					dependant, ok := def.fieldsByName[argName]
+					dependent, ok := def.fieldsByName[argName]
 					if !ok {
 						return nil, fmt.Errorf("plugins: %s.%s plugin has incorrect arg %s", name, fieldName, argName)
 					}
-					if _, ok := def.dependants[dependant.index]; !ok {
-						def.dependants[dependant.index] = make([]int, 0)
+					if _, ok := def.dependents[dependent.index]; !ok {
+						def.dependents[dependent.index] = make([]int, 0)
 					}
-					def.dependants[dependant.index] = append(def.dependants[dependant.index], field.index)
+					def.dependents[dependent.index] = append(def.dependents[dependent.index], field.index)
 
 				}
 				field.computedBy = &ePlugin{plugin}
@@ -253,10 +253,10 @@ func (ws *Worksheet) set(field *tField, value Value) error {
 	}
 
 	// if this field is an ascendant to any other, recompute them
-	for _, dependantIndex := range ws.def.dependants[index] {
-		dependant := ws.def.fieldsByIndex[dependantIndex]
-		updatedValue := dependant.computedBy.Compute(ws)
-		if err := ws.set(dependant, updatedValue); err != nil {
+	for _, dependentIndex := range ws.def.dependents[index] {
+		dependent := ws.def.fieldsByIndex[dependentIndex]
+		updatedValue := dependent.computedBy.Compute(ws)
+		if err := ws.set(dependent, updatedValue); err != nil {
 			return err
 		}
 	}
