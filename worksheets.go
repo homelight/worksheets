@@ -60,12 +60,9 @@ type Options struct {
 	Plugins map[string]map[string]ComputedBy
 }
 
-// NewDefinitions parses a worksheet definition, and creates a worksheet
-// model from it.
+// NewDefinitions parses one or more worksheet definitions, and creates worksheet
+// models from them.
 func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
-	if 1 < len(opts) {
-		return nil, fmt.Errorf("too many options provided")
-	}
 
 	p := newParser(reader)
 	defs, err := p.parseWorksheets()
@@ -73,40 +70,9 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 		return nil, err
 	}
 
-	if len(opts) == 1 {
-		opt := opts[0]
-		for name, plugins := range opt.Plugins {
-			def, ok := defs[name]
-			if !ok {
-				return nil, fmt.Errorf("plugins: unknown worksheet(%s)", name)
-			}
-			def.dependents = make(map[int][]int)
-			for fieldName, plugin := range plugins {
-				field, ok := def.fieldsByName[fieldName]
-				if !ok {
-					return nil, fmt.Errorf("plugins: unknown field %s.%s", name, fieldName)
-				}
-				if _, ok := field.computedBy.(*tExternal); !ok {
-					return nil, fmt.Errorf("plugins: field %s.%s not externally defined", name, fieldName)
-				}
-				args := plugin.Args()
-				if len(args) == 0 {
-					return nil, fmt.Errorf("plugins: %s.%s plugin has no dependencies", name, fieldName)
-				}
-				for _, argName := range args {
-					dependent, ok := def.fieldsByName[argName]
-					if !ok {
-						return nil, fmt.Errorf("plugins: %s.%s plugin has incorrect arg %s", name, fieldName, argName)
-					}
-					if _, ok := def.dependents[dependent.index]; !ok {
-						def.dependents[dependent.index] = make([]int, 0)
-					}
-					def.dependents[dependent.index] = append(def.dependents[dependent.index], field.index)
-
-				}
-				field.computedBy = &ePlugin{plugin}
-			}
-		}
+	err = parseOptions(defs, opts...)
+	if err != nil {
+		return nil, err
 	}
 
 	// Any unresolved externals?
@@ -121,6 +87,57 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 	return &Definitions{
 		defs: defs,
 	}, nil
+}
+
+func parseOptions(defs map[string]*tWorksheet, opts ...Options) error {
+	if 1 < len(opts) {
+		return fmt.Errorf("too many options provided")
+	}
+
+	if len(opts) == 1 {
+		opt := opts[0]
+		for name, plugins := range opt.Plugins {
+			def, ok := defs[name]
+			if !ok {
+				return fmt.Errorf("plugins: unknown worksheet(%s)", name)
+			}
+			err := attachPluginsToFields(def, plugins)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func attachPluginsToFields(def *tWorksheet, plugins map[string]ComputedBy) error {
+	def.dependents = make(map[int][]int)
+	for fieldName, plugin := range plugins {
+		field, ok := def.fieldsByName[fieldName]
+		if !ok {
+			return fmt.Errorf("plugins: unknown field %s.%s", def.name, fieldName)
+		}
+		if _, ok := field.computedBy.(*tExternal); !ok {
+			return fmt.Errorf("plugins: field %s.%s not externally defined", def.name, fieldName)
+		}
+		args := plugin.Args()
+		if len(args) == 0 {
+			return fmt.Errorf("plugins: %s.%s plugin has no dependencies", def.name, fieldName)
+		}
+		for _, argName := range args {
+			dependent, ok := def.fieldsByName[argName]
+			if !ok {
+				return fmt.Errorf("plugins: %s.%s plugin has incorrect arg %s", def.name, fieldName, argName)
+			}
+			if _, ok := def.dependents[dependent.index]; !ok {
+				def.dependents[dependent.index] = make([]int, 0)
+			}
+			def.dependents[dependent.index] = append(def.dependents[dependent.index], field.index)
+
+		}
+		field.computedBy = &ePlugin{plugin}
+	}
+	return nil
 }
 
 func (defs *Definitions) MustNewWorksheet(name string) *Worksheet {
