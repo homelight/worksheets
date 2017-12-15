@@ -20,6 +20,15 @@ type expression interface {
 	Compute(ws *Worksheet) Value
 }
 
+// Assert that all expressions implement the expression interface
+var _ = []expression{
+	&tExternal{},
+}
+
+func (e *tExternal) Compute(ws *Worksheet) Value {
+	panic(fmt.Sprintf("unresolved plugin in worksheet(%s)", ws.def.name))
+}
+
 type ePlugin struct {
 	computedBy ComputedBy
 }
@@ -32,13 +41,4 @@ func (e *ePlugin) Compute(ws *Worksheet) Value {
 		values[i] = value
 	}
 	return e.computedBy.Compute(values...)
-}
-
-// Assert that all expression struct are tExpressions.
-var _ = []expression{
-	&tExternal{},
-}
-
-func (e *tExternal) Compute(ws *Worksheet) Value {
-	panic(fmt.Sprintf("unresolved plugin in worksheet(%s)", ws.def.name))
 }

@@ -86,60 +86,97 @@ func (s *Zuite) TestWorksheetNew_multipleDefsSameName() {
 	}
 }
 
-func (s *Zuite) TestExample_externalComputedBy() {
-	_, err := NewDefinitions(strings.NewReader(`worksheet simple {
-		2:hello_name text computed_by { external }
-	}`))
-	if assert.Error(s.T(), err) {
-		require.Equal(s.T(), "plugins: missing plugin for simple.hello_name", err.Error())
-	}
-}
-
-func (s *Zuite) TestExample_externalComputedBy2() {
-	opt := Options{
-		Plugins: map[string]map[string]ComputedBy{
-			"not_so_simple": map[string]ComputedBy{},
+func (s *Zuite) TestWorksheet_externalComputedBy() {
+	cases := []struct {
+		def         string
+		opt         *Options
+		expectedErr string
+	}{
+		{
+			`worksheet simple {
+				1:hello_name text computed_by { external }
+			}`,
+			nil,
+			"plugins: missing plugin for simple.hello_name",
 		},
-	}
-	_, err := NewDefinitions(strings.NewReader(`worksheet simple {
-	}`), opt)
-	if assert.Error(s.T(), err) {
-		require.Equal(s.T(), "plugins: unknown worksheet(not_so_simple)", err.Error())
-	}
-}
-
-func (s *Zuite) TestExample_externalComputedBy3() {
-	opt := Options{
-		Plugins: map[string]map[string]ComputedBy{
-			"simple": map[string]ComputedBy{
-				"unknown_name": nil,
+		{
+			`worksheet simple {}`,
+			&Options{
+				Plugins: map[string]map[string]ComputedBy{
+					"not_so_simple": map[string]ComputedBy{
+						"unknown_name": nil,
+					},
+				},
 			},
+			"plugins: unknown worksheet(not_so_simple)",
 		},
-	}
-	_, err := NewDefinitions(strings.NewReader(`worksheet simple {
-	}`), opt)
-	if assert.Error(s.T(), err) {
-		require.Equal(s.T(), "plugins: unknown field simple.unknown_name", err.Error())
-	}
-}
-
-func (s *Zuite) TestExample_externalComputedBy4() {
-	opt := Options{
-		Plugins: map[string]map[string]ComputedBy{
-			"simple": map[string]ComputedBy{
-				"name": nil,
+		{
+			`worksheet simple {}`,
+			&Options{
+				Plugins: map[string]map[string]ComputedBy{
+					"simple": map[string]ComputedBy{
+						"unknown_name": nil,
+					},
+				},
 			},
+			"plugins: unknown field simple.unknown_name",
+		},
+		{
+			`worksheet simple {
+				1:name text
+			}`,
+			&Options{
+				Plugins: map[string]map[string]ComputedBy{
+					"simple": map[string]ComputedBy{
+						"name": nil,
+					},
+				},
+			},
+			"plugins: field simple.name not externally defined",
+		},
+		{
+			`worksheet simple {
+				1:name text computed_by { external }
+				2:age number[0]
+			}`,
+			&Options{
+				Plugins: map[string]map[string]ComputedBy{
+					"simple": map[string]ComputedBy{
+						"name": sayAlice([]string{}),
+					},
+				},
+			},
+			"plugins: simple.name plugin has no dependencies",
+		},
+		{
+			`worksheet simple {
+				1:name text computed_by { external }
+				2:age number[0]
+			}`,
+			&Options{
+				Plugins: map[string]map[string]ComputedBy{
+					"simple": map[string]ComputedBy{
+						"name": sayAlice([]string{"agee"}),
+					},
+				},
+			},
+			"plugins: simple.name plugin has incorrect arg agee",
 		},
 	}
-	_, err := NewDefinitions(strings.NewReader(`worksheet simple {
-		1:name text
-	}`), opt)
-	if assert.Error(s.T(), err) {
-		require.Equal(s.T(), "plugins: field simple.name not externally defined", err.Error())
+	for _, ex := range cases {
+		var opts []Options
+		if ex.opt != nil {
+			opts = append(opts, *ex.opt)
+		}
+		_, err := NewDefinitions(strings.NewReader(ex.def), opts...)
+		if assert.Error(s.T(), err) {
+			require.Equal(s.T(), ex.expectedErr, err.Error())
+		}
 	}
+
 }
 
-func (s *Zuite) TestExample_externalComputedBy6() {
+func (s *Zuite) TestWorksheet_externalComputedByPlugin() {
 	opt := Options{
 		Plugins: map[string]map[string]ComputedBy{
 			"simple": map[string]ComputedBy{
@@ -182,10 +219,19 @@ func (fn fullName) Args() []string {
 }
 
 func (fn fullName) Compute(values ...Value) Value {
-	firstName := values[0].String()
-	lastName := values[1].String()
-	firstName = firstName[1 : len(firstName)-1]
-	lastName = lastName[1 : len(lastName)-1]
+	var firstName, lastName string
+	switch t := values[0].(type) {
+	case *tText:
+		firstName = t.value
+	case *tUndefined:
+		firstName = ""
+	}
+	switch t := values[1].(type) {
+	case *tText:
+		lastName = t.value
+	case *tUndefined:
+		lastName = ""
+	}
 	return NewText(fmt.Sprintf("%s %s", firstName, lastName))
 }
 
@@ -198,8 +244,8 @@ func (fn age) Args() []string {
 }
 
 func (fn age) Compute(values ...Value) Value {
-	birthYearStr := values[0].String()
-	birthYear, _ := strconv.ParseInt(birthYearStr, 10, 32)
+	// TODO(pascal): we need to figure out how to make Values useful, e.g. having an AsString()
+	birthYear := values[0].(*tNumber).value
 	value, _ := NewValue(strconv.FormatInt(2018-birthYear, 10))
 	return value
 }
@@ -213,46 +259,28 @@ func (fn bio) Args() []string {
 }
 
 func (fn bio) Compute(values ...Value) Value {
-	fullName := values[0].String()
-	birthYear := values[1].String()
-	age := values[2].String()
-	fullName = fullName[1 : len(fullName)-1]
+	var fullName string
+	var birthYear, age int64
+	switch t := values[0].(type) {
+	case *tText:
+		fullName = t.value
+	case *tUndefined:
+		fullName = ""
+	}
+	switch t := values[1].(type) {
+	case *tNumber:
+		birthYear = t.value
+	case *tUndefined:
+		birthYear = 0
+	}
+	switch t := values[2].(type) {
+	case *tNumber:
+		age = t.value
+	case *tUndefined:
+		age = 0
+	}
 
-	return NewText(fmt.Sprintf("%s, age %s, born in %s", fullName, age, birthYear))
-}
-
-func (s *Zuite) TestExample_externalComputedBy4point5() {
-	opt := Options{
-		Plugins: map[string]map[string]ComputedBy{
-			"simple": map[string]ComputedBy{
-				"name": sayAlice([]string{}),
-			},
-		},
-	}
-	_, err := NewDefinitions(strings.NewReader(`worksheet simple {
-		1:name text computed_by { external }
-		2:age number[0]
-	}`), opt)
-	if assert.Error(s.T(), err) {
-		require.Equal(s.T(), "plugins: simple.name plugin has no dependencies", err.Error())
-	}
-}
-
-func (s *Zuite) TestExample_externalComputedBy5() {
-	opt := Options{
-		Plugins: map[string]map[string]ComputedBy{
-			"simple": map[string]ComputedBy{
-				"name": sayAlice([]string{"agee"}),
-			},
-		},
-	}
-	_, err := NewDefinitions(strings.NewReader(`worksheet simple {
-		1:name text computed_by { external }
-		2:age number[0]
-	}`), opt)
-	if assert.Error(s.T(), err) {
-		require.Equal(s.T(), "plugins: simple.name plugin has incorrect arg agee", err.Error())
-	}
+	return NewText(fmt.Sprintf("%s, age %d, born in %d", fullName, age, birthYear))
 }
 
 func (s *Zuite) TestExternalComputedBy_good() {
@@ -304,6 +332,8 @@ func (s *Zuite) TestExternalComputedBy_goodComplicated() {
 	ws.MustSet("first_name", NewText("Alice"))
 	ws.MustSet("last_name", NewText("Maters"))
 	ws.MustSet("birth_year", MustNewValue("1945"))
+	require.Equal(s.T(), `"Alice Maters"`, ws.MustGet("full_name").String())
+	require.Equal(s.T(), `73`, ws.MustGet("age").String())
 	require.Equal(s.T(), `"Alice Maters, age 73, born in 1945"`, ws.MustGet("bio").String())
 }
 

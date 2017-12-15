@@ -70,7 +70,7 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 		return nil, err
 	}
 
-	err = parseOptions(defs, opts...)
+	err = processOptions(defs, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -89,22 +89,23 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 	}, nil
 }
 
-func parseOptions(defs map[string]*tWorksheet, opts ...Options) error {
-	if 1 < len(opts) {
+func processOptions(defs map[string]*tWorksheet, opts ...Options) error {
+	if len(opts) == 0 {
+		return nil
+	} else if len(opts) != 1 {
 		return fmt.Errorf("too many options provided")
 	}
 
-	if len(opts) == 1 {
-		opt := opts[0]
-		for name, plugins := range opt.Plugins {
-			def, ok := defs[name]
-			if !ok {
-				return fmt.Errorf("plugins: unknown worksheet(%s)", name)
-			}
-			err := attachPluginsToFields(def, plugins)
-			if err != nil {
-				return err
-			}
+	opt := opts[0]
+
+	for name, plugins := range opt.Plugins {
+		def, ok := defs[name]
+		if !ok {
+			return fmt.Errorf("plugins: unknown worksheet(%s)", name)
+		}
+		err := attachPluginsToFields(def, plugins)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
