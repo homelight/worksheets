@@ -41,6 +41,10 @@ type tWorksheet struct {
 	fields        []*tField
 	fieldsByName  map[string]*tField
 	fieldsByIndex map[int]*tField
+
+	// derived values handling
+	externals  map[int]ComputedBy
+	dependents map[int][]int
 }
 
 func (ws *tWorksheet) addField(field *tField) error {
@@ -60,11 +64,11 @@ func (ws *tWorksheet) addField(field *tField) error {
 }
 
 type tField struct {
-	index int
-	name  string
-	typ   Type
+	index      int
+	name       string
+	typ        Type
+	computedBy expression
 	// also need constrainedBy *tExpression
-	// also need computedBy    *tExpression
 }
 
 type tUndefinedType struct{}
@@ -94,14 +98,16 @@ type tBool struct {
 
 var (
 	// tokens
-	pWorksheet = newTokenPattern("worksheet", "worksheet")
-	pLacco     = newTokenPattern("{", "\\{")
-	pRacco     = newTokenPattern("}", "\\}")
-	pLparen    = newTokenPattern("(", "\\(")
-	pRparen    = newTokenPattern(")", "\\)")
-	pLbracket  = newTokenPattern("[", "\\[")
-	pRbracket  = newTokenPattern("]", "\\]")
-	pColon     = newTokenPattern(":", ":")
+	pLacco      = newTokenPattern("{", "\\{")
+	pRacco      = newTokenPattern("}", "\\}")
+	pLparen     = newTokenPattern("(", "\\(")
+	pRparen     = newTokenPattern(")", "\\)")
+	pLbracket   = newTokenPattern("[", "\\[")
+	pRbracket   = newTokenPattern("]", "\\]")
+	pColon      = newTokenPattern(":", ":")
+	pWorksheet  = newTokenPattern("worksheet", "worksheet")
+	pComputedBy = newTokenPattern("computed_by", "computed_by")
+	pExternal   = newTokenPattern("external", "external")
 
 	// token patterns
 	pName   = newTokenPattern("name", "[a-z]+([a-z_]*[a-z])?")
@@ -113,7 +119,7 @@ var (
 func (p *parser) parseWorksheets() (map[string]*tWorksheet, error) {
 	wsDefs := make(map[string]*tWorksheet)
 
-	for pWorksheet.re.MatchString(p.peek()) {
+	for p.peek(pWorksheet) {
 		def, err := p.parseWorksheet()
 		if err != nil {
 			return nil, err
@@ -167,7 +173,7 @@ func (p *parser) parseWorksheet() (*tWorksheet, error) {
 		return nil, err
 	}
 
-	for token := p.peek(); token != "}"; token = p.peek() {
+	for !p.peek(pRacco) {
 		field, err := p.parseField()
 		if err != nil {
 			return nil, err
@@ -211,13 +217,48 @@ func (p *parser) parseField() (*tField, error) {
 		return nil, err
 	}
 
+	var computedBy expression
+	if p.peek(pComputedBy) {
+		_, err = p.nextAndCheck(pComputedBy)
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = p.nextAndCheck(pLacco)
+		if err != nil {
+			return nil, err
+		}
+
+		computedBy, err = p.parseExpression()
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = p.nextAndCheck(pRacco)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	f := &tField{
-		index: index,
-		name:  name,
-		typ:   typ,
+		index:      index,
+		name:       name,
+		typ:        typ,
+		computedBy: computedBy,
 	}
 
 	return f, nil
+}
+
+type tExternal struct{}
+
+func (p *parser) parseExpression() (expression, error) {
+	_, err := p.nextAndCheck(pExternal)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tExternal{}, nil
 }
 
 func (p *parser) parseType() (Type, error) {
@@ -337,8 +378,15 @@ func (p *parser) next() string {
 	}
 }
 
-func (p *parser) peek() string {
+func (p *parser) peek(maybes ...*tokenPattern) bool {
 	token := p.next()
 	p.toks = append(p.toks, token)
-	return token
+
+	for _, maybe := range maybes {
+		if maybe.re.MatchString(token) {
+			return true
+		}
+	}
+
+	return false
 }
