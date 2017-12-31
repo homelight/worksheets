@@ -192,9 +192,6 @@ func (s *Session) Update(ws *Worksheet) error {
 	if err != nil {
 		return err
 	}
-	if result.RowsAffected != int64(len(diff)) {
-		return fmt.Errorf("unable to update old values")
-	}
 
 	// insert new rValues
 	insert := s.tx.InsertInto("worksheet_values").Columns("*").Blacklist("id")

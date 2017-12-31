@@ -173,6 +173,27 @@ func (s *DbZuite) TestUpdate() {
 	require.Empty(s.T(), ws.diff())
 }
 
+func (s *DbZuite) TestUpdateUndefinedField() {
+	ws, err := s.store.defs.NewWorksheet("simple")
+	require.NoError(s.T(), err)
+
+	err = ws.Set("name", NewText("Alice"))
+	require.NoError(s.T(), err)
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	err = ws.Set("age", MustNewValue("73"))
+	require.NoError(s.T(), err)
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		return session.Update(ws)
+	})
+}
+
 func IdAt(s []rValue, index int) int64 {
 	if 0 <= index && index < len(s) {
 		return s[index].Id
