@@ -79,6 +79,26 @@ func (s *Zuite) TestParser_parseWorksheetErrors() {
 	}
 }
 
+func (s *Zuite) TestParser_parseExpressionOrExternal() {
+	cases := map[string]expression{
+		`external`: &tExternal{},
+
+		`3`:         &tNumber{3, &tNumberType{0}},
+		`-5.12`:     &tNumber{-512, &tNumberType{2}},
+		`undefined`: &tUndefined{},
+		`"Alice"`:   &tText{"Alice"},
+		`true`:      &tBool{true},
+
+		`foo`: &tVar{"foo"},
+	}
+	for input, expected := range cases {
+		p := newParser(strings.NewReader(input))
+		actual, err := p.parseExpressionOrExternal()
+		require.NoError(s.T(), err, input)
+		require.Equal(s.T(), expected, actual, input)
+	}
+}
+
 func (s *Zuite) TestParser_parseLiteral() {
 	cases := map[string]Value{
 		`undefined`: &tUndefined{},

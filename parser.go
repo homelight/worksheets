@@ -105,15 +105,19 @@ var (
 	pLbracket   = newTokenPattern("[", "\\[")
 	pRbracket   = newTokenPattern("]", "\\]")
 	pColon      = newTokenPattern(":", ":")
+	pMinus      = newTokenPattern("-", "-")
 	pWorksheet  = newTokenPattern("worksheet", "worksheet")
 	pComputedBy = newTokenPattern("computed_by", "computed_by")
 	pExternal   = newTokenPattern("external", "external")
+	pUndefined  = newTokenPattern("undefined", "undefined")
+	pTrue       = newTokenPattern("true", "true")
+	pFalse      = newTokenPattern("false", "false")
 
 	// token patterns
 	pName   = newTokenPattern("name", "[a-z]+([a-z_]*[a-z])?")
 	pIndex  = newTokenPattern("index", "[0-9]+")
 	pNumber = newTokenPattern("number", "[0-9]+(\\.[0-9]+)?")
-	pString = newTokenPattern("string", "\".*\"")
+	pText   = newTokenPattern("text", "\".*\"")
 )
 
 func (p *parser) parseWorksheets() (map[string]*tWorksheet, error) {
@@ -229,7 +233,7 @@ func (p *parser) parseField() (*tField, error) {
 			return nil, err
 		}
 
-		computedBy, err = p.parseExpression()
+		computedBy, err = p.parseExpressionOrExternal()
 		if err != nil {
 			return nil, err
 		}
@@ -252,13 +256,56 @@ func (p *parser) parseField() (*tField, error) {
 
 type tExternal struct{}
 
-func (p *parser) parseExpression() (expression, error) {
-	_, err := p.nextAndCheck(pExternal)
-	if err != nil {
-		return nil, err
-	}
+type tVar struct {
+	name string
+}
 
-	return &tExternal{}, nil
+// expr := 'external'
+//       | literal
+//       | var
+func (p *parser) parseExpressionOrExternal() (expression, error) {
+	choice, ok := p.peekWithChoice([]*tokenPattern{
+		pExternal,
+		pUndefined,
+		pTrue,
+		pFalse,
+		pNumber,
+		pMinus,
+		pText,
+		pName,
+	}, []string{
+		"external",
+		"literal",
+		"literal",
+		"literal",
+		"literal",
+		"literal",
+		"literal",
+		"var",
+	})
+	if !ok {
+		return nil, fmt.Errorf("expecting expression")
+	}
+	switch choice {
+	case "external":
+		p.next()
+		return &tExternal{}, nil
+
+	case "literal":
+		val, err := p.parseLiteral()
+
+		if err != nil {
+			return nil, err
+		}
+		return val.(expression), nil
+
+	case "var":
+		token := p.next()
+		return &tVar{token}, nil
+
+	default:
+		panic(fmt.Sprintf("nextAndChoice returned '%s'", choice))
+	}
 }
 
 func (p *parser) parseType() (Type, error) {
@@ -333,7 +380,7 @@ func (p *parser) parseLiteral() (Value, error) {
 		}
 		return &tNumber{value, &tNumberType{scale}}, nil
 	}
-	if pString.re.MatchString(token) {
+	if pText.re.MatchString(token) {
 		value, err := strconv.Unquote(token)
 		if err != nil {
 			return nil, err
@@ -378,15 +425,31 @@ func (p *parser) next() string {
 	}
 }
 
-func (p *parser) peek(maybes ...*tokenPattern) bool {
+func (p *parser) peek(maybe *tokenPattern) bool {
 	token := p.next()
 	p.toks = append(p.toks, token)
 
-	for _, maybe := range maybes {
-		if maybe.re.MatchString(token) {
-			return true
-		}
+	return maybe.re.MatchString(token)
+}
+
+// peekWithChoice peeks, and matches against a set of possible tokens. When a
+// match is found, it returns the choice in the choice array corresponding to
+// the index of the token in the maybes array.
+//
+// We use two arrays here, rather than a map, to guarantee a prioritized
+// selection of the choices.
+func (p *parser) peekWithChoice(maybes []*tokenPattern, choices []string) (string, bool) {
+	if len(maybes) != len(choices) {
+		panic("peekWithChoice invoked with maybes not equal to choices")
 	}
 
-	return false
+	token := p.next()
+	p.toks = append(p.toks, token)
+
+	for index, maybe := range maybes {
+		if maybe.re.MatchString(token) {
+			return choices[index], true
+		}
+	}
+	return "", false
 }

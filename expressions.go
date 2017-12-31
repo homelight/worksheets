@@ -23,10 +23,36 @@ type expression interface {
 // Assert that all expressions implement the expression interface
 var _ = []expression{
 	&tExternal{},
+	&ePlugin{},
+	&tUndefined{},
+	&tNumber{},
+	&tText{},
+	&tBool{},
+	&tVar{},
 }
 
 func (e *tExternal) Compute(ws *Worksheet) Value {
 	panic(fmt.Sprintf("unresolved plugin in worksheet(%s)", ws.def.name))
+}
+
+func (e *tUndefined) Compute(ws *Worksheet) Value {
+	return e
+}
+
+func (e *tNumber) Compute(ws *Worksheet) Value {
+	return e
+}
+
+func (e *tText) Compute(ws *Worksheet) Value {
+	return e
+}
+
+func (e *tBool) Compute(ws *Worksheet) Value {
+	return e
+}
+
+func (e *tVar) Compute(ws *Worksheet) Value {
+	panic("not implemented")
 }
 
 type ePlugin struct {
