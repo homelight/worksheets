@@ -18,18 +18,18 @@ import (
 
 func (s *Zuite) TestValueString() {
 	cases := map[Value]string{
-		&tUndefined{}: "undefined",
+		&Undefined{}: "undefined",
 
-		&tText{`Hello, "World"!`}: `"Hello, \"World\"!"`,
+		&Text{`Hello, "World"!`}: `"Hello, \"World\"!"`,
 
-		&tBool{true}: "true",
+		&Bool{true}: "true",
 
-		&tNumber{1, &tNumberType{0}}:     "1",
-		&tNumber{10000, &tNumberType{4}}: "1.0000",
-		&tNumber{123, &tNumberType{1}}:   "12.3",
-		&tNumber{123, &tNumberType{2}}:   "1.23",
-		&tNumber{123, &tNumberType{3}}:   "0.123",
-		&tNumber{123, &tNumberType{4}}:   "0.0123",
+		&Number{1, &tNumberType{0}}:     "1",
+		&Number{10000, &tNumberType{4}}: "1.0000",
+		&Number{123, &tNumberType{1}}:   "12.3",
+		&Number{123, &tNumberType{2}}:   "1.23",
+		&Number{123, &tNumberType{3}}:   "0.123",
+		&Number{123, &tNumberType{4}}:   "0.0123",
 	}
 	for value, expected := range cases {
 		assert.Equal(s.T(), expected, value.String())
@@ -94,5 +94,29 @@ func (s *Zuite) TestValueEqual() {
 				}
 			}
 		}
+	}
+}
+
+func (s *Zuite) TestNumber_Plus() {
+	cases := []struct {
+		left, right, expected *Number
+	}{
+		{
+			left:     MustNewValue("2").(*Number),
+			right:    MustNewValue("3").(*Number),
+			expected: MustNewValue("5").(*Number),
+		},
+		{
+			left:     MustNewValue("2.0").(*Number),
+			right:    MustNewValue("3").(*Number),
+			expected: MustNewValue("5.0").(*Number),
+		},
+	}
+	for _, ex := range cases {
+		actual := ex.left.Plus(ex.right)
+		assert.Equal(s.T(), ex.expected, actual, "%s + %s", ex.left, ex.right)
+
+		actual = ex.right.Plus(ex.left)
+		assert.Equal(s.T(), ex.expected, actual, "%s + %s", ex.right, ex.left)
 	}
 }

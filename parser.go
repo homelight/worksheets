@@ -81,21 +81,6 @@ type tNumberType struct {
 	scale int
 }
 
-type tUndefined struct{}
-
-type tNumber struct {
-	value int64
-	typ   *tNumberType
-}
-
-type tText struct {
-	value string
-}
-
-type tBool struct {
-	value bool
-}
-
 var (
 	// tokens
 	pLacco      = newTokenPattern("{", "\\{")
@@ -104,8 +89,11 @@ var (
 	pRparen     = newTokenPattern(")", "\\)")
 	pLbracket   = newTokenPattern("[", "\\[")
 	pRbracket   = newTokenPattern("]", "\\]")
-	pColon      = newTokenPattern(":", ":")
-	pMinus      = newTokenPattern("-", "-")
+	pColon      = newTokenPattern(":", "\\:")
+	pPlus       = newTokenPattern("+", "\\+")
+	pMinus      = newTokenPattern("-", "\\-")
+	pMult       = newTokenPattern("*", "\\*")
+	pDiv        = newTokenPattern("/", "\\/")
 	pWorksheet  = newTokenPattern("worksheet", "worksheet")
 	pComputedBy = newTokenPattern("computed_by", "computed_by")
 	pExternal   = newTokenPattern("external", "external")
@@ -254,15 +242,30 @@ func (p *parser) parseField() (*tField, error) {
 	return f, nil
 }
 
+type tOp string
+
+const (
+	opPlus  tOp = "plus"
+	opMinus     = "minus"
+	opMult      = "mult"
+	opDiv       = "div"
+)
+
 type tExternal struct{}
+
+type tBinop struct {
+	op          tOp
+	left, right expression
+}
 
 type tVar struct {
 	name string
 }
 
-// expr := 'external'
-//       | literal
-//       | var
+// parseExpressionOrExternal
+//
+//  := 'external'
+//   | parseExpression
 func (p *parser) parseExpressionOrExternal() (expression, error) {
 	choice, ok := p.peekWithChoice([]*tokenPattern{
 		pExternal,
@@ -275,6 +278,45 @@ func (p *parser) parseExpressionOrExternal() (expression, error) {
 		pName,
 	}, []string{
 		"external",
+		"expr",
+		"expr",
+		"expr",
+		"expr",
+		"expr",
+		"expr",
+		"expr",
+	})
+	if !ok {
+		return nil, fmt.Errorf("expecting expression or external")
+	}
+	switch choice {
+	case "external":
+		p.next()
+		return &tExternal{}, nil
+
+	case "expr":
+		return p.parseExpression()
+
+	default:
+		panic(fmt.Sprintf("nextAndChoice returned '%s'", choice))
+	}
+}
+
+// parseExpression
+//
+//  := parseLiteral
+//   | var
+//   | exp (+ -  * /) exp
+func (p *parser) parseExpression() (expression, error) {
+	choice, ok := p.peekWithChoice([]*tokenPattern{
+		pUndefined,
+		pTrue,
+		pFalse,
+		pNumber,
+		pMinus,
+		pText,
+		pName,
+	}, []string{
 		"literal",
 		"literal",
 		"literal",
@@ -286,10 +328,13 @@ func (p *parser) parseExpressionOrExternal() (expression, error) {
 	if !ok {
 		return nil, fmt.Errorf("expecting expression")
 	}
+
+	// left
+	var left expression
 	switch choice {
 	case "external":
 		p.next()
-		return &tExternal{}, nil
+		left = &tExternal{}
 
 	case "literal":
 		val, err := p.parseLiteral()
@@ -297,15 +342,40 @@ func (p *parser) parseExpressionOrExternal() (expression, error) {
 		if err != nil {
 			return nil, err
 		}
-		return val.(expression), nil
+		left = val.(expression)
 
 	case "var":
 		token := p.next()
-		return &tVar{token}, nil
+		left = &tVar{token}
 
 	default:
 		panic(fmt.Sprintf("nextAndChoice returned '%s'", choice))
 	}
+
+	// operator?
+	op, ok := p.peekWithChoice([]*tokenPattern{
+		pPlus,
+		pMinus,
+		pMult,
+		pDiv,
+	}, []string{
+		string(opPlus),
+		string(opMinus),
+		string(opMult),
+		string(opDiv),
+	})
+	if !ok {
+		return left, nil
+	}
+	p.next()
+
+	// right
+	right, err := p.parseExpression()
+	if err != nil {
+		return nil, err
+	}
+
+	return &tBinop{tOp(op), left, right}, nil
 }
 
 func (p *parser) parseType() (Type, error) {
@@ -351,11 +421,11 @@ func (p *parser) parseLiteral() (Value, error) {
 	token := p.next()
 	switch token {
 	case "undefined":
-		return &tUndefined{}, nil
+		return &Undefined{}, nil
 	case "true":
-		return &tBool{true}, nil
+		return &Bool{true}, nil
 	case "false":
-		return &tBool{false}, nil
+		return &Bool{false}, nil
 	case "-":
 		negNumber = true
 		token, err = p.nextAndCheck(pNumber)
@@ -378,14 +448,14 @@ func (p *parser) parseLiteral() (Value, error) {
 		if negNumber {
 			value = -value
 		}
-		return &tNumber{value, &tNumberType{scale}}, nil
+		return &Number{value, &tNumberType{scale}}, nil
 	}
 	if pText.re.MatchString(token) {
 		value, err := strconv.Unquote(token)
 		if err != nil {
 			return nil, err
 		}
-		return &tText{value}, nil
+		return &Text{value}, nil
 	}
 	return nil, fmt.Errorf("unknown literal, found %s", token)
 }

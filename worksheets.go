@@ -63,7 +63,6 @@ type Options struct {
 // NewDefinitions parses one or more worksheet definitions, and creates worksheet
 // models from them.
 func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
-
 	p := newParser(reader)
 	defs, err := p.parseWorksheets()
 	if err != nil {
@@ -80,6 +79,30 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 		for _, field := range def.fields {
 			if _, ok := field.computedBy.(*tExternal); ok {
 				return nil, fmt.Errorf("plugins: missing plugin for %s.%s", def.name, field.name)
+			}
+		}
+	}
+
+	// Resolve computed_by dependencies
+	for _, def := range defs {
+		def.dependents = make(map[int][]int)
+		for _, field := range def.fields {
+			if field.computedBy != nil {
+				fieldName := field.name
+				args := field.computedBy.Args()
+				if len(args) == 0 {
+					return nil, fmt.Errorf("%s.%s has no dependencies", def.name, fieldName)
+				}
+				for _, argName := range args {
+					dependent, ok := def.fieldsByName[argName]
+					if !ok {
+						return nil, fmt.Errorf("%s.%s references unknown arg %s", def.name, fieldName, argName)
+					}
+					if _, ok := def.dependents[dependent.index]; !ok {
+						def.dependents[dependent.index] = make([]int, 0)
+					}
+					def.dependents[dependent.index] = append(def.dependents[dependent.index], field.index)
+				}
 			}
 		}
 	}
@@ -112,7 +135,6 @@ func processOptions(defs map[string]*tWorksheet, opts ...Options) error {
 }
 
 func attachPluginsToFields(def *tWorksheet, plugins map[string]ComputedBy) error {
-	def.dependents = make(map[int][]int)
 	for fieldName, plugin := range plugins {
 		field, ok := def.fieldsByName[fieldName]
 		if !ok {
@@ -120,21 +142,6 @@ func attachPluginsToFields(def *tWorksheet, plugins map[string]ComputedBy) error
 		}
 		if _, ok := field.computedBy.(*tExternal); !ok {
 			return fmt.Errorf("plugins: field %s.%s not externally defined", def.name, fieldName)
-		}
-		args := plugin.Args()
-		if len(args) == 0 {
-			return fmt.Errorf("plugins: %s.%s plugin has no dependencies", def.name, fieldName)
-		}
-		for _, argName := range args {
-			dependent, ok := def.fieldsByName[argName]
-			if !ok {
-				return fmt.Errorf("plugins: %s.%s plugin has incorrect arg %s", def.name, fieldName, argName)
-			}
-			if _, ok := def.dependents[dependent.index]; !ok {
-				def.dependents[dependent.index] = make([]int, 0)
-			}
-			def.dependents[dependent.index] = append(def.dependents[dependent.index], field.index)
-
 		}
 		field.computedBy = &ePlugin{plugin}
 	}
@@ -213,11 +220,11 @@ func (ws *Worksheet) validate() error {
 }
 
 func (ws *Worksheet) Id() string {
-	return ws.data[IndexId].(*tText).value
+	return ws.data[IndexId].(*Text).value
 }
 
 func (ws *Worksheet) Version() int {
-	return int(ws.data[IndexVersion].(*tNumber).value)
+	return int(ws.data[IndexVersion].(*Number).value)
 }
 
 func (ws *Worksheet) Name() string {
@@ -270,7 +277,10 @@ func (ws *Worksheet) set(field *tField, value Value) error {
 	// if this field is an ascendant to any other, recompute them
 	for _, dependentIndex := range ws.def.dependents[index] {
 		dependent := ws.def.fieldsByIndex[dependentIndex]
-		updatedValue := dependent.computedBy.Compute(ws)
+		updatedValue, err := dependent.computedBy.Compute(ws)
+		if err != nil {
+			return err
+		}
 		if err := ws.set(dependent, updatedValue); err != nil {
 			return err
 		}
@@ -331,7 +341,7 @@ func (ws *Worksheet) Get(name string) (Value, error) {
 	// is a value set for this field?
 	value, ok := ws.data[index]
 	if !ok {
-		return &tUndefined{}, nil
+		return &Undefined{}, nil
 	}
 
 	// type check
@@ -356,7 +366,7 @@ func (ws *Worksheet) diff() map[int]Value {
 		orig, hasOrig := ws.orig[index]
 		data, hasData := ws.data[index]
 		if hasOrig && !hasData {
-			diff[index] = &tUndefined{}
+			diff[index] = &Undefined{}
 		} else if !hasOrig && hasData {
 			diff[index] = data
 		} else if !orig.Equal(data) {

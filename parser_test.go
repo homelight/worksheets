@@ -83,13 +83,15 @@ func (s *Zuite) TestParser_parseExpressionOrExternal() {
 	cases := map[string]expression{
 		`external`: &tExternal{},
 
-		`3`:         &tNumber{3, &tNumberType{0}},
-		`-5.12`:     &tNumber{-512, &tNumberType{2}},
-		`undefined`: &tUndefined{},
-		`"Alice"`:   &tText{"Alice"},
-		`true`:      &tBool{true},
+		`3`:         &Number{3, &tNumberType{0}},
+		`-5.12`:     &Number{-512, &tNumberType{2}},
+		`undefined`: &Undefined{},
+		`"Alice"`:   &Text{"Alice"},
+		`true`:      &Bool{true},
 
 		`foo`: &tVar{"foo"},
+
+		`3 + 4`: &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}},
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))
@@ -101,16 +103,16 @@ func (s *Zuite) TestParser_parseExpressionOrExternal() {
 
 func (s *Zuite) TestParser_parseLiteral() {
 	cases := map[string]Value{
-		`undefined`: &tUndefined{},
+		`undefined`: &Undefined{},
 
-		`1`:       &tNumber{1, &tNumberType{0}},
-		`-123.67`: &tNumber{-12367, &tNumberType{2}},
-		`1.000`:   &tNumber{1000, &tNumberType{3}},
+		`1`:       &Number{1, &tNumberType{0}},
+		`-123.67`: &Number{-12367, &tNumberType{2}},
+		`1.000`:   &Number{1000, &tNumberType{3}},
 
-		`"foo"`: &tText{"foo"},
-		`"456"`: &tText{"456"},
+		`"foo"`: &Text{"foo"},
+		`"456"`: &Text{"456"},
 
-		`true`: &tBool{true},
+		`true`: &Bool{true},
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))

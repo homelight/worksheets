@@ -146,7 +146,7 @@ func (s *Zuite) TestWorksheet_externalComputedBy() {
 					},
 				},
 			},
-			"plugins: simple.name plugin has no dependencies",
+			"simple.name has no dependencies",
 		},
 		{
 			`worksheet simple {
@@ -160,7 +160,7 @@ func (s *Zuite) TestWorksheet_externalComputedBy() {
 					},
 				},
 			},
-			"plugins: simple.name plugin has incorrect arg agee",
+			"simple.name references unknown arg agee",
 		},
 	}
 	for _, ex := range cases {
@@ -221,15 +221,15 @@ func (fn fullName) Args() []string {
 func (fn fullName) Compute(values ...Value) Value {
 	var firstName, lastName string
 	switch t := values[0].(type) {
-	case *tText:
+	case *Text:
 		firstName = t.value
-	case *tUndefined:
+	case *Undefined:
 		firstName = ""
 	}
 	switch t := values[1].(type) {
-	case *tText:
+	case *Text:
 		lastName = t.value
-	case *tUndefined:
+	case *Undefined:
 		lastName = ""
 	}
 	return NewText(fmt.Sprintf("%s %s", firstName, lastName))
@@ -245,7 +245,7 @@ func (fn age) Args() []string {
 
 func (fn age) Compute(values ...Value) Value {
 	// TODO(pascal): we need to figure out how to make Values useful, e.g. having an AsString()
-	birthYear := values[0].(*tNumber).value
+	birthYear := values[0].(*Number).value
 	value, _ := NewValue(strconv.FormatInt(2018-birthYear, 10))
 	return value
 }
@@ -262,21 +262,21 @@ func (fn bio) Compute(values ...Value) Value {
 	var fullName string
 	var birthYear, age int64
 	switch t := values[0].(type) {
-	case *tText:
+	case *Text:
 		fullName = t.value
-	case *tUndefined:
+	case *Undefined:
 		fullName = ""
 	}
 	switch t := values[1].(type) {
-	case *tNumber:
+	case *Number:
 		birthYear = t.value
-	case *tUndefined:
+	case *Undefined:
 		birthYear = 0
 	}
 	switch t := values[2].(type) {
-	case *tNumber:
+	case *Number:
 		age = t.value
-	case *tUndefined:
+	case *Undefined:
 		age = 0
 	}
 
@@ -335,6 +335,19 @@ func (s *Zuite) TestExternalComputedBy_goodComplicated() {
 	require.Equal(s.T(), `"Alice Maters"`, ws.MustGet("full_name").String())
 	require.Equal(s.T(), `73`, ws.MustGet("age").String())
 	require.Equal(s.T(), `"Alice Maters, age 73, born in 1945"`, ws.MustGet("bio").String())
+}
+
+func (s *Zuite) TestSimpleExpressionsInWorksheet() {
+	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {
+		1:age number[0]
+		2:age_plus_two number[0] computed_by { age + 2 }
+	}`))
+	require.NoError(s.T(), err)
+
+	ws := defs.MustNewWorksheet("simple")
+
+	ws.MustSet("age", MustNewValue("73"))
+	require.Equal(s.T(), "75", ws.MustGet("age_plus_two").String())
 }
 
 func (s *Zuite) TestWorksheetNew_origEmpty() {
