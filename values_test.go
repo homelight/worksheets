@@ -120,3 +120,53 @@ func (s *Zuite) TestNumber_Plus() {
 		assert.Equal(s.T(), ex.expected, actual, "%s + %s", ex.right, ex.left)
 	}
 }
+
+func (s *Zuite) TestNumber_Minus() {
+	cases := []struct {
+		left, right, expected *Number
+	}{
+		{
+			left:     MustNewValue("2").(*Number),
+			right:    MustNewValue("3").(*Number),
+			expected: MustNewValue("-1").(*Number),
+		},
+		{
+			left:     MustNewValue("2.0").(*Number),
+			right:    MustNewValue("3").(*Number),
+			expected: MustNewValue("-1.0").(*Number),
+		},
+	}
+	for _, ex := range cases {
+		actual := ex.left.Minus(ex.right)
+		assert.Equal(s.T(), ex.expected, actual, "%s + %s", ex.left, ex.right)
+	}
+}
+
+func (s *Zuite) TestNumber_Mult() {
+	cases := []struct {
+		left, right, expected *Number
+	}{
+		{
+			left:     MustNewValue("2").(*Number),
+			right:    MustNewValue("3").(*Number),
+			expected: MustNewValue("6").(*Number),
+		},
+		{
+			left:     MustNewValue("2.0").(*Number),
+			right:    MustNewValue("3").(*Number),
+			expected: MustNewValue("6.0").(*Number),
+		},
+		{
+			left:     MustNewValue("2.0").(*Number),
+			right:    MustNewValue("3.0").(*Number),
+			expected: MustNewValue("6.00").(*Number),
+		},
+	}
+	for _, ex := range cases {
+		actual := ex.left.Mult(ex.right)
+		assert.Equal(s.T(), ex.expected, actual, "%s + %s", ex.left, ex.right)
+
+		actual = ex.right.Mult(ex.left)
+		assert.Equal(s.T(), ex.expected, actual, "%s + %s", ex.right, ex.left)
+	}
+}

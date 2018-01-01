@@ -119,6 +119,10 @@ func (e *tBinop) Compute(ws *Worksheet) (Value, error) {
 	switch e.op {
 	case opPlus:
 		return nLeft.Plus(nRight), nil
+	case opMinus:
+		return nLeft.Minus(nRight), nil
+	case opMult:
+		return nLeft.Mult(nRight), nil
 	default:
 		panic("not implemented")
 	}

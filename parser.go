@@ -276,8 +276,10 @@ func (p *parser) parseExpressionOrExternal() (expression, error) {
 		pMinus,
 		pText,
 		pName,
+		pLparen,
 	}, []string{
 		"external",
+		"expr",
 		"expr",
 		"expr",
 		"expr",
@@ -295,7 +297,7 @@ func (p *parser) parseExpressionOrExternal() (expression, error) {
 		return &tExternal{}, nil
 
 	case "expr":
-		return p.parseExpression()
+		return p.parseExpression(true)
 
 	default:
 		panic(fmt.Sprintf("nextAndChoice returned '%s'", choice))
@@ -307,7 +309,7 @@ func (p *parser) parseExpressionOrExternal() (expression, error) {
 //  := parseLiteral
 //   | var
 //   | exp (+ -  * /) exp
-func (p *parser) parseExpression() (expression, error) {
+func (p *parser) parseExpression(withOp bool) (expression, error) {
 	choice, ok := p.peekWithChoice([]*tokenPattern{
 		pUndefined,
 		pTrue,
@@ -316,6 +318,7 @@ func (p *parser) parseExpression() (expression, error) {
 		pMinus,
 		pText,
 		pName,
+		pLparen,
 	}, []string{
 		"literal",
 		"literal",
@@ -324,58 +327,130 @@ func (p *parser) parseExpression() (expression, error) {
 		"literal",
 		"literal",
 		"var",
+		"paren",
 	})
 	if !ok {
 		return nil, fmt.Errorf("expecting expression")
 	}
 
-	// left
-	var left expression
+	// first
+	var first expression
 	switch choice {
-	case "external":
-		p.next()
-		left = &tExternal{}
-
 	case "literal":
 		val, err := p.parseLiteral()
-
 		if err != nil {
 			return nil, err
 		}
-		left = val.(expression)
+		first = val.(expression)
 
 	case "var":
 		token := p.next()
-		left = &tVar{token}
+		first = &tVar{token}
+
+	case "paren":
+		p.next()
+
+		expr, err := p.parseExpression(true)
+		if err != nil {
+			return nil, err
+		}
+		first = expr
+
+		if _, err := p.nextAndCheck(pRparen); err != nil {
+			return nil, err
+		}
 
 	default:
 		panic(fmt.Sprintf("nextAndChoice returned '%s'", choice))
 	}
 
-	// operator?
-	op, ok := p.peekWithChoice([]*tokenPattern{
-		pPlus,
-		pMinus,
-		pMult,
-		pDiv,
-	}, []string{
-		string(opPlus),
-		string(opMinus),
-		string(opMult),
-		string(opDiv),
-	})
-	if !ok {
-		return left, nil
-	}
-	p.next()
-
-	// right
-	right, err := p.parseExpression()
-	if err != nil {
-		return nil, err
+	if !withOp {
+		return first, nil
 	}
 
-	return &tBinop{tOp(op), left, right}, nil
+	// more?
+	var (
+		exprs []expression
+		ops   []tOp
+	)
+	for {
+		op, ok := p.peekWithChoice([]*tokenPattern{
+			pPlus,
+			pMinus,
+			pMult,
+			pDiv,
+		}, []string{
+			string(opPlus),
+			string(opMinus),
+			string(opMult),
+			string(opDiv),
+		})
+		if !ok {
+			if exprs == nil {
+				return first, nil
+			} else {
+				return foldExprs(exprs, ops), nil
+			}
+		}
+
+		if exprs == nil {
+			exprs = []expression{first}
+		}
+
+		p.next()
+		ops = append(ops, tOp(op))
+
+		next, err := p.parseExpression(false)
+		if err != nil {
+			return nil, err
+		}
+		exprs = append(exprs, next)
+	}
+}
+
+var opPrecedence = map[tOp]int{
+	opPlus:  1,
+	opMinus: 1,
+	opMult:  2,
+	opDiv:   3,
+}
+
+// foldExprs folds expressions separated by operators by respecting the
+// operator precedence rules.
+//
+// Implementation note: The `exprs` array has one more element than the
+// `ops` array at all times. The operator at index `i` joins the expressions
+// at index `i` and `i+1`. The algorithm folds left by iteratively finding
+// a local maxima for operator precedence -- i.e. a place in the `ops` array
+// where the left and right are lower than the operator to fold.
+func foldExprs(exprs []expression, ops []tOp) expression {
+folding:
+	for {
+		for i, end := 0, len(ops)-1; i <= end; i++ {
+			left := (i == 0)
+			if !left {
+				left = opPrecedence[ops[i-1]] <= opPrecedence[ops[i]]
+			}
+
+			right := (i == end)
+			if !right {
+				right = opPrecedence[ops[i]] >= opPrecedence[ops[i+1]]
+			}
+
+			if left && right {
+				folded := &tBinop{ops[i], exprs[i], exprs[i+1]}
+				if end == 0 {
+					return folded
+				}
+
+				ops = append(ops[:i], ops[i+1:]...)
+				exprs = append(exprs[:i], exprs[i+1:]...)
+				exprs[i] = folded
+
+				continue folding
+			}
+		}
+	}
 }
 
 func (p *parser) parseType() (Type, error) {

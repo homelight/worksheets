@@ -15,6 +15,7 @@ package worksheets
 import (
 	"strings"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -92,12 +93,39 @@ func (s *Zuite) TestParser_parseExpressionOrExternal() {
 		`foo`: &tVar{"foo"},
 
 		`3 + 4`: &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}},
+
+		`(true)`:          &Bool{true},
+		`(3 + 4)`:         &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}},
+		`(3) + (4)`:       &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}},
+		`((((3)) + (4)))`: &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}},
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))
 		actual, err := p.parseExpressionOrExternal()
 		require.NoError(s.T(), err, input)
 		require.Equal(s.T(), expected, actual, input)
+	}
+}
+
+func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
+	cases := map[string]string{
+		`3`:           `3`,
+		`3 + 4`:       `7`,
+		`3 + 4 + 5`:   `12`,
+		`3 - 4 + 5`:   `4`,
+		`3 + 4 - 5`:   `2`,
+		`3 + 4 * 5`:   `23`,
+		`3 * 4 + 5`:   `17`,
+		`3 * (4 + 5)`: `27`,
+	}
+	for input, output := range cases {
+		expected := MustNewValue(output)
+		p := newParser(strings.NewReader(input))
+		expr, err := p.parseExpressionOrExternal()
+		require.NoError(s.T(), err, input)
+		actual, err := expr.Compute(nil)
+		require.NoError(s.T(), err, input)
+		assert.Equal(s.T(), expected, actual, "%s should equal %s", input, output)
 	}
 }
 

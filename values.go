@@ -143,21 +143,36 @@ func (value *Number) String() string {
 	return buffer.String()
 }
 
-func (left *Number) Plus(right *Number) *Number {
-	scale := left.typ.scale
-	if scale < right.typ.scale {
-		scale = right.typ.scale
+func (value *Number) toScale(scale int) int64 {
+	if scale < value.typ.scale {
+		panic("must round to lower scale")
 	}
 
-	lv, rv := left.value, right.value
-	for ls := left.typ.scale; ls < scale; ls++ {
-		lv *= 10
+	v := value.value
+	for s := value.typ.scale; s < scale; s++ {
+		v *= 10
 	}
-	for rs := right.typ.scale; rs < scale; rs++ {
-		rv *= 10
-	}
+
+	return v
+}
+
+func (left *Number) Plus(right *Number) *Number {
+	scale := left.typ.scale + right.typ.scale
+	lv, rv := left.toScale(scale), right.toScale(scale)
 
 	return &Number{lv + rv, &tNumberType{scale}}
+}
+
+func (left *Number) Minus(right *Number) *Number {
+	scale := left.typ.scale + right.typ.scale
+	lv, rv := left.toScale(scale), right.toScale(scale)
+
+	return &Number{lv - rv, &tNumberType{scale}}
+}
+
+func (left *Number) Mult(right *Number) *Number {
+	scale := left.typ.scale + right.typ.scale
+	return &Number{left.value * right.value, &tNumberType{scale}}
 }
 
 func NewText(value string) Value {
