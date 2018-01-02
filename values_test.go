@@ -209,3 +209,125 @@ func (s *Zuite) TestNumber_Round() {
 			ex.value, ex.round.mode, ex.round.scale, ex.expected)
 	}
 }
+
+func (s *Zuite) TestNumber_Div() {
+	cases := []struct {
+		left, right, expected *Number
+		round                 *tRound
+	}{
+		{
+			left:     MustNewValue("8").(*Number),
+			right:    MustNewValue("2").(*Number),
+			expected: MustNewValue("4.0").(*Number),
+			round:    &tRound{"up", 1},
+		},
+		{
+			left:     MustNewValue("8").(*Number),
+			right:    MustNewValue("2").(*Number),
+			expected: MustNewValue("4.00").(*Number),
+			round:    &tRound{"up", 2},
+		},
+		{
+			left:     MustNewValue("1").(*Number),
+			right:    MustNewValue("7").(*Number),
+			expected: MustNewValue("0.1").(*Number),
+			round:    &tRound{"down", 1},
+		},
+		{
+			left:     MustNewValue("1").(*Number),
+			right:    MustNewValue("7").(*Number),
+			expected: MustNewValue("0.2").(*Number),
+			round:    &tRound{"up", 1},
+		},
+		{
+			left:     MustNewValue("1").(*Number),
+			right:    MustNewValue("7").(*Number),
+			expected: MustNewValue("0.14").(*Number),
+			round:    &tRound{"down", 2},
+		},
+		{
+			left:     MustNewValue("1").(*Number),
+			right:    MustNewValue("7").(*Number),
+			expected: MustNewValue("0.15").(*Number),
+			round:    &tRound{"up", 2},
+		},
+		{
+			left:     MustNewValue("7").(*Number),
+			right:    MustNewValue("1.23").(*Number),
+			expected: MustNewValue("5.691").(*Number),
+			round:    &tRound{"down", 3},
+		},
+		{
+			left:     MustNewValue("7").(*Number),
+			right:    MustNewValue("1.23").(*Number),
+			expected: MustNewValue("5.691").(*Number),
+			round:    &tRound{"up", 3},
+		},
+		{
+			left:     MustNewValue("7").(*Number),
+			right:    MustNewValue("1.23").(*Number),
+			expected: MustNewValue("5.6910").(*Number),
+			round:    &tRound{"down", 4},
+		},
+		{
+			left:     MustNewValue("7").(*Number),
+			right:    MustNewValue("1.23").(*Number),
+			expected: MustNewValue("5.6911").(*Number),
+			round:    &tRound{"up", 4},
+		},
+		{
+			left:     MustNewValue("7").(*Number),
+			right:    MustNewValue("1.23").(*Number),
+			expected: MustNewValue("5.69105").(*Number),
+			round:    &tRound{"down", 5},
+		},
+		{
+			left:     MustNewValue("7").(*Number),
+			right:    MustNewValue("1.23").(*Number),
+			expected: MustNewValue("5.69106").(*Number),
+			round:    &tRound{"up", 5},
+		},
+		{
+			left:     MustNewValue("7.777").(*Number),
+			right:    MustNewValue("1.6").(*Number),
+			expected: MustNewValue("4").(*Number),
+			round:    &tRound{"down", 0},
+		},
+		{
+			left:     MustNewValue("7.777").(*Number),
+			right:    MustNewValue("1.6").(*Number),
+			expected: MustNewValue("5").(*Number),
+			round:    &tRound{"up", 0},
+		},
+		{
+			left:     MustNewValue("7.777").(*Number),
+			right:    MustNewValue("1.6").(*Number),
+			expected: MustNewValue("4.8").(*Number),
+			round:    &tRound{"down", 1},
+		},
+		{
+			left:     MustNewValue("7.777").(*Number),
+			right:    MustNewValue("1.6").(*Number),
+			expected: MustNewValue("4.9").(*Number),
+			round:    &tRound{"up", 1},
+		},
+		{
+			left:     MustNewValue("9.999999").(*Number),
+			right:    MustNewValue("1").(*Number),
+			expected: MustNewValue("9").(*Number),
+			round:    &tRound{"down", 0},
+		},
+		{
+			left:     MustNewValue("9.999999").(*Number),
+			right:    MustNewValue("1").(*Number),
+			expected: MustNewValue("10").(*Number),
+			round:    &tRound{"up", 0},
+		},
+	}
+	for _, ex := range cases {
+		actual := ex.left.Div(ex.right, ex.round.mode, ex.round.scale)
+		assert.Equal(s.T(), ex.expected, actual,
+			"%s / %s round %s %d should equal %s",
+			ex.left, ex.right, ex.round.mode, ex.round.scale, ex.expected)
+	}
+}

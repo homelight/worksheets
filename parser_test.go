@@ -189,14 +189,14 @@ func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
 		`1.2345 round up 4`:   `1.2345`,
 		`1.2345 round up 5`:   `1.23450`,
 
-		// ` 3 * 5  / 4 round down 0`:             `1`,
-		// `(3 * 5) / 4 round down 0`:             `3`,
-		// ` 3 * 5  / 4 round up 0`:               `6`,
-		// `(3 * 5) / 4 round up 0`:               `4`,
-		// `29 / 2 round down 0 / 7 round down 0`: `2`,
-		// `29 / 2 round down 0 / 7 round up 0`:   `2`,
-		// `29 / 2 round up 0 / 7 round down 0`:   `2`,
-		// `29 / 2 round up 0 / 7 round up 0`:     `3`,
+		` 3 * 5  / 4 round down 0`:             `3`,
+		`(3 * 5) / 4 round down 0`:             `3`,
+		` 3 * 5  / 4 round up 0`:               `6`,
+		`(3 * 5) / 4 round up 0`:               `4`,
+		`29 / 2 round down 0 / 7 round down 0`: `2`,
+		`29 / 2 round down 0 / 7 round up 0`:   `2`,
+		`29 / 2 round up 0 / 7 round down 0`:   `2`,
+		`29 / 2 round up 0 / 7 round up 0`:     `3`,
 	}
 	for input, output := range cases {
 		expected := MustNewValue(output)

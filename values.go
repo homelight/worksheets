@@ -226,6 +226,20 @@ func (value *Number) Round(mode RoundingMode, scale int) *Number {
 	return value
 }
 
+func (left *Number) Div(right *Number, mode RoundingMode, scale int) *Number {
+	// tempScale = max(left.typ.scale, scale + right.typ.scale) + 1
+	tempScale := scale + right.typ.scale
+	if left.typ.scale > tempScale {
+		tempScale = left.typ.scale
+	}
+	tempScale = tempScale + 1
+
+	// scale up left, integer division, and round correctly to finalize
+	lv := left.scaleUp(tempScale)
+	temp := &Number{lv / right.value, &tNumberType{tempScale - right.typ.scale}}
+	return temp.Round(mode, scale)
+}
+
 func NewText(value string) Value {
 	return &Text{value}
 }

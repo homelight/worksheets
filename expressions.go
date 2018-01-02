@@ -124,6 +124,11 @@ func (e *tBinop) Compute(ws *Worksheet) (Value, error) {
 		result = nLeft.Minus(nRight)
 	case opMult:
 		result = nLeft.Mult(nRight)
+	case opDiv:
+		if e.round == nil {
+			return nil, fmt.Errorf("division without rounding mode")
+		}
+		return nLeft.Div(nRight, e.round.mode, e.round.scale), nil
 	default:
 		panic("not implemented")
 	}
