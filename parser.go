@@ -100,6 +100,10 @@ var (
 	pUndefined  = newTokenPattern("undefined", "undefined")
 	pTrue       = newTokenPattern("true", "true")
 	pFalse      = newTokenPattern("false", "false")
+	pRound      = newTokenPattern("round", "round")
+	pUp         = newTokenPattern(string(modeUp), string(modeUp))
+	pDown       = newTokenPattern(string(modeDown), string(modeDown))
+	pHalf       = newTokenPattern(string(modeHalf), string(modeHalf))
 
 	// token patterns
 	pName   = newTokenPattern("name", "[a-z]+([a-z_]*[a-z])?")
@@ -251,11 +255,33 @@ const (
 	opDiv       = "div"
 )
 
+type tRoundingMode string
+
+const (
+	modeUp   tRoundingMode = "up"
+	modeDown               = "down"
+	modeHalf               = "half"
+)
+
+type tRound struct {
+	mode  tRoundingMode
+	scale int
+}
+
+func (t *tRound) String() string {
+	return fmt.Sprintf("%s %d", t.mode, t.scale)
+}
+
 type tExternal struct{}
 
 type tBinop struct {
 	op          tOp
 	left, right expression
+	round       *tRound
+}
+
+func (t *tBinop) String() string {
+	return fmt.Sprintf("binop(%s, %s, %s, %s)", t.op, t.left, t.right, t.round)
 }
 
 type tVar struct {
@@ -368,10 +394,19 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 		return first, nil
 	}
 
+	if p.peek(pRound) {
+		round, err := p.parseRound()
+		if err != nil {
+			return nil, err
+		}
+		first = &tBinop{opPlus, first, vZero, round}
+	}
+
 	// more?
 	var (
-		exprs []expression
-		ops   []tOp
+		exprs  []expression
+		ops    []tOp
+		rounds [][]*tRound
 	)
 	for {
 		op, ok := p.peekWithChoice([]*tokenPattern{
@@ -389,7 +424,7 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 			if exprs == nil {
 				return first, nil
 			} else {
-				return foldExprs(exprs, ops), nil
+				return foldExprs(exprs, ops, rounds), nil
 			}
 		}
 
@@ -405,6 +440,17 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 			return nil, err
 		}
 		exprs = append(exprs, next)
+
+		// roundings?
+		var roundsForOp []*tRound
+		for p.peek(pRound) {
+			round, err := p.parseRound()
+			if err != nil {
+				return nil, err
+			}
+			roundsForOp = append(roundsForOp, round)
+		}
+		rounds = append(rounds, roundsForOp)
 	}
 }
 
@@ -423,7 +469,7 @@ var opPrecedence = map[tOp]int{
 // at index `i` and `i+1`. The algorithm folds left by iteratively finding
 // a local maxima for operator precedence -- i.e. a place in the `ops` array
 // where the left and right are lower than the operator to fold.
-func foldExprs(exprs []expression, ops []tOp) expression {
+func foldExprs(exprs []expression, ops []tOp, rounds [][]*tRound) expression {
 folding:
 	for {
 		for i, end := 0, len(ops)-1; i <= end; i++ {
@@ -438,7 +484,27 @@ folding:
 			}
 
 			if left && right {
-				folded := &tBinop{ops[i], exprs[i], exprs[i+1]}
+				var round *tRound
+
+				// TODO(pascal): properly folding roundings requires an
+				// explanation. It is not trivial.
+				for j := i; j < len(rounds); j++ {
+					if len(rounds[j]) != 0 {
+						round = rounds[j][0]
+						rounds[j] = rounds[j][1:]
+						j = j - 1
+						for 0 <= j && len(rounds[j]) != 0 {
+							for _, remainderRound := range rounds[j] {
+								exprs[j+1] = &tBinop{opPlus, exprs[j+1], vZero, remainderRound}
+							}
+							rounds[j] = nil
+							j--
+						}
+						break
+					}
+				}
+
+				folded := &tBinop{ops[i], exprs[i], exprs[i+1], round}
 				if end == 0 {
 					return folded
 				}
@@ -451,6 +517,38 @@ folding:
 			}
 		}
 	}
+}
+
+func (p *parser) parseRound() (*tRound, error) {
+	if _, err := p.nextAndCheck(pRound); err != nil {
+		return nil, err
+	}
+
+	mode, ok := p.peekWithChoice([]*tokenPattern{
+		pUp,
+		pDown,
+		pHalf,
+	}, []string{
+		string(modeUp),
+		string(modeDown),
+		string(modeHalf),
+	})
+	if !ok {
+		return nil, fmt.Errorf("expecting rounding mode (up, down, or half)")
+	}
+	p.next()
+
+	sIndex, err := p.nextAndCheck(pIndex)
+	if err != nil {
+		return nil, err
+	}
+	index, err := strconv.Atoi(sIndex)
+	if err != nil {
+		// unexpected since sIndex should conform to pIndex
+		panic(err)
+	}
+
+	return &tRound{tRoundingMode(mode), index}, nil
 }
 
 func (p *parser) parseType() (Type, error) {

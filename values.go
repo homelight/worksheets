@@ -19,6 +19,10 @@ import (
 	"strings"
 )
 
+var (
+	vZero = &Number{0, &tNumberType{0}}
+)
+
 // Value represents a runtime value.
 type Value interface {
 	// Type returns this value's type.

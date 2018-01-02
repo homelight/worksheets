@@ -92,18 +92,76 @@ func (s *Zuite) TestParser_parseExpressionOrExternal() {
 
 		`foo`: &tVar{"foo"},
 
-		`3 + 4`: &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}},
+		`3 + 4`: &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}, nil},
 
 		`(true)`:          &Bool{true},
-		`(3 + 4)`:         &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}},
-		`(3) + (4)`:       &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}},
-		`((((3)) + (4)))`: &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}},
+		`(3 + 4)`:         &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}, nil},
+		`(3) + (4)`:       &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}, nil},
+		`((((3)) + (4)))`: &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}, nil},
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))
 		actual, err := p.parseExpressionOrExternal()
 		require.NoError(s.T(), err, input)
-		require.Equal(s.T(), expected, actual, input)
+		assert.Equal(s.T(), expected, actual, input)
+	}
+}
+
+func (s *Zuite) TestParser_parseExpressionAllAboutRounding() {
+	cases := map[string]expression{
+		// single expressions being rounded
+		`3.00 round down 1`:     &tBinop{opPlus, &Number{300, &tNumberType{2}}, &Number{0, &tNumberType{0}}, &tRound{"down", 1}},
+		`3.00 * 4 round down 5`: &tBinop{opMult, &Number{300, &tNumberType{2}}, &Number{4, &tNumberType{0}}, &tRound{"down", 5}},
+		`3.00 round down 5 * 4`: &tBinop{
+			opMult,
+			&tBinop{opPlus, &Number{300, &tNumberType{2}}, &Number{0, &tNumberType{0}}, &tRound{"down", 5}},
+			&Number{4, &tNumberType{0}},
+			nil,
+		},
+
+		// rounding closest to the operator it applies
+		`1 * 2 round up 4 * 3 round half 5`: &tBinop{
+			opMult,
+			&tBinop{opMult, &Number{1, &tNumberType{0}}, &Number{2, &tNumberType{0}}, &tRound{"up", 4}},
+			&Number{3, &tNumberType{0}},
+			&tRound{"half", 5},
+		},
+		// same way to write the above, because 1 * 2 is the first operator to
+		// be folded, it associates with the first rounding mode
+		`1 * 2 * 3 round up 4 round half 5`: &tBinop{
+			opMult,
+			&tBinop{opMult, &Number{1, &tNumberType{0}}, &Number{2, &tNumberType{0}}, &tRound{"up", 4}},
+			&Number{3, &tNumberType{0}},
+			&tRound{"half", 5},
+		},
+		// here, because 2 / 3 is the first operator to be folded, the rounding
+		// mode applies to this first
+		`1 * 2 / 3 round up 4 round half 5`: &tBinop{
+			opMult,
+			&Number{1, &tNumberType{0}},
+			&tBinop{opDiv, &Number{2, &tNumberType{0}}, &Number{3, &tNumberType{0}}, &tRound{"up", 4}},
+			&tRound{"half", 5},
+		},
+		// we move round up 4 closer to the 1 * 2 group, but since the division
+		// has precedence, this really means that 2 is first rounded (i.e. it
+		// has no bearings on the * binop)
+		`1 * 2 round up 4 / 3 round half 5`: &tBinop{
+			opMult,
+			&Number{1, &tNumberType{0}},
+			&tBinop{
+				opDiv,
+				&tBinop{opPlus, &Number{2, &tNumberType{0}}, vZero, &tRound{"up", 4}},
+				&Number{3, &tNumberType{0}},
+				&tRound{"half", 5},
+			},
+			nil,
+		},
+	}
+	for input, expected := range cases {
+		p := newParser(strings.NewReader(input))
+		actual, err := p.parseExpressionOrExternal()
+		require.NoError(s.T(), err, input)
+		assert.Equal(s.T(), expected, actual, input)
 	}
 }
 
@@ -117,6 +175,15 @@ func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
 		`3 + 4 * 5`:   `23`,
 		`3 * 4 + 5`:   `17`,
 		`3 * (4 + 5)`: `27`,
+
+		// ` 3 * 5  / 4 round down 0`:             `1`,
+		// `(3 * 5) / 4 round down 0`:             `3`,
+		// ` 3 * 5  / 4 round up 0`:               `6`,
+		// `(3 * 5) / 4 round up 0`:               `4`,
+		// `29 / 2 round down 0 / 7 round down 0`: `2`,
+		// `29 / 2 round down 0 / 7 round up 0`:   `2`,
+		// `29 / 2 round up 0 / 7 round down 0`:   `2`,
+		// `29 / 2 round up 0 / 7 round up 0`:     `3`,
 	}
 	for input, output := range cases {
 		expected := MustNewValue(output)
