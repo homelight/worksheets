@@ -170,3 +170,42 @@ func (s *Zuite) TestNumber_Mult() {
 		assert.Equal(s.T(), ex.expected, actual, "%s + %s", ex.right, ex.left)
 	}
 }
+
+func (s *Zuite) TestNumber_Round() {
+	cases := []struct {
+		value, expected *Number
+		round           *tRound
+	}{
+		{
+			value:    MustNewValue("2.34").(*Number),
+			round:    &tRound{"down", 2},
+			expected: MustNewValue("2.34").(*Number),
+		},
+		{
+			value:    MustNewValue("2.34").(*Number),
+			round:    &tRound{"down", 3},
+			expected: MustNewValue("2.340").(*Number),
+		},
+		{
+			value:    MustNewValue("2.34").(*Number),
+			round:    &tRound{"down", 1},
+			expected: MustNewValue("2.3").(*Number),
+		},
+		{
+			value:    MustNewValue("2.34").(*Number),
+			round:    &tRound{"up", 1},
+			expected: MustNewValue("2.4").(*Number),
+		},
+		{
+			value:    MustNewValue("2.00").(*Number),
+			round:    &tRound{"up", 1},
+			expected: MustNewValue("2.0").(*Number),
+		},
+	}
+	for _, ex := range cases {
+		actual := ex.value.Round(ex.round.mode, ex.round.scale)
+		assert.Equal(s.T(), ex.expected, actual,
+			"%s round %s %d should equal %s",
+			ex.value, ex.round.mode, ex.round.scale, ex.expected)
+	}
+}

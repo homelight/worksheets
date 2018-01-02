@@ -116,16 +116,23 @@ func (e *tBinop) Compute(ws *Worksheet) (Value, error) {
 	}
 
 	// TODO(pascal): implement for other ops
+	var result *Number
 	switch e.op {
 	case opPlus:
-		return nLeft.Plus(nRight), nil
+		result = nLeft.Plus(nRight)
 	case opMinus:
-		return nLeft.Minus(nRight), nil
+		result = nLeft.Minus(nRight)
 	case opMult:
-		return nLeft.Mult(nRight), nil
+		result = nLeft.Mult(nRight)
 	default:
 		panic("not implemented")
 	}
+
+	if e.round != nil {
+		result = result.Round(e.round.mode, e.round.scale)
+	}
+
+	return result, nil
 }
 
 type ePlugin struct {

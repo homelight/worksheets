@@ -23,6 +23,15 @@ var (
 	vZero = &Number{0, &tNumberType{0}}
 )
 
+// RoundingMode describes the rounding mode to be used in an operation.
+type RoundingMode string
+
+const (
+	ModeUp   RoundingMode = "up"
+	ModeDown              = "down"
+	ModeHalf              = "half"
+)
+
 // Value represents a runtime value.
 type Value interface {
 	// Type returns this value's type.
@@ -147,7 +156,7 @@ func (value *Number) String() string {
 	return buffer.String()
 }
 
-func (value *Number) toScale(scale int) int64 {
+func (value *Number) scaleUp(scale int) int64 {
 	if scale < value.typ.scale {
 		panic("must round to lower scale")
 	}
@@ -162,14 +171,14 @@ func (value *Number) toScale(scale int) int64 {
 
 func (left *Number) Plus(right *Number) *Number {
 	scale := left.typ.scale + right.typ.scale
-	lv, rv := left.toScale(scale), right.toScale(scale)
+	lv, rv := left.scaleUp(scale), right.scaleUp(scale)
 
 	return &Number{lv + rv, &tNumberType{scale}}
 }
 
 func (left *Number) Minus(right *Number) *Number {
 	scale := left.typ.scale + right.typ.scale
-	lv, rv := left.toScale(scale), right.toScale(scale)
+	lv, rv := left.scaleUp(scale), right.scaleUp(scale)
 
 	return &Number{lv - rv, &tNumberType{scale}}
 }
@@ -177,6 +186,44 @@ func (left *Number) Minus(right *Number) *Number {
 func (left *Number) Mult(right *Number) *Number {
 	scale := left.typ.scale + right.typ.scale
 	return &Number{left.value * right.value, &tNumberType{scale}}
+}
+
+func (value *Number) Round(mode RoundingMode, scale int) *Number {
+	if value.typ.scale == scale {
+		return value
+	} else if value.typ.scale < scale {
+		v := value.scaleUp(scale)
+		return &Number{v, &tNumberType{scale}}
+	}
+
+	factor := int64(1)
+	for i := value.typ.scale; i != scale; i-- {
+		factor = factor * 10
+	}
+
+	remainder := value.value % factor
+
+	v := value.value
+	for i := value.typ.scale; i != scale; i-- {
+		v = v / 10
+	}
+
+	switch mode {
+	case ModeDown:
+		return &Number{v, &tNumberType{scale}}
+
+	case ModeUp:
+		var up int64
+		if remainder != 0 {
+			up = 1
+		}
+		return &Number{v + up, &tNumberType{scale}}
+
+	case ModeHalf:
+		panic("not implemented")
+	}
+
+	return value
 }
 
 func NewText(value string) Value {

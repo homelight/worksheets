@@ -101,9 +101,9 @@ var (
 	pTrue       = newTokenPattern("true", "true")
 	pFalse      = newTokenPattern("false", "false")
 	pRound      = newTokenPattern("round", "round")
-	pUp         = newTokenPattern(string(modeUp), string(modeUp))
-	pDown       = newTokenPattern(string(modeDown), string(modeDown))
-	pHalf       = newTokenPattern(string(modeHalf), string(modeHalf))
+	pUp         = newTokenPattern(string(ModeUp), string(ModeUp))
+	pDown       = newTokenPattern(string(ModeDown), string(ModeDown))
+	pHalf       = newTokenPattern(string(ModeHalf), string(ModeHalf))
 
 	// token patterns
 	pName   = newTokenPattern("name", "[a-z]+([a-z_]*[a-z])?")
@@ -255,16 +255,8 @@ const (
 	opDiv       = "div"
 )
 
-type tRoundingMode string
-
-const (
-	modeUp   tRoundingMode = "up"
-	modeDown               = "down"
-	modeHalf               = "half"
-)
-
 type tRound struct {
-	mode  tRoundingMode
+	mode  RoundingMode
 	scale int
 }
 
@@ -529,9 +521,9 @@ func (p *parser) parseRound() (*tRound, error) {
 		pDown,
 		pHalf,
 	}, []string{
-		string(modeUp),
-		string(modeDown),
-		string(modeHalf),
+		string(ModeUp),
+		string(ModeDown),
+		string(ModeHalf),
 	})
 	if !ok {
 		return nil, fmt.Errorf("expecting rounding mode (up, down, or half)")
@@ -548,7 +540,7 @@ func (p *parser) parseRound() (*tRound, error) {
 		panic(err)
 	}
 
-	return &tRound{tRoundingMode(mode), index}, nil
+	return &tRound{RoundingMode(mode), index}, nil
 }
 
 func (p *parser) parseType() (Type, error) {
