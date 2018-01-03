@@ -106,10 +106,13 @@ var (
 	pHalf       = newTokenPattern(string(ModeHalf), string(ModeHalf))
 
 	// token patterns
-	pName   = newTokenPattern("name", "[a-z]+([a-z_]*[a-z])?")
-	pIndex  = newTokenPattern("index", "[0-9]+")
-	pNumber = newTokenPattern("number", "[0-9]+(\\.[0-9]+)?")
-	pText   = newTokenPattern("text", "\".*\"")
+	pName  = newTokenPattern("name", "[a-z]+([a-z_]*[a-z])?")
+	pIndex = newTokenPattern("index", "[0-9]+")
+	pText  = newTokenPattern("text", "\".*\"")
+
+	pNumber               = newTokenPattern("number", "[0-9]+(\\.[0-9]+)?")
+	pNumberWithUnderscore = newTokenPattern("number", "[_0-9]+")
+	pNumberWithDot        = newTokenPattern("number", "\\.[0-9]*")
 )
 
 func (p *parser) parseWorksheets() (map[string]*tWorksheet, error) {
@@ -333,11 +336,15 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 		pTrue,
 		pFalse,
 		pNumber,
+		pNumberWithDot,
+		pNumberWithUnderscore,
 		pMinus,
 		pText,
 		pName,
 		pLparen,
 	}, []string{
+		"literal",
+		"literal",
 		"literal",
 		"literal",
 		"literal",
@@ -599,6 +606,19 @@ func (p *parser) parseLiteral() (Value, error) {
 		}
 	}
 	if pNumber.re.MatchString(token) {
+		for p.peek(pNumberWithUnderscore) || p.peek(pNumberWithDot) {
+			addToken := p.next()
+			if strings.HasSuffix(addToken, "_") {
+				return nil, fmt.Errorf("number cannot terminate with underscore")
+			}
+			if strings.HasSuffix(addToken, ".") {
+				if p.peek(pNumberWithUnderscore) {
+					return nil, fmt.Errorf("number fraction cannot start with underscore")
+				}
+				return nil, fmt.Errorf("number cannot terminate with dot")
+			}
+			token = token + strings.Replace(addToken, "_", "", -1)
+		}
 		dot := strings.Index(token, ".")
 		value, err := strconv.ParseInt(strings.Replace(token, ".", "", 1), 10, 64)
 		if err != nil {
@@ -621,6 +641,9 @@ func (p *parser) parseLiteral() (Value, error) {
 			return nil, err
 		}
 		return &Text{value}, nil
+	}
+	if pNumberWithUnderscore.re.MatchString(token) {
+		return nil, fmt.Errorf("number cannot start with underscore")
 	}
 	return nil, fmt.Errorf("unknown literal, found %s", token)
 }
