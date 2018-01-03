@@ -209,13 +209,30 @@ func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
 	}
 }
 
+func (s *Zuite) TestParser_parseExpressionErrors() {
+	cases := map[string]string{
+		`_1_234`:    `number cannot start with underscore`,
+		`1_234_`:    `number cannot terminate with underscore`,
+		`1_234.`:    `number cannot terminate with dot`,
+		`1_234._67`: `number fraction cannot start with underscore`,
+		`1_234.+7`:  `number cannot terminate with dot`,
+	}
+	for input, expected := range cases {
+		p := newParser(strings.NewReader(input))
+		_, err := p.parseExpression(true)
+		assert.EqualError(s.T(), err, expected, input)
+	}
+}
+
 func (s *Zuite) TestParser_parseLiteral() {
 	cases := map[string]Value{
 		`undefined`: &Undefined{},
 
-		`1`:       &Number{1, &tNumberType{0}},
-		`-123.67`: &Number{-12367, &tNumberType{2}},
-		`1.000`:   &Number{1000, &tNumberType{3}},
+		`1`:                  &Number{1, &tNumberType{0}},
+		`-123.67`:            &Number{-12367, &tNumberType{2}},
+		`1.000`:              &Number{1000, &tNumberType{3}},
+		`1_234.000_000_008`:  &Number{1234000000008, &tNumberType{9}},
+		`-1_234.000_000_008`: &Number{-1234000000008, &tNumberType{9}},
 
 		`"foo"`: &Text{"foo"},
 		`"456"`: &Text{"456"},
@@ -226,7 +243,7 @@ func (s *Zuite) TestParser_parseLiteral() {
 		p := newParser(strings.NewReader(input))
 		actual, err := p.parseLiteral()
 		require.NoError(s.T(), err)
-		require.Equal(s.T(), expected, actual)
+		assert.Equal(s.T(), expected, actual, input)
 	}
 }
 
@@ -245,23 +262,40 @@ func (s *Zuite) TestParser_parseType() {
 	}
 }
 
-func (s *Zuite) TestTokenizer_Simple() {
-	input := `worksheet simple {1:full_name text}`
-	p := newParser(strings.NewReader(input))
+func (s *Zuite) TestTokenizer() {
+	cases := map[string][]string{
+		`worksheet simple {1:full_name text}`: []string{
+			"worksheet",
+			"simple",
+			"{",
+			"1",
+			":",
+			"full_name",
+			"text",
+			"}",
+		},
+		`1_2___4.6_78___+_1_2`: []string{
+			"1",
+			"_2___4",
+			".6",
+			"_78___",
+			"+",
+			"_1_2",
+		},
+		`1_2__6+7`: []string{
+			"1",
+			"_2__6",
+			"+",
+			"7",
+		},
+	}
+	for input, toks := range cases {
+		p := newParser(strings.NewReader(input))
 
-	toks := []string{
-		"worksheet",
-		"simple",
-		"{",
-		"1",
-		":",
-		"full_name",
-		"text",
-		"}",
+		for _, tok := range toks {
+			require.Equal(s.T(), tok, p.next(), input)
+		}
+		require.Equal(s.T(), "", p.next(), input)
+		require.Equal(s.T(), "", p.next(), input)
 	}
-	for _, tok := range toks {
-		require.Equal(s.T(), tok, p.next())
-	}
-	require.Equal(s.T(), "", p.next())
-	require.Equal(s.T(), "", p.next())
 }
