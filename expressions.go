@@ -17,28 +17,143 @@ import (
 )
 
 type expression interface {
-	Compute(ws *Worksheet) Value
+	Args() []string
+	Compute(ws *Worksheet) (Value, error)
 }
 
 // Assert that all expressions implement the expression interface
 var _ = []expression{
+	&Undefined{},
+	&Number{},
+	&Text{},
+	&Bool{},
+
 	&tExternal{},
+	&ePlugin{},
+	&tVar{},
+	&tBinop{},
 }
 
-func (e *tExternal) Compute(ws *Worksheet) Value {
+func (e *tExternal) Args() []string {
+	panic(fmt.Sprintf("unresolved plugin in worksheet"))
+}
+
+func (e *tExternal) Compute(ws *Worksheet) (Value, error) {
 	panic(fmt.Sprintf("unresolved plugin in worksheet(%s)", ws.def.name))
+}
+
+func (e *Undefined) Args() []string {
+	return nil
+}
+
+func (e *Undefined) Compute(ws *Worksheet) (Value, error) {
+	return e, nil
+}
+
+func (e *Number) Args() []string {
+	return nil
+}
+
+func (e *Number) Compute(ws *Worksheet) (Value, error) {
+	return e, nil
+}
+
+func (e *Text) Args() []string {
+	return nil
+}
+
+func (e *Text) Compute(ws *Worksheet) (Value, error) {
+	return e, nil
+}
+
+func (e *Bool) Args() []string {
+	return nil
+}
+
+func (e *Bool) Compute(ws *Worksheet) (Value, error) {
+	return e, nil
+}
+
+func (e *tVar) Args() []string {
+	return []string{e.name}
+}
+
+func (e *tVar) Compute(ws *Worksheet) (Value, error) {
+	return ws.Get(e.name)
+}
+
+func (e *tBinop) Args() []string {
+	left := e.left.Args()
+	right := e.right.Args()
+	return append(left, right...)
+}
+
+func (e *tBinop) Compute(ws *Worksheet) (Value, error) {
+	left, err := e.left.Compute(ws)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := left.(*Undefined); ok {
+		return left, nil
+	}
+
+	right, err := e.right.Compute(ws)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := right.(*Undefined); ok {
+		return right, nil
+	}
+
+	nLeft, ok := left.(*Number)
+	if !ok {
+		return nil, fmt.Errorf("op on non-number")
+	}
+
+	nRight, ok := right.(*Number)
+	if !ok {
+		return nil, fmt.Errorf("op on non-number")
+	}
+
+	// TODO(pascal): implement for other ops
+	var result *Number
+	switch e.op {
+	case opPlus:
+		result = nLeft.Plus(nRight)
+	case opMinus:
+		result = nLeft.Minus(nRight)
+	case opMult:
+		result = nLeft.Mult(nRight)
+	case opDiv:
+		if e.round == nil {
+			return nil, fmt.Errorf("division without rounding mode")
+		}
+		return nLeft.Div(nRight, e.round.mode, e.round.scale), nil
+	default:
+		panic("not implemented")
+	}
+
+	if e.round != nil {
+		result = result.Round(e.round.mode, e.round.scale)
+	}
+
+	return result, nil
 }
 
 type ePlugin struct {
 	computedBy ComputedBy
 }
 
-func (e *ePlugin) Compute(ws *Worksheet) Value {
+func (e *ePlugin) Args() []string {
+	return e.computedBy.Args()
+}
+
+func (e *ePlugin) Compute(ws *Worksheet) (Value, error) {
 	args := e.computedBy.Args()
 	values := make([]Value, len(args), len(args))
 	for i, arg := range args {
 		value := ws.MustGet(arg)
 		values[i] = value
 	}
-	return e.computedBy.Compute(values...)
+	return e.computedBy.Compute(values...), nil
 }

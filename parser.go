@@ -81,21 +81,6 @@ type tNumberType struct {
 	scale int
 }
 
-type tUndefined struct{}
-
-type tNumber struct {
-	value int64
-	typ   *tNumberType
-}
-
-type tText struct {
-	value string
-}
-
-type tBool struct {
-	value bool
-}
-
 var (
 	// tokens
 	pLacco      = newTokenPattern("{", "\\{")
@@ -104,16 +89,27 @@ var (
 	pRparen     = newTokenPattern(")", "\\)")
 	pLbracket   = newTokenPattern("[", "\\[")
 	pRbracket   = newTokenPattern("]", "\\]")
-	pColon      = newTokenPattern(":", ":")
+	pColon      = newTokenPattern(":", "\\:")
+	pPlus       = newTokenPattern("+", "\\+")
+	pMinus      = newTokenPattern("-", "\\-")
+	pMult       = newTokenPattern("*", "\\*")
+	pDiv        = newTokenPattern("/", "\\/")
 	pWorksheet  = newTokenPattern("worksheet", "worksheet")
 	pComputedBy = newTokenPattern("computed_by", "computed_by")
 	pExternal   = newTokenPattern("external", "external")
+	pUndefined  = newTokenPattern("undefined", "undefined")
+	pTrue       = newTokenPattern("true", "true")
+	pFalse      = newTokenPattern("false", "false")
+	pRound      = newTokenPattern("round", "round")
+	pUp         = newTokenPattern(string(ModeUp), string(ModeUp))
+	pDown       = newTokenPattern(string(ModeDown), string(ModeDown))
+	pHalf       = newTokenPattern(string(ModeHalf), string(ModeHalf))
 
 	// token patterns
 	pName   = newTokenPattern("name", "[a-z]+([a-z_]*[a-z])?")
 	pIndex  = newTokenPattern("index", "[0-9]+")
 	pNumber = newTokenPattern("number", "[0-9]+(\\.[0-9]+)?")
-	pString = newTokenPattern("string", "\".*\"")
+	pText   = newTokenPattern("text", "\".*\"")
 )
 
 func (p *parser) parseWorksheets() (map[string]*tWorksheet, error) {
@@ -229,7 +225,7 @@ func (p *parser) parseField() (*tField, error) {
 			return nil, err
 		}
 
-		computedBy, err = p.parseExpression()
+		computedBy, err = p.parseExpressionOrExternal()
 		if err != nil {
 			return nil, err
 		}
@@ -250,15 +246,301 @@ func (p *parser) parseField() (*tField, error) {
 	return f, nil
 }
 
+type tOp string
+
+const (
+	opPlus  tOp = "plus"
+	opMinus     = "minus"
+	opMult      = "mult"
+	opDiv       = "div"
+)
+
+type tRound struct {
+	mode  RoundingMode
+	scale int
+}
+
+func (t *tRound) String() string {
+	return fmt.Sprintf("%s %d", t.mode, t.scale)
+}
+
 type tExternal struct{}
 
-func (p *parser) parseExpression() (expression, error) {
-	_, err := p.nextAndCheck(pExternal)
-	if err != nil {
+type tBinop struct {
+	op          tOp
+	left, right expression
+	round       *tRound
+}
+
+func (t *tBinop) String() string {
+	return fmt.Sprintf("binop(%s, %s, %s, %s)", t.op, t.left, t.right, t.round)
+}
+
+type tVar struct {
+	name string
+}
+
+// parseExpressionOrExternal
+//
+//  := 'external'
+//   | parseExpression
+func (p *parser) parseExpressionOrExternal() (expression, error) {
+	choice, ok := p.peekWithChoice([]*tokenPattern{
+		pExternal,
+		pUndefined,
+		pTrue,
+		pFalse,
+		pNumber,
+		pMinus,
+		pText,
+		pName,
+		pLparen,
+	}, []string{
+		"external",
+		"expr",
+		"expr",
+		"expr",
+		"expr",
+		"expr",
+		"expr",
+		"expr",
+		"expr",
+	})
+	if !ok {
+		return nil, fmt.Errorf("expecting expression or external")
+	}
+	switch choice {
+	case "external":
+		p.next()
+		return &tExternal{}, nil
+
+	case "expr":
+		return p.parseExpression(true)
+
+	default:
+		panic(fmt.Sprintf("nextAndChoice returned '%s'", choice))
+	}
+}
+
+// parseExpression
+//
+//  := parseLiteral
+//   | var
+//   | exp (+ -  * /) exp
+func (p *parser) parseExpression(withOp bool) (expression, error) {
+	choice, ok := p.peekWithChoice([]*tokenPattern{
+		pUndefined,
+		pTrue,
+		pFalse,
+		pNumber,
+		pMinus,
+		pText,
+		pName,
+		pLparen,
+	}, []string{
+		"literal",
+		"literal",
+		"literal",
+		"literal",
+		"literal",
+		"literal",
+		"var",
+		"paren",
+	})
+	if !ok {
+		return nil, fmt.Errorf("expecting expression")
+	}
+
+	// first
+	var first expression
+	switch choice {
+	case "literal":
+		val, err := p.parseLiteral()
+		if err != nil {
+			return nil, err
+		}
+		first = val.(expression)
+
+	case "var":
+		token := p.next()
+		first = &tVar{token}
+
+	case "paren":
+		p.next()
+
+		expr, err := p.parseExpression(true)
+		if err != nil {
+			return nil, err
+		}
+		first = expr
+
+		if _, err := p.nextAndCheck(pRparen); err != nil {
+			return nil, err
+		}
+
+	default:
+		panic(fmt.Sprintf("nextAndChoice returned '%s'", choice))
+	}
+
+	if !withOp {
+		return first, nil
+	}
+
+	if p.peek(pRound) {
+		round, err := p.parseRound()
+		if err != nil {
+			return nil, err
+		}
+		first = &tBinop{opPlus, first, vZero, round}
+	}
+
+	// more?
+	var (
+		exprs  []expression
+		ops    []tOp
+		rounds [][]*tRound
+	)
+	for {
+		op, ok := p.peekWithChoice([]*tokenPattern{
+			pPlus,
+			pMinus,
+			pMult,
+			pDiv,
+		}, []string{
+			string(opPlus),
+			string(opMinus),
+			string(opMult),
+			string(opDiv),
+		})
+		if !ok {
+			if exprs == nil {
+				return first, nil
+			} else {
+				return foldExprs(exprs, ops, rounds), nil
+			}
+		}
+
+		if exprs == nil {
+			exprs = []expression{first}
+		}
+
+		p.next()
+		ops = append(ops, tOp(op))
+
+		next, err := p.parseExpression(false)
+		if err != nil {
+			return nil, err
+		}
+		exprs = append(exprs, next)
+
+		// roundings?
+		var roundsForOp []*tRound
+		for p.peek(pRound) {
+			round, err := p.parseRound()
+			if err != nil {
+				return nil, err
+			}
+			roundsForOp = append(roundsForOp, round)
+		}
+		rounds = append(rounds, roundsForOp)
+	}
+}
+
+var opPrecedence = map[tOp]int{
+	opPlus:  1,
+	opMinus: 1,
+	opMult:  2,
+	opDiv:   3,
+}
+
+// foldExprs folds expressions separated by operators by respecting the
+// operator precedence rules.
+//
+// Implementation note: The `exprs` array has one more element than the
+// `ops` array at all times. The operator at index `i` joins the expressions
+// at index `i` and `i+1`. The algorithm folds left by iteratively finding
+// a local maxima for operator precedence -- i.e. a place in the `ops` array
+// where the left and right are lower than the operator to fold.
+func foldExprs(exprs []expression, ops []tOp, rounds [][]*tRound) expression {
+folding:
+	for {
+		for i, end := 0, len(ops)-1; i <= end; i++ {
+			left := (i == 0)
+			if !left {
+				left = opPrecedence[ops[i-1]] <= opPrecedence[ops[i]]
+			}
+
+			right := (i == end)
+			if !right {
+				right = opPrecedence[ops[i]] >= opPrecedence[ops[i+1]]
+			}
+
+			if left && right {
+				var round *tRound
+
+				// TODO(pascal): properly folding roundings requires an
+				// explanation. It is not trivial.
+				for j := i; j < len(rounds); j++ {
+					if len(rounds[j]) != 0 {
+						round = rounds[j][0]
+						rounds[j] = rounds[j][1:]
+						j = j - 1
+						for 0 <= j && len(rounds[j]) != 0 {
+							for _, remainderRound := range rounds[j] {
+								exprs[j+1] = &tBinop{opPlus, exprs[j+1], vZero, remainderRound}
+							}
+							rounds[j] = nil
+							j--
+						}
+						break
+					}
+				}
+
+				folded := &tBinop{ops[i], exprs[i], exprs[i+1], round}
+				if end == 0 {
+					return folded
+				}
+
+				ops = append(ops[:i], ops[i+1:]...)
+				exprs = append(exprs[:i], exprs[i+1:]...)
+				exprs[i] = folded
+
+				continue folding
+			}
+		}
+	}
+}
+
+func (p *parser) parseRound() (*tRound, error) {
+	if _, err := p.nextAndCheck(pRound); err != nil {
 		return nil, err
 	}
 
-	return &tExternal{}, nil
+	mode, ok := p.peekWithChoice([]*tokenPattern{
+		pUp,
+		pDown,
+		pHalf,
+	}, []string{
+		string(ModeUp),
+		string(ModeDown),
+		string(ModeHalf),
+	})
+	if !ok {
+		return nil, fmt.Errorf("expecting rounding mode (up, down, or half)")
+	}
+	p.next()
+
+	sIndex, err := p.nextAndCheck(pIndex)
+	if err != nil {
+		return nil, err
+	}
+	index, err := strconv.Atoi(sIndex)
+	if err != nil {
+		// unexpected since sIndex should conform to pIndex
+		panic(err)
+	}
+
+	return &tRound{RoundingMode(mode), index}, nil
 }
 
 func (p *parser) parseType() (Type, error) {
@@ -304,11 +586,11 @@ func (p *parser) parseLiteral() (Value, error) {
 	token := p.next()
 	switch token {
 	case "undefined":
-		return &tUndefined{}, nil
+		return &Undefined{}, nil
 	case "true":
-		return &tBool{true}, nil
+		return &Bool{true}, nil
 	case "false":
-		return &tBool{false}, nil
+		return &Bool{false}, nil
 	case "-":
 		negNumber = true
 		token, err = p.nextAndCheck(pNumber)
@@ -331,14 +613,14 @@ func (p *parser) parseLiteral() (Value, error) {
 		if negNumber {
 			value = -value
 		}
-		return &tNumber{value, &tNumberType{scale}}, nil
+		return &Number{value, &tNumberType{scale}}, nil
 	}
-	if pString.re.MatchString(token) {
+	if pText.re.MatchString(token) {
 		value, err := strconv.Unquote(token)
 		if err != nil {
 			return nil, err
 		}
-		return &tText{value}, nil
+		return &Text{value}, nil
 	}
 	return nil, fmt.Errorf("unknown literal, found %s", token)
 }
@@ -378,15 +660,31 @@ func (p *parser) next() string {
 	}
 }
 
-func (p *parser) peek(maybes ...*tokenPattern) bool {
+func (p *parser) peek(maybe *tokenPattern) bool {
 	token := p.next()
 	p.toks = append(p.toks, token)
 
-	for _, maybe := range maybes {
-		if maybe.re.MatchString(token) {
-			return true
-		}
+	return maybe.re.MatchString(token)
+}
+
+// peekWithChoice peeks, and matches against a set of possible tokens. When a
+// match is found, it returns the choice in the choice array corresponding to
+// the index of the token in the maybes array.
+//
+// We use two arrays here, rather than a map, to guarantee a prioritized
+// selection of the choices.
+func (p *parser) peekWithChoice(maybes []*tokenPattern, choices []string) (string, bool) {
+	if len(maybes) != len(choices) {
+		panic("peekWithChoice invoked with maybes not equal to choices")
 	}
 
-	return false
+	token := p.next()
+	p.toks = append(p.toks, token)
+
+	for index, maybe := range maybes {
+		if maybe.re.MatchString(token) {
+			return choices[index], true
+		}
+	}
+	return "", false
 }

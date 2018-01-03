@@ -19,6 +19,19 @@ import (
 	"strings"
 )
 
+var (
+	vZero = &Number{0, &tNumberType{0}}
+)
+
+// RoundingMode describes the rounding mode to be used in an operation.
+type RoundingMode string
+
+const (
+	ModeUp   RoundingMode = "up"
+	ModeDown              = "down"
+	ModeHalf              = "half"
+)
+
 // Value represents a runtime value.
 type Value interface {
 	// Type returns this value's type.
@@ -33,10 +46,29 @@ type Value interface {
 
 // Assert that all literals are Value.
 var _ []Value = []Value{
-	&tUndefined{},
-	&tNumber{},
-	&tText{},
-	&tBool{},
+	&Undefined{},
+	&Number{},
+	&Text{},
+	&Bool{},
+}
+
+// Undefined represents an undefined value.
+type Undefined struct{}
+
+// Number represents a fixed decimal number.
+type Number struct {
+	value int64
+	typ   *tNumberType
+}
+
+// Text represents a string.
+type Text struct {
+	value string
+}
+
+// Bool represents a boolean.
+type Bool struct {
+	value bool
 }
 
 func NewValue(value string) (Value, error) {
@@ -61,35 +93,35 @@ func MustNewValue(value string) Value {
 }
 
 func NewUndefined() Value {
-	return &tUndefined{}
+	return &Undefined{}
 }
 
-func (value *tUndefined) Type() Type {
+func (value *Undefined) Type() Type {
 	return &tUndefinedType{}
 }
 
-func (value *tUndefined) Equal(that Value) bool {
-	_, ok := that.(*tUndefined)
+func (value *Undefined) Equal(that Value) bool {
+	_, ok := that.(*Undefined)
 	return ok
 }
 
-func (value *tUndefined) String() string {
+func (value *Undefined) String() string {
 	return "undefined"
 }
 
-func (value *tNumber) Type() Type {
+func (value *Number) Type() Type {
 	return value.typ
 }
 
-func (value *tNumber) Equal(that Value) bool {
-	typed, ok := that.(*tNumber)
+func (value *Number) Equal(that Value) bool {
+	typed, ok := that.(*Number)
 	if !ok {
 		return false
 	}
 	return value.value == typed.value && value.typ.scale == typed.typ.scale
 }
 
-func (value *tNumber) String() string {
+func (value *Number) String() string {
 	s := strconv.FormatInt(value.value, 10)
 	scale := value.typ.scale
 	if scale == 0 {
@@ -124,20 +156,104 @@ func (value *tNumber) String() string {
 	return buffer.String()
 }
 
-func NewText(value string) Value {
-	return &tText{value}
+func (value *Number) scaleUp(scale int) int64 {
+	if scale < value.typ.scale {
+		panic("must round to lower scale")
+	}
+
+	v := value.value
+	for s := value.typ.scale; s < scale; s++ {
+		v *= 10
+	}
+
+	return v
 }
 
-func (value *tText) Type() Type {
+func (left *Number) Plus(right *Number) *Number {
+	scale := left.typ.scale + right.typ.scale
+	lv, rv := left.scaleUp(scale), right.scaleUp(scale)
+
+	return &Number{lv + rv, &tNumberType{scale}}
+}
+
+func (left *Number) Minus(right *Number) *Number {
+	scale := left.typ.scale + right.typ.scale
+	lv, rv := left.scaleUp(scale), right.scaleUp(scale)
+
+	return &Number{lv - rv, &tNumberType{scale}}
+}
+
+func (left *Number) Mult(right *Number) *Number {
+	scale := left.typ.scale + right.typ.scale
+	return &Number{left.value * right.value, &tNumberType{scale}}
+}
+
+func (value *Number) Round(mode RoundingMode, scale int) *Number {
+	if value.typ.scale == scale {
+		return value
+	} else if value.typ.scale < scale {
+		v := value.scaleUp(scale)
+		return &Number{v, &tNumberType{scale}}
+	}
+
+	factor := int64(1)
+	for i := value.typ.scale; i != scale; i-- {
+		factor = factor * 10
+	}
+
+	remainder := value.value % factor
+
+	v := value.value
+	for i := value.typ.scale; i != scale; i-- {
+		v = v / 10
+	}
+
+	switch mode {
+	case ModeDown:
+		return &Number{v, &tNumberType{scale}}
+
+	case ModeUp:
+		var up int64
+		if remainder != 0 {
+			up = 1
+		}
+		return &Number{v + up, &tNumberType{scale}}
+
+	case ModeHalf:
+		panic("not implemented")
+	}
+
+	return value
+}
+
+func (left *Number) Div(right *Number, mode RoundingMode, scale int) *Number {
+	// tempScale = max(left.typ.scale, scale + right.typ.scale) + 1
+	tempScale := scale + right.typ.scale
+	if left.typ.scale > tempScale {
+		tempScale = left.typ.scale
+	}
+	tempScale = tempScale + 1
+
+	// scale up left, integer division, and round correctly to finalize
+	lv := left.scaleUp(tempScale)
+	temp := &Number{lv / right.value, &tNumberType{tempScale - right.typ.scale}}
+	return temp.Round(mode, scale)
+}
+
+func NewText(value string) Value {
+	return &Text{value}
+}
+
+func (value *Text) Type() Type {
 	return &tTextType{}
 }
 
-func (value *tText) String() string {
+func (value *Text) String() string {
 	return strconv.Quote(value.value)
 }
 
-func (value *tText) Equal(that Value) bool {
-	typed, ok := that.(*tText)
+func (value *Text) Equal(that Value) bool {
+	typed, ok := that.(*Text)
 	if !ok {
 		return false
 	}
@@ -145,21 +261,21 @@ func (value *tText) Equal(that Value) bool {
 }
 
 func NewBool(value bool) Value {
-	return &tBool{value}
+	return &Bool{value}
 }
 
-func (value *tBool) Type() Type {
+func (value *Bool) Type() Type {
 	return &tBoolType{}
 }
 
-func (value *tBool) Equal(that Value) bool {
-	typed, ok := that.(*tBool)
+func (value *Bool) Equal(that Value) bool {
+	typed, ok := that.(*Bool)
 	if !ok {
 		return false
 	}
 	return value.value == typed.value
 }
 
-func (value *tBool) String() string {
+func (value *Bool) String() string {
 	return strconv.FormatBool(value.value)
 }
