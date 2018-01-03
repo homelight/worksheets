@@ -31,6 +31,7 @@ var _ = []expression{
 	&tExternal{},
 	&ePlugin{},
 	&tVar{},
+	&tUnop{},
 	&tBinop{},
 }
 
@@ -82,6 +83,32 @@ func (e *tVar) Compute(ws *Worksheet) (Value, error) {
 	return ws.Get(e.name)
 }
 
+func (e *tUnop) Args() []string {
+	return e.expr.Args()
+}
+
+func (e *tUnop) Compute(ws *Worksheet) (Value, error) {
+	result, err := e.expr.Compute(ws)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, ok := result.(*Undefined); ok {
+		return result, nil
+	}
+
+	switch e.op {
+	case opNot:
+		bResult, ok := result.(*Bool)
+		if !ok {
+			return nil, fmt.Errorf("! on non-bool")
+		}
+		return &Bool{!bResult.value}, nil
+	default:
+		panic(fmt.Sprintf("not implemented for %s", e.op))
+	}
+}
+
 func (e *tBinop) Args() []string {
 	left := e.left.Args()
 	right := e.right.Args()
@@ -93,21 +120,60 @@ func (e *tBinop) Compute(ws *Worksheet) (Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, ok := left.(*Undefined); ok {
-		return left, nil
+
+	// bool operations
+	if e.op == opAnd || e.op == opOr {
+		if _, ok := left.(*Undefined); ok {
+			return left, nil
+		}
+
+		bLeft, ok := left.(*Bool)
+		if !ok {
+			return nil, fmt.Errorf("op on non-bool")
+		}
+
+		if (e.op == opAnd && !bLeft.value) || (e.op == opOr && bLeft.value) {
+			return bLeft, nil
+		}
+
+		right, err := e.right.Compute(ws)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, ok := right.(*Undefined); ok {
+			return right, nil
+		}
+
+		bRight, ok := right.(*Bool)
+		if !ok {
+			return nil, fmt.Errorf("op on non-bool")
+		}
+
+		return bRight, nil
 	}
 
 	right, err := e.right.Compute(ws)
 	if err != nil {
 		return nil, err
 	}
-	if _, ok := right.(*Undefined); ok {
-		return right, nil
+
+	// equality
+	if e.op == opEqual {
+		return &Bool{left.Equal(right)}, nil
+	}
+	if e.op == opNotEqual {
+		return &Bool{!left.Equal(right)}, nil
 	}
 
+	// numerical operations
 	nLeft, ok := left.(*Number)
 	if !ok {
 		return nil, fmt.Errorf("op on non-number")
+	}
+
+	if _, ok := left.(*Undefined); ok {
+		return left, nil
 	}
 
 	nRight, ok := right.(*Number)
@@ -115,7 +181,10 @@ func (e *tBinop) Compute(ws *Worksheet) (Value, error) {
 		return nil, fmt.Errorf("op on non-number")
 	}
 
-	// TODO(pascal): implement for other ops
+	if _, ok := right.(*Undefined); ok {
+		return right, nil
+	}
+
 	var result *Number
 	switch e.op {
 	case opPlus:
@@ -130,7 +199,7 @@ func (e *tBinop) Compute(ws *Worksheet) (Value, error) {
 		}
 		return nLeft.Div(nRight, e.round.mode, e.round.scale), nil
 	default:
-		panic("not implemented")
+		panic(fmt.Sprintf("not implemented for %s", e.op))
 	}
 
 	if e.round != nil {

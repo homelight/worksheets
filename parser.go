@@ -94,6 +94,11 @@ var (
 	pMinus      = newTokenPattern("-", "\\-")
 	pMult       = newTokenPattern("*", "\\*")
 	pDiv        = newTokenPattern("/", "\\/")
+	pNot        = newTokenPattern("!", "\\!")
+	pEqual      = newTokenPattern("==", "\\=\\=")
+	pNotEqual   = newTokenPattern("!=", "\\!\\=")
+	pAnd        = newTokenPattern("&&", "\\&\\&")
+	pOr         = newTokenPattern("||", "\\|\\|")
 	pWorksheet  = newTokenPattern("worksheet", "worksheet")
 	pComputedBy = newTokenPattern("computed_by", "computed_by")
 	pExternal   = newTokenPattern("external", "external")
@@ -252,10 +257,15 @@ func (p *parser) parseField() (*tField, error) {
 type tOp string
 
 const (
-	opPlus  tOp = "plus"
-	opMinus     = "minus"
-	opMult      = "mult"
-	opDiv       = "div"
+	opPlus     tOp = "plus"
+	opMinus        = "minus"
+	opMult         = "mult"
+	opDiv          = "div"
+	opNot          = "not"
+	opEqual        = "equal"
+	opNotEqual     = "not-equal"
+	opOr           = "or"
+	opAnd          = "and"
 )
 
 type tRound struct {
@@ -268,6 +278,11 @@ func (t *tRound) String() string {
 }
 
 type tExternal struct{}
+
+type tUnop struct {
+	op   tOp
+	expr expression
+}
 
 type tBinop struct {
 	op          tOp
@@ -298,8 +313,10 @@ func (p *parser) parseExpressionOrExternal() (expression, error) {
 		pText,
 		pName,
 		pLparen,
+		pNot,
 	}, []string{
 		"external",
+		"expr",
 		"expr",
 		"expr",
 		"expr",
@@ -342,6 +359,7 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 		pText,
 		pName,
 		pLparen,
+		pNot,
 	}, []string{
 		"literal",
 		"literal",
@@ -353,6 +371,7 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 		"literal",
 		"var",
 		"paren",
+		"unop",
 	})
 	if !ok {
 		return nil, fmt.Errorf("expecting expression")
@@ -385,6 +404,23 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 			return nil, err
 		}
 
+	case "unop":
+		op, ok := p.peekWithChoice([]*tokenPattern{
+			pNot,
+		}, []string{
+			string(opNot),
+		})
+		if !ok {
+			panic("should not be in unop")
+		}
+		p.next()
+
+		expr, err := p.parseExpression(true)
+		if err != nil {
+			return nil, err
+		}
+		first = &tUnop{tOp(op), expr}
+
 	default:
 		panic(fmt.Sprintf("nextAndChoice returned '%s'", choice))
 	}
@@ -413,11 +449,19 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 			pMinus,
 			pMult,
 			pDiv,
+			pEqual,
+			pNotEqual,
+			pAnd,
+			pOr,
 		}, []string{
 			string(opPlus),
 			string(opMinus),
 			string(opMult),
 			string(opDiv),
+			string(opEqual),
+			string(opNotEqual),
+			string(opAnd),
+			string(opOr),
 		})
 		if !ok {
 			if exprs == nil {
@@ -454,10 +498,14 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 }
 
 var opPrecedence = map[tOp]int{
-	opPlus:  1,
-	opMinus: 1,
-	opMult:  2,
-	opDiv:   3,
+	opAnd:      1,
+	opOr:       1,
+	opEqual:    2,
+	opNotEqual: 2,
+	opPlus:     3,
+	opMinus:    3,
+	opMult:     4,
+	opDiv:      5,
 }
 
 // foldExprs folds expressions separated by operators by respecting the
@@ -671,14 +719,36 @@ func (p *parser) nextAndCheck(expected *tokenPattern) (string, error) {
 	return token, err
 }
 
+var tokensToCombine = map[string]string{
+	"=": "=",
+	"!": "=",
+	"&": "&",
+	"|": "|",
+}
+
 func (p *parser) next() string {
 	if len(p.toks) == 0 {
 		p.s.Scan()
 		token := p.s.TokenText()
-		return token
+
+		second, ok := tokensToCombine[token]
+		if !ok {
+			return token
+		}
+
+		first := token
+		firstPos := p.s.Position
+		p.s.Scan()
+		seconPos := p.s.Position
+		token = p.s.TokenText()
+		if token == second && firstPos.Line == seconPos.Line && firstPos.Column == seconPos.Column-1 {
+			return first + second
+		}
+		p.toks = append(p.toks, token)
+		return first
 	} else {
-		token := p.toks[0]
-		p.toks = p.toks[1:]
+		token := p.toks[len(p.toks)-1]
+		p.toks = p.toks[:len(p.toks)-1]
 		return token
 	}
 }

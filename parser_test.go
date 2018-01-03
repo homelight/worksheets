@@ -93,6 +93,7 @@ func (s *Zuite) TestParser_parseExpressionOrExternal() {
 		`foo`: &tVar{"foo"},
 
 		`3 + 4`: &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}, nil},
+		`!foo`:  &tUnop{opNot, &tVar{"foo"}},
 
 		`(true)`:          &Bool{true},
 		`(3 + 4)`:         &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}, nil},
@@ -103,6 +104,7 @@ func (s *Zuite) TestParser_parseExpressionOrExternal() {
 		p := newParser(strings.NewReader(input))
 		actual, err := p.parseExpressionOrExternal()
 		require.NoError(s.T(), err, input)
+		require.Equal(s.T(), "", p.next(), "%s should have reached eof", input)
 		assert.Equal(s.T(), expected, actual, input)
 	}
 }
@@ -197,15 +199,36 @@ func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
 		`29 / 2 round down 0 / 7 round up 0`:   `2`,
 		`29 / 2 round up 0 / 7 round down 0`:   `2`,
 		`29 / 2 round up 0 / 7 round up 0`:     `3`,
+
+		`!undefined`:                       `undefined`,
+		`!true`:                            `false`,
+		`3 == 4`:                           `false`,
+		`3 + 1 == 4`:                       `true`,
+		`4 / 1 round down 0 == 2 * 2`:      `true`,
+		`5 - 1 == 2 * 2 round down 0`:      `true`,
+		`3 + 1 == 4 && true`:               `true`,
+		`"foo" == "foo" && "bar" == "bar"`: `true`,
+		`3 + 1 != 4 || true`:               `true`,
+		`3 + 1 != 4 || false`:              `false`,
+		`"foo" != "foo" || "bar" == "baz"`: `false`,
+
+		`true || undefined`:                `true`,
+		`true || 6 / 0 round down 7 == 6`:  `true`,
+		`false && undefined`:               `false`,
+		`false && 6 / 0 round down 7 == 6`: `false`,
+
+		// TODO(pascal): work on convoluted examples below
+		// `5 - 1 == 2 * 2 round down 2 round down 0`: `true`,
 	}
 	for input, output := range cases {
 		expected := MustNewValue(output)
 		p := newParser(strings.NewReader(input))
 		expr, err := p.parseExpressionOrExternal()
 		require.NoError(s.T(), err, input)
+		require.Equal(s.T(), "", p.next(), "%s should have reached eof", input)
 		actual, err := expr.Compute(nil)
 		require.NoError(s.T(), err, input)
-		assert.Equal(s.T(), expected, actual, "%s should equal %s", input, output)
+		assert.Equal(s.T(), expected, actual, "%s should equal %s was %s", input, output, actual)
 	}
 }
 
@@ -287,6 +310,21 @@ func (s *Zuite) TestTokenizer() {
 			"_2__6",
 			"+",
 			"7",
+		},
+		`1!=2!3! =4==5=6= =7&&8&9& &0||1|2| |done`: []string{
+			"1", "!=",
+			"2", "!",
+			"3", "!", "=",
+			"4", "==",
+			"5", "=",
+			"6", "=", "=",
+			"7", "&&",
+			"8", "&",
+			"9", "&", "&",
+			"0", "||",
+			"1", "|",
+			"2", "|", "|",
+			"done",
 		},
 	}
 	for input, toks := range cases {
