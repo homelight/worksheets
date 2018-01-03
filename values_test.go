@@ -176,6 +176,7 @@ func (s *Zuite) TestNumber_Round() {
 		value, expected *Number
 		round           *tRound
 	}{
+		// down
 		{
 			value:    MustNewValue("2.34").(*Number),
 			round:    &tRound{"down", 2},
@@ -191,6 +192,8 @@ func (s *Zuite) TestNumber_Round() {
 			round:    &tRound{"down", 1},
 			expected: MustNewValue("2.3").(*Number),
 		},
+
+		// up
 		{
 			value:    MustNewValue("2.34").(*Number),
 			round:    &tRound{"up", 1},
@@ -200,6 +203,48 @@ func (s *Zuite) TestNumber_Round() {
 			value:    MustNewValue("2.00").(*Number),
 			round:    &tRound{"up", 1},
 			expected: MustNewValue("2.0").(*Number),
+		},
+
+		// half
+		{
+			value:    MustNewValue("2.34").(*Number),
+			round:    &tRound{"half", 1},
+			expected: MustNewValue("2.3").(*Number),
+		},
+		{
+			value:    MustNewValue("2.35").(*Number),
+			round:    &tRound{"half", 1},
+			expected: MustNewValue("2.4").(*Number),
+		},
+		{
+			value:    MustNewValue("-2.34").(*Number),
+			round:    &tRound{"half", 1},
+			expected: MustNewValue("-2.3").(*Number),
+		},
+		{
+			value:    MustNewValue("-2.35").(*Number),
+			round:    &tRound{"half", 1},
+			expected: MustNewValue("-2.4").(*Number),
+		},
+		{
+			value:    MustNewValue("2.304").(*Number),
+			round:    &tRound{"half", 2},
+			expected: MustNewValue("2.30").(*Number),
+		},
+		{
+			value:    MustNewValue("2.305").(*Number),
+			round:    &tRound{"half", 2},
+			expected: MustNewValue("2.31").(*Number),
+		},
+		{
+			value:    MustNewValue("-2.304").(*Number),
+			round:    &tRound{"half", 2},
+			expected: MustNewValue("-2.30").(*Number),
+		},
+		{
+			value:    MustNewValue("-2.305").(*Number),
+			round:    &tRound{"half", 2},
+			expected: MustNewValue("-2.31").(*Number),
 		},
 	}
 	for _, ex := range cases {
@@ -322,6 +367,18 @@ func (s *Zuite) TestNumber_Div() {
 			right:    MustNewValue("1").(*Number),
 			expected: MustNewValue("10").(*Number),
 			round:    &tRound{"up", 0},
+		},
+		{
+			left:     MustNewValue("7").(*Number),
+			right:    MustNewValue("2.22").(*Number),
+			expected: MustNewValue("3.1532").(*Number),
+			round:    &tRound{"half", 4},
+		},
+		{
+			left:     MustNewValue("-7").(*Number),
+			right:    MustNewValue("2.22").(*Number),
+			expected: MustNewValue("-3.1532").(*Number),
+			round:    &tRound{"half", 4},
 		},
 	}
 	for _, ex := range cases {
