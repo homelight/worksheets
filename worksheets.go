@@ -98,9 +98,6 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 					if !ok {
 						return nil, fmt.Errorf("%s.%s references unknown arg %s", def.name, fieldName, argName)
 					}
-					if _, ok := def.dependents[dependent.index]; !ok {
-						def.dependents[dependent.index] = make([]int, 0)
-					}
 					def.dependents[dependent.index] = append(def.dependents[dependent.index], field.index)
 				}
 			}
@@ -260,6 +257,15 @@ func (ws *Worksheet) Set(name string, value Value) error {
 
 func (ws *Worksheet) set(field *tField, value Value) error {
 	index := field.index
+
+	// ident
+	if oldValue, ok := ws.data[index]; !ok {
+		if _, ok := value.(*Undefined); ok {
+			return nil
+		}
+	} else if oldValue.Equal(value) {
+		return nil
+	}
 
 	// type check
 	litType := value.Type()

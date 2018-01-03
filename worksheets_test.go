@@ -350,6 +350,26 @@ func (s *Zuite) TestSimpleExpressionsInWorksheet() {
 	require.Equal(s.T(), "75", ws.MustGet("age_plus_two").String())
 }
 
+func (s *Zuite) TestCyclicEditsIfNoIdentCheck() {
+	defs, err := NewDefinitions(strings.NewReader(`worksheet cyclic_edits {
+		1:right bool
+		2:a bool computed_by {
+			b || right
+		}
+		3:b bool computed_by {
+			a || !right
+		}
+	}`))
+	require.NoError(s.T(), err)
+
+	ws := defs.MustNewWorksheet("cyclic_edits")
+
+	ws.MustSet("right", MustNewValue("true"))
+	require.Equal(s.T(), "true", ws.MustGet("right").String(), "right")
+	require.Equal(s.T(), "undefined", ws.MustGet("a").String(), "a")
+	require.Equal(s.T(), "undefined", ws.MustGet("b").String(), "b")
+}
+
 func (s *Zuite) TestWorksheetNew_origEmpty() {
 	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
 	require.NoError(s.T(), err)

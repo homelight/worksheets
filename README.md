@@ -428,7 +428,7 @@ Assume we have the worksheet
 
 	worksheet cyclic_edits {
 		1:right bool
-		2:wrong computed {
+		2:wrong bool computed_by {
 			return !right
 		}
 	}
