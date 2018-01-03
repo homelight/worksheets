@@ -220,7 +220,14 @@ func (value *Number) Round(mode RoundingMode, scale int) *Number {
 		return &Number{v + up, &tNumberType{scale}}
 
 	case ModeHalf:
-		panic("not implemented")
+		var up int64
+		threshold := 5 * factor / 10
+		if remainder > 0 && threshold <= remainder {
+			up = 1
+		} else if remainder < 0 && remainder <= -threshold {
+			up = -1
+		}
+		return &Number{v + up, &tNumberType{scale}}
 	}
 
 	return value
