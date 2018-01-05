@@ -21,7 +21,7 @@ import (
 var (
 	alice = NewText("Alice")
 	bob   = NewText("Bob")
-	eve   = NewText("Eve")
+	carol = NewText("Carol")
 )
 
 func (s *Zuite) TestSliceExample() {
@@ -41,11 +41,11 @@ func (s *Zuite) TestSliceExample() {
 	ws.MustAppend("names", bob)
 	require.Equal(s.T(), []Value{alice, bob}, ws.MustGetSlice("names"))
 
-	ws.MustAppend("names", eve)
-	require.Equal(s.T(), []Value{alice, bob, eve}, ws.MustGetSlice("names"))
+	ws.MustAppend("names", carol)
+	require.Equal(s.T(), []Value{alice, bob, carol}, ws.MustGetSlice("names"))
 
 	ws.MustDel("names", 1)
-	require.Equal(s.T(), []Value{alice, eve}, ws.MustGetSlice("names"))
+	require.Equal(s.T(), []Value{alice, carol}, ws.MustGetSlice("names"))
 
 	ws.MustDel("names", 1)
 	require.Equal(s.T(), []Value{alice}, ws.MustGetSlice("names"))
