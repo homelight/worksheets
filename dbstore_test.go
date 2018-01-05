@@ -64,7 +64,6 @@ func (s *DbZuite) TestSave() {
 
 	require.Equal(s.T(), []rValue{
 		{
-			Id:          IdAt(valuesRecs, 0),
 			WorksheetId: ws.Id(),
 			Index:       IndexId,
 			FromVersion: 1,
@@ -72,7 +71,6 @@ func (s *DbZuite) TestSave() {
 			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
 		},
 		{
-			Id:          IdAt(valuesRecs, 1),
 			WorksheetId: ws.Id(),
 			Index:       IndexVersion,
 			FromVersion: 1,
@@ -80,7 +78,6 @@ func (s *DbZuite) TestSave() {
 			Value:       `1`,
 		},
 		{
-			Id:          IdAt(valuesRecs, 2),
 			WorksheetId: ws.Id(),
 			Index:       83,
 			FromVersion: 1,
@@ -125,7 +122,6 @@ func (s *DbZuite) TestUpdate() {
 
 	require.Equal(s.T(), []rValue{
 		{
-			Id:          IdAt(valuesRecs, 0),
 			WorksheetId: ws.Id(),
 			Index:       IndexId,
 			FromVersion: 1,
@@ -133,7 +129,6 @@ func (s *DbZuite) TestUpdate() {
 			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
 		},
 		{
-			Id:          IdAt(valuesRecs, 1),
 			WorksheetId: ws.Id(),
 			Index:       IndexVersion,
 			FromVersion: 1,
@@ -141,7 +136,6 @@ func (s *DbZuite) TestUpdate() {
 			Value:       `1`,
 		},
 		{
-			Id:          IdAt(valuesRecs, 2),
 			WorksheetId: ws.Id(),
 			Index:       IndexVersion,
 			FromVersion: 2,
@@ -149,7 +143,6 @@ func (s *DbZuite) TestUpdate() {
 			Value:       `2`,
 		},
 		{
-			Id:          IdAt(valuesRecs, 3),
 			WorksheetId: ws.Id(),
 			Index:       83,
 			FromVersion: 1,
@@ -157,7 +150,6 @@ func (s *DbZuite) TestUpdate() {
 			Value:       `"Alice"`,
 		},
 		{
-			Id:          IdAt(valuesRecs, 4),
 			WorksheetId: ws.Id(),
 			Index:       83,
 			FromVersion: 2,
@@ -194,13 +186,6 @@ func (s *DbZuite) TestUpdateUndefinedField() {
 	})
 }
 
-func IdAt(s []rValue, index int) int64 {
-	if 0 <= index && index < len(s) {
-		return s[index].Id
-	}
-	return 0
-}
-
 func (s *DbZuite) MustRunTransaction(fn func(tx *runner.Tx) error) {
 	err := RunTransaction(s.db, fn)
 	require.NoError(s.T(), err)
@@ -226,6 +211,9 @@ func (s *DbZuite) DbState() ([]rWorksheet, []rValue) {
 		OrderBy("worksheet_id, index, from_version").
 		QueryStructs(&valuesRecs); err != nil {
 		require.NoError(s.T(), err)
+	}
+	for i := range valuesRecs {
+		valuesRecs[i].Id = 0
 	}
 
 	return wsRecs, valuesRecs
