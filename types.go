@@ -31,6 +31,8 @@ var _ []Type = []Type{
 	&tTextType{},
 	&tBoolType{},
 	&tNumberType{},
+	&tSliceType{},
+	&tWorksheetType{},
 }
 
 func (typ *tUndefinedType) AssignableTo(_ Type) bool {
@@ -66,4 +68,21 @@ func (typ *tNumberType) AssignableTo(u Type) bool {
 
 func (typ *tNumberType) String() string {
 	return fmt.Sprintf("number[%d]", typ.scale)
+}
+
+func (typ *tSliceType) AssignableTo(u Type) bool {
+	other, ok := u.(*tSliceType)
+	return ok && typ.elementType.AssignableTo(other.elementType)
+}
+
+func (typ *tSliceType) String() string {
+	panic("not implemented")
+}
+
+func (typ *tWorksheetType) AssignableTo(u Type) bool {
+	panic("not implemented")
+}
+
+func (typ *tWorksheetType) String() string {
+	panic("not implemented")
 }

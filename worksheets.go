@@ -335,27 +335,131 @@ func (ws *Worksheet) MustGet(name string) Value {
 	return value
 }
 
-// TODO(pascal): need to think about proper return type here, should be consistent with Set
+func (ws *Worksheet) MustGetSlice(name string) []Value {
+	slice, err := ws.GetSlice(name)
+	if err != nil {
+		panic(err)
+	}
+	return slice
+}
+
+func (ws *Worksheet) GetSlice(name string) ([]Value, error) {
+	slice, err := ws.getSlice(name)
+	if err != nil {
+		return nil, err
+	} else if slice == nil {
+		return nil, nil
+	}
+
+	var values []Value
+	for _, element := range slice.elements {
+		values = append(values, element.value)
+	}
+	return values, nil
+}
+
+func (ws *Worksheet) getSlice(name string) (*slice, error) {
+	field, value, err := ws.get(name)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, ok := field.typ.(*tSliceType); !ok {
+		return nil, fmt.Errorf("GetSlice on non-slice field %s", name)
+	}
+
+	if _, ok := value.(*Undefined); ok {
+		return nil, nil
+	}
+
+	return value.(*slice), nil
+}
+
+// Get gets a value for base types, e.g. text, number, or bool.
+// For other kinds of values, use specific getters such as `GetSlice`.
 func (ws *Worksheet) Get(name string) (Value, error) {
+	_, value, err := ws.get(name)
+	return value, err
+}
+
+func (ws *Worksheet) get(name string) (*tField, Value, error) {
 	// lookup field by name
 	field, ok := ws.def.fieldsByName[name]
 	if !ok {
-		return nil, fmt.Errorf("unknown field %s", name)
+		return nil, nil, fmt.Errorf("unknown field %s", name)
 	}
 	index := field.index
 
 	// is a value set for this field?
 	value, ok := ws.data[index]
 	if !ok {
-		return &Undefined{}, nil
+		return field, &Undefined{}, nil
 	}
 
 	// type check
 	if ok := value.Type().AssignableTo(field.typ); !ok {
-		return nil, fmt.Errorf("cannot assign %s to %s", value, field.typ)
+		return nil, nil, fmt.Errorf("cannot assign %s to %s", value, field.typ)
 	}
 
-	return value, nil
+	return field, value, nil
+}
+
+func (ws *Worksheet) MustAppend(name string, value Value) {
+	if err := ws.Append(name, value); err != nil {
+		panic(err)
+	}
+}
+
+func (ws *Worksheet) Append(name string, element Value) error {
+	// lookup field by name
+	field, ok := ws.def.fieldsByName[name]
+	if !ok {
+		return fmt.Errorf("unknown field %s", name)
+	}
+	index := field.index
+
+	sliceType, ok := field.typ.(*tSliceType)
+	if !ok {
+		return fmt.Errorf("Append on non-slice field %s", name)
+	}
+
+	// is a value set for this field?
+	value, ok := ws.data[index]
+	if !ok {
+		value = &slice{
+			typ: sliceType,
+		}
+		ws.data[index] = value
+	}
+
+	// append
+	slice := value.(*slice)
+	slice.elements = append(slice.elements, sliceElement{
+		index: 0, // wrong
+		value: element,
+	})
+
+	return nil
+}
+
+func (ws *Worksheet) MustDel(name string, index int) {
+	if err := ws.Del(name, index); err != nil {
+		panic(err)
+	}
+}
+
+func (ws *Worksheet) Del(name string, index int) error {
+	slice, err := ws.getSlice(name)
+	if err != nil {
+		return err
+	}
+
+	if index < 0 || len(slice.elements) <= index {
+		return fmt.Errorf("index out-of-bound")
+	}
+
+	slice.elements = append(slice.elements[:index], slice.elements[index+1:]...)
+	return nil
 }
 
 func (ws *Worksheet) diff() map[int]Value {

@@ -44,12 +44,15 @@ type Value interface {
 	String() string
 }
 
-// Assert that all literals are Value.
 var _ []Value = []Value{
+	// Assert that all literals are Value.
 	&Undefined{},
 	&Number{},
 	&Text{},
 	&Bool{},
+
+	// Internals.
+	&slice{},
 }
 
 // Undefined represents an undefined value.
@@ -285,4 +288,26 @@ func (value *Bool) Equal(that Value) bool {
 
 func (value *Bool) String() string {
 	return strconv.FormatBool(value.value)
+}
+
+type sliceElement struct {
+	index int
+	value Value
+}
+
+type slice struct {
+	typ      *tSliceType
+	elements []sliceElement
+}
+
+func (value *slice) Type() Type {
+	return value.typ
+}
+
+func (value *slice) Equal(that Value) bool {
+	return false
+}
+
+func (value *slice) String() string {
+	return ""
 }
