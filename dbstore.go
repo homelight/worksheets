@@ -76,9 +76,28 @@ type rValue struct {
 	Value       string `db:"value"`
 }
 
+// rSlice represents a record of the worksheet_slices table.
+type rSlice struct {
+	Id          string `db:"id"`
+	WorksheetId string `db:"worksheet_id"`
+	Version     int    `db:"version"`
+}
+
+// rSliceElement represents a record of the worksheet_slice_elements table.
+type rSliceElement struct {
+	Id          int64  `db:"id"`
+	SliceId     string `db:"slice_id"`
+	Rank        int    `db:"rank"`
+	FromVersion int    `db:"from_version"`
+	ToVersion   int    `db:"to_version"`
+	Value       string `db:"value"`
+}
+
 var tableToEntities = map[string]interface{}{
-	"worksheets":       &rWorksheet{},
-	"worksheet_values": &rWorksheet{},
+	"worksheets":               &rWorksheet{},
+	"worksheet_values":         &rValue{},
+	"worksheet_slices":         &rSlice{},
+	"worksheet_slice_elements": &rSliceElement{},
 }
 
 func (s *Session) Load(name, id string) (*Worksheet, error) {
@@ -138,18 +157,55 @@ func (s *Session) Save(ws *Worksheet) error {
 	}
 
 	// insert rValues
-	insert := s.tx.InsertInto("worksheet_values").Columns("*").Blacklist("id")
+	var slicesToInsert []*slice
+	insertValues := s.tx.InsertInto("worksheet_values").Columns("*").Blacklist("id")
 	for index, value := range ws.data {
-		insert.Record(rValue{
+		insertValues.Record(rValue{
 			WorksheetId: ws.Id(),
 			Index:       index,
 			FromVersion: ws.Version(),
 			ToVersion:   math.MaxInt32,
 			Value:       value.String(),
 		})
+
+		if slice, ok := value.(*slice); ok {
+			slicesToInsert = append(slicesToInsert, slice)
+		}
 	}
-	if _, err := insert.Exec(); err != nil {
+	if _, err := insertValues.Exec(); err != nil {
 		return err
+	}
+
+	if len(slicesToInsert) != 0 {
+		// insert slices
+		insertSlices := s.tx.InsertInto("worksheet_slices").Columns("*")
+		for _, slice := range slicesToInsert {
+			insertSlices.Record(rSlice{
+				Id:          slice.id,
+				WorksheetId: ws.Id(),
+				Version:     ws.Version(),
+			})
+		}
+		if _, err := insertSlices.Exec(); err != nil {
+			return err
+		}
+
+		// insert slice elements
+		insertSliceElements := s.tx.InsertInto("worksheet_slice_elements").Columns("*").Blacklist("id")
+		for _, slice := range slicesToInsert {
+			for _, element := range slice.elements {
+				insertSliceElements.Record(rSliceElement{
+					SliceId:     slice.id,
+					Rank:        element.rank,
+					FromVersion: ws.Version(),
+					ToVersion:   math.MaxInt32,
+					Value:       element.value.String(),
+				})
+			}
+		}
+		if _, err := insertSliceElements.Exec(); err != nil {
+			return err
+		}
 	}
 
 	// now we can update ws itself to reflect the save

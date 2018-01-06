@@ -13,25 +13,27 @@
 package worksheets
 
 import (
+	"fmt"
+	"math"
 	"strings"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
 
 var (
 	alice = NewText("Alice")
 	bob   = NewText("Bob")
 	carol = NewText("Carol")
+
+	defsWithSlice = MustNewDefinitions(strings.NewReader(`
+		worksheet with_slice {
+			42:names []text
+		}`))
 )
 
 func (s *Zuite) TestSliceExample() {
-	defs, err := NewDefinitions(strings.NewReader(`
-		worksheet with_slice {
-			1:names []text
-		}`))
-	require.NoError(s.T(), err)
-
-	ws := defs.MustNewWorksheet("with_slice")
+	ws := defsWithSlice.MustNewWorksheet("with_slice")
 
 	require.Len(s.T(), ws.MustGetSlice("names"), 0)
 
@@ -54,6 +56,75 @@ func (s *Zuite) TestSliceExample() {
 	require.Len(s.T(), ws.MustGetSlice("names"), 0)
 }
 
+func (s *DbZuite) TestSliceSave() {
+	ws := defsWithSlice.MustNewWorksheet("with_slice")
+	ws.MustAppend("names", alice)
+
+	// We're reaching into the data store to get the slice id in order to write
+	// assertions against it.
+	theSliceId := (ws.data[42].(*slice)).id
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	wsRecs, valuesRecs, slicesRecs, sliceElementsRecs := s.DbState()
+
+	require.Equal(s.T(), []rWorksheet{
+		{
+			Id:      ws.Id(),
+			Version: 1,
+			Name:    "with_slice",
+		},
+	}, wsRecs)
+
+	require.Equal(s.T(), []rValue{
+		{
+			WorksheetId: ws.Id(),
+			Index:       IndexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+		},
+		{
+			WorksheetId: ws.Id(),
+			Index:       IndexVersion,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `1`,
+		},
+		{
+			WorksheetId: ws.Id(),
+			Index:       42,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`[:%s`, theSliceId),
+		},
+	}, valuesRecs)
+
+	require.Equal(s.T(), []rSlice{
+		{
+			Id:          theSliceId,
+			WorksheetId: ws.Id(),
+			Version:     1,
+		},
+	}, slicesRecs)
+
+	require.Equal(s.T(), []rSliceElement{
+		{
+			SliceId:     theSliceId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Rank:        1,
+			Value:       `"Alice"`,
+		},
+	}, sliceElementsRecs)
+
+	// Upon Save, orig needs to be set to data.
+	require.Empty(s.T(), ws.diff())
+}
+
 // impl notes:
 // - when loading from DB, must order by index
 // - test Get on slice type fails, even if it is undefined
@@ -61,3 +132,4 @@ func (s *Zuite) TestSliceExample() {
 // - test Append on non-slice field fails
 // - test append of non-assignable type e.g. putting a bool in []text
 // - test deletes on out of bound indexes
+// - denormalize things like max_index to speed up append and such

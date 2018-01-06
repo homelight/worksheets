@@ -17,6 +17,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/satori/go.uuid"
 )
 
 var (
@@ -291,13 +293,49 @@ func (value *Bool) String() string {
 }
 
 type sliceElement struct {
-	index int
+	rank  int
 	value Value
 }
 
 type slice struct {
+	id       string
 	typ      *tSliceType
 	elements []sliceElement
+}
+
+func newSlice(typ *tSliceType) *slice {
+	return &slice{
+		id:  uuid.NewV4().String(),
+		typ: typ,
+	}
+}
+
+func (value *slice) doAppend(element Value) *slice {
+	var maxRank int
+	if l := len(value.elements); l != 0 {
+		maxRank = value.elements[l-1].rank
+	}
+
+	return &slice{
+		id:  value.id,
+		typ: value.typ,
+		elements: append(value.elements, sliceElement{
+			rank:  maxRank + 1,
+			value: element,
+		}),
+	}
+}
+
+func (value *slice) doDel(index int) (*slice, error) {
+	if index < 0 || len(value.elements) <= index {
+		return nil, fmt.Errorf("index out-of-bound")
+	}
+
+	return &slice{
+		id:       value.id,
+		typ:      value.typ,
+		elements: append(value.elements[:index], value.elements[index+1:]...),
+	}, nil
 }
 
 func (value *slice) Type() Type {
@@ -305,9 +343,11 @@ func (value *slice) Type() Type {
 }
 
 func (value *slice) Equal(that Value) bool {
-	return false
+	// Since slices structs are meant to be immutable, pointer equality is how
+	// we check equality. See doXxx funcs for more details.
+	return value == that
 }
 
 func (value *slice) String() string {
-	return ""
+	return fmt.Sprintf("[:%s", value.id)
 }

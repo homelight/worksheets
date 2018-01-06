@@ -30,3 +30,24 @@ create table worksheet_values (
 
   unique(id)
 );
+
+drop table if exists worksheet_slices;
+create table worksheet_slices (
+  id             uuid,
+  worksheet_id   uuid,
+  version        int,
+
+  unique(id)
+);
+
+drop table if exists worksheet_slice_elements;
+create table worksheet_slice_elements (
+  id             serial,
+  slice_id       uuid,
+  rank           int,
+  from_version   int,
+  to_version     int,
+  value          varchar,
+
+  unique(id)
+);

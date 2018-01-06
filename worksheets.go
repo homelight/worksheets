@@ -60,6 +60,14 @@ type Options struct {
 	Plugins map[string]map[string]ComputedBy
 }
 
+func MustNewDefinitions(reader io.Reader, opts ...Options) *Definitions {
+	defs, err := NewDefinitions(reader, opts...)
+	if err != nil {
+		panic(err)
+	}
+	return defs
+}
+
 // NewDefinitions parses one or more worksheet definitions, and creates worksheet
 // models from them.
 func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
@@ -344,7 +352,7 @@ func (ws *Worksheet) MustGetSlice(name string) []Value {
 }
 
 func (ws *Worksheet) GetSlice(name string) ([]Value, error) {
-	slice, err := ws.getSlice(name)
+	_, slice, err := ws.getSlice(name)
 	if err != nil {
 		return nil, err
 	} else if slice == nil {
@@ -358,21 +366,21 @@ func (ws *Worksheet) GetSlice(name string) ([]Value, error) {
 	return values, nil
 }
 
-func (ws *Worksheet) getSlice(name string) (*slice, error) {
+func (ws *Worksheet) getSlice(name string) (*tField, *slice, error) {
 	field, value, err := ws.get(name)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if _, ok := field.typ.(*tSliceType); !ok {
-		return nil, fmt.Errorf("GetSlice on non-slice field %s", name)
+		return nil, nil, fmt.Errorf("GetSlice on non-slice field %s", name)
 	}
 
 	if _, ok := value.(*Undefined); ok {
-		return nil, nil
+		return field, nil, nil
 	}
 
-	return value.(*slice), nil
+	return field, value.(*slice), nil
 }
 
 // Get gets a value for base types, e.g. text, number, or bool.
@@ -426,18 +434,14 @@ func (ws *Worksheet) Append(name string, element Value) error {
 	// is a value set for this field?
 	value, ok := ws.data[index]
 	if !ok {
-		value = &slice{
-			typ: sliceType,
-		}
+		value = newSlice(sliceType)
 		ws.data[index] = value
 	}
 
 	// append
 	slice := value.(*slice)
-	slice.elements = append(slice.elements, sliceElement{
-		index: 0, // wrong
-		value: element,
-	})
+	slice = slice.doAppend(element)
+	ws.data[index] = slice
 
 	return nil
 }
@@ -449,16 +453,18 @@ func (ws *Worksheet) MustDel(name string, index int) {
 }
 
 func (ws *Worksheet) Del(name string, index int) error {
-	slice, err := ws.getSlice(name)
+	field, slice, err := ws.getSlice(name)
 	if err != nil {
 		return err
 	}
 
-	if index < 0 || len(slice.elements) <= index {
-		return fmt.Errorf("index out-of-bound")
+	slice, err = slice.doDel(index)
+	if err != nil {
+		return err
 	}
 
-	slice.elements = append(slice.elements[:index], slice.elements[index+1:]...)
+	ws.data[field.index] = slice
+
 	return nil
 }
 
