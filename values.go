@@ -310,6 +310,13 @@ func newSlice(typ *tSliceType) *slice {
 	}
 }
 
+func newSliceWithId(typ *tSliceType, id string) *slice {
+	return &slice{
+		id:  id,
+		typ: typ,
+	}
+}
+
 func (value *slice) doAppend(element Value) *slice {
 	var maxRank int
 	if l := len(value.elements); l != 0 {

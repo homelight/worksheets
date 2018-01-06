@@ -13,10 +13,29 @@
 package worksheets
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 )
+
+// some useful values
+var (
+	alice = NewText("Alice")
+	bob   = NewText("Bob")
+	carol = NewText("Carol")
+)
+
+// definitions
+var defs = MustNewDefinitions(strings.NewReader(`
+worksheet simple {
+	83:name text
+	91:age  number[0]
+}
+
+worksheet with_slice {
+	42:names []text
+}`))
 
 type Zuite struct {
 	suite.Suite

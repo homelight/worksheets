@@ -15,25 +15,13 @@ package worksheets
 import (
 	"fmt"
 	"math"
-	"strings"
 
 	"github.com/stretchr/testify/require"
 	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
 
-var (
-	alice = NewText("Alice")
-	bob   = NewText("Bob")
-	carol = NewText("Carol")
-
-	defsWithSlice = MustNewDefinitions(strings.NewReader(`
-		worksheet with_slice {
-			42:names []text
-		}`))
-)
-
 func (s *Zuite) TestSliceExample() {
-	ws := defsWithSlice.MustNewWorksheet("with_slice")
+	ws := defs.MustNewWorksheet("with_slice")
 
 	require.Len(s.T(), ws.MustGetSlice("names"), 0)
 
@@ -57,7 +45,7 @@ func (s *Zuite) TestSliceExample() {
 }
 
 func (s *DbZuite) TestSliceSave() {
-	ws := defsWithSlice.MustNewWorksheet("with_slice")
+	ws := defs.MustNewWorksheet("with_slice")
 	ws.MustAppend("names", alice)
 
 	// We're reaching into the data store to get the slice id in order to write
@@ -125,6 +113,30 @@ func (s *DbZuite) TestSliceSave() {
 	require.Empty(s.T(), ws.diff())
 }
 
+func (s *DbZuite) TestSliceLoad() {
+	ws := defs.MustNewWorksheet("with_slice")
+	ws.MustAppend("names", alice)
+	ws.MustAppend("names", carol)
+	ws.MustAppend("names", bob)
+	ws.MustAppend("names", carol)
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	// Load into a fresh worksheet, and look at the slice.
+	var (
+		fresh *Worksheet
+		err   error
+	)
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		fresh, err = session.Load("with_slice", ws.Id())
+		return err
+	})
+	require.Equal(s.T(), []Value{alice, carol, bob, carol}, fresh.MustGetSlice("names"))
+}
+
 // impl notes:
 // - when loading from DB, must order by index
 // - test Get on slice type fails, even if it is undefined
@@ -133,3 +145,4 @@ func (s *DbZuite) TestSliceSave() {
 // - test append of non-assignable type e.g. putting a bool in []text
 // - test deletes on out of bound indexes
 // - denormalize things like max_index to speed up append and such
+// - support for slices of slices (may want to do this later)

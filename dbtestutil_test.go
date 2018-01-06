@@ -15,7 +15,6 @@ package worksheets
 import (
 	"database/sql"
 	"fmt"
-	"strings"
 	"testing"
 
 	_ "github.com/lib/pq"
@@ -29,12 +28,6 @@ type DbZuite struct {
 	store *DbStore
 }
 
-const definitions = `
-worksheet simple {
-	83:name text
-	91:age  number[0]
-}`
-
 func (s *DbZuite) SetupSuite() {
 	// db
 	dbUrl := "postgres://ws_user:@localhost/ws_test?sslmode=disable"
@@ -45,10 +38,6 @@ func (s *DbZuite) SetupSuite() {
 	s.db = runner.NewDB(db, "postgres")
 
 	// store
-	defs, err := NewDefinitions(strings.NewReader(definitions))
-	if err != nil {
-		panic(err)
-	}
 	s.store = NewStore(defs)
 }
 

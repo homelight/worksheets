@@ -118,7 +118,11 @@ func (s *Session) Load(name, id string) (*Worksheet, error) {
 		return nil, fmt.Errorf("unknown worksheet %s:%s", name, id)
 	}
 
-	var valuesRecs []rValue
+	var (
+		valuesRecs   []rValue
+		slicesToLoad = make(map[string]*slice)
+		slicesIds    []interface{}
+	)
 	err = s.tx.
 		Select("*").
 		From("worksheet_values").
@@ -129,13 +133,60 @@ func (s *Session) Load(name, id string) (*Worksheet, error) {
 		return nil, err
 	}
 	for _, valueRec := range valuesRecs {
-		value, err := NewValue(valueRec.Value)
+		index := valueRec.Index
+
+		// field
+		field, ok := ws.def.fieldsByIndex[index]
+		if !ok {
+			return nil, fmt.Errorf("unknown value with field index %d", index)
+		}
+
+		// type dependent treatment
+		var value Value
+		switch t := field.typ.(type) {
+		case *tSliceType:
+			if !strings.HasPrefix(valueRec.Value, "[:") {
+				return nil, fmt.Errorf("unreadable value for slice %s", valueRec.Value)
+			}
+			slice := newSliceWithId(t, valueRec.Value[2:])
+			slicesToLoad[slice.id] = slice
+			slicesIds = append(slicesIds, slice.id)
+			value, err = slice, nil
+		default:
+			value, err = NewValue(valueRec.Value)
+		}
 		if err != nil {
 			return nil, err
 		}
-		index := valueRec.Index
+
+		// set orig and data
 		ws.orig[index] = value
 		ws.data[index] = value
+	}
+
+	if len(slicesToLoad) != 0 {
+		var sliceElementsRecs []rSliceElement
+		err = s.tx.
+			Select("*").
+			From("worksheet_slice_elements").
+			Where(inClause("slice_id", len(slicesIds)), slicesIds...).
+			Where("from_version <= $1 and $1 <= to_version", wsRec.Version).
+			OrderBy("slice_id, rank").
+			QueryStructs(&sliceElementsRecs)
+		if err != nil {
+			return nil, err
+		}
+		for _, sliceElementsRec := range sliceElementsRecs {
+			value, err := NewValue(sliceElementsRec.Value) // wrong, this could be a slice too!
+			if err != nil {
+				return nil, err
+			}
+			slice := slicesToLoad[sliceElementsRec.SliceId]
+			slice.elements = append(slice.elements, sliceElement{
+				rank:  sliceElementsRec.Rank,
+				value: value,
+			})
+		}
 	}
 
 	return ws, nil
