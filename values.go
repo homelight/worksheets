@@ -297,8 +297,13 @@ type sliceElement struct {
 	value Value
 }
 
+func (el sliceElement) String() string {
+	return fmt.Sprintf("%d:%s", el.rank, el.value)
+}
+
 type slice struct {
 	id       string
+	lastRank int
 	typ      *tSliceType
 	elements []sliceElement
 }
@@ -310,27 +315,28 @@ func newSlice(typ *tSliceType) *slice {
 	}
 }
 
-func newSliceWithId(typ *tSliceType, id string) *slice {
+func newSliceWithIdAndLastRank(typ *tSliceType, id string, lastRank int) *slice {
 	return &slice{
-		id:  id,
-		typ: typ,
+		id:       id,
+		typ:      typ,
+		lastRank: lastRank,
 	}
 }
 
 func (value *slice) doAppend(element Value) *slice {
-	var maxRank int
-	if l := len(value.elements); l != 0 {
-		maxRank = value.elements[l-1].rank
-	}
+	nextRank := value.lastRank + 1
+	value.lastRank++
 
-	return &slice{
-		id:  value.id,
-		typ: value.typ,
+	slice := &slice{
+		id:       value.id,
+		typ:      value.typ,
+		lastRank: value.lastRank,
 		elements: append(value.elements, sliceElement{
-			rank:  maxRank + 1,
+			rank:  nextRank,
 			value: element,
 		}),
 	}
+	return slice
 }
 
 func (value *slice) doDel(index int) (*slice, error) {
@@ -338,10 +344,19 @@ func (value *slice) doDel(index int) (*slice, error) {
 		return nil, fmt.Errorf("index out-of-bound")
 	}
 
+	var elements []sliceElement
+	for i := 0; i < len(value.elements); i++ {
+		if i != index {
+			elements = append(elements, value.elements[i])
+		}
+	}
 	return &slice{
 		id:       value.id,
 		typ:      value.typ,
-		elements: append(value.elements[:index], value.elements[index+1:]...),
+		lastRank: value.lastRank,
+		// odd bug with this method... should investigate
+		// elements: append(value.elements[:index], value.elements[index+1:]...),
+		elements: elements,
 	}, nil
 }
 
@@ -356,5 +371,5 @@ func (value *slice) Equal(that Value) bool {
 }
 
 func (value *slice) String() string {
-	return fmt.Sprintf("[:%s", value.id)
+	return fmt.Sprintf("[:%d:%s", value.lastRank, value.id)
 }

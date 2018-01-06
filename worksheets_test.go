@@ -14,6 +14,7 @@ package worksheets
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -418,30 +419,54 @@ func (s *Zuite) TestWorksheet_diff() {
 	require.NoError(s.T(), err)
 
 	// initial diff
-	require.Equal(s.T(), map[int]Value{
-		IndexId:      NewText(ws.Id()),
-		IndexVersion: MustNewValue("1"),
+	require.Equal(s.T(), map[int]change{
+		IndexId: change{
+			before: &Undefined{},
+			after:  NewText(ws.Id()),
+		},
+		IndexVersion: change{
+			before: &Undefined{},
+			after:  MustNewValue("1"),
+		},
 	}, ws.diff())
 
 	// set name to Alice
-	err = ws.Set("name", NewText("Alice"))
+	err = ws.Set("name", alice)
 	require.NoError(s.T(), err)
 
 	// now, also expecting Alice
-	require.Equal(s.T(), map[int]Value{
-		IndexId:      NewText(ws.Id()),
-		IndexVersion: MustNewValue("1"),
-		1:            NewText("Alice"),
+	require.Equal(s.T(), map[int]change{
+		IndexId: change{
+			before: &Undefined{},
+			after:  NewText(ws.Id()),
+		},
+		IndexVersion: change{
+			before: &Undefined{},
+			after:  MustNewValue("1"),
+		},
+		1: change{
+			before: &Undefined{},
+			after:  alice,
+		},
 	}, ws.diff())
 
 	// Alice is now Bob
-	err = ws.Set("name", NewText("Bob"))
+	err = ws.Set("name", bob)
 	require.NoError(s.T(), err)
 
-	require.Equal(s.T(), map[int]Value{
-		IndexId:      NewText(ws.Id()),
-		IndexVersion: MustNewValue("1"),
-		1:            NewText("Bob"),
+	require.Equal(s.T(), map[int]change{
+		IndexId: change{
+			before: &Undefined{},
+			after:  NewText(ws.Id()),
+		},
+		IndexVersion: change{
+			before: &Undefined{},
+			after:  MustNewValue("1"),
+		},
+		1: change{
+			before: &Undefined{},
+			after:  bob,
+		},
 	}, ws.diff())
 
 	// let's fake Bob being there before, and not anymore
@@ -450,9 +475,79 @@ func (s *Zuite) TestWorksheet_diff() {
 	require.NoError(s.T(), err)
 
 	// now, name should go to an explicit undefine
-	require.Equal(s.T(), map[int]Value{
-		IndexId:      NewText(ws.Id()),
-		IndexVersion: MustNewValue("1"),
-		1:            MustNewValue("undefined"),
+	require.Equal(s.T(), map[int]change{
+		IndexId: change{
+			before: &Undefined{},
+			after:  NewText(ws.Id()),
+		},
+		IndexVersion: change{
+			before: &Undefined{},
+			after:  MustNewValue("1"),
+		},
+		1: change{
+			before: bob,
+			after:  &Undefined{},
+		},
 	}, ws.diff())
+}
+
+func (s *Zuite) TestWorksheet_diffSlices() {
+	cases := []struct {
+		before, after map[int]Value
+		ranksOfDels   []int
+		elementsAdded []sliceElement
+	}{
+		{
+			before:        map[int]Value{},
+			after:         map[int]Value{17: alice},
+			ranksOfDels:   nil,
+			elementsAdded: []sliceElement{{rank: 17, value: alice}},
+		},
+		{
+			before:        map[int]Value{17: alice},
+			after:         map[int]Value{17: bob},
+			ranksOfDels:   []int{17},
+			elementsAdded: []sliceElement{{rank: 17, value: bob}},
+		},
+		{
+			before:        map[int]Value{17: alice},
+			after:         map[int]Value{},
+			ranksOfDels:   []int{17},
+			elementsAdded: nil,
+		},
+		{
+			before:        map[int]Value{17: alice, 67: bob},
+			after:         map[int]Value{2: carol, 67: bob},
+			ranksOfDels:   []int{17},
+			elementsAdded: []sliceElement{{2, carol}},
+		},
+		{
+			before:        map[int]Value{1: alice, 3: bob, 5: carol},
+			after:         map[int]Value{2: carol},
+			ranksOfDels:   []int{1, 3, 5},
+			elementsAdded: []sliceElement{{2, carol}},
+		},
+	}
+	for _, ex := range cases {
+		actualRanksOfDels, actualElementsAdded := diffSlices(toSlice(ex.before), toSlice(ex.after))
+		assert.Equal(s.T(), ex.ranksOfDels, actualRanksOfDels, "dels: %v to %v", ex.before, ex.after)
+		assert.Equal(s.T(), ex.elementsAdded, actualElementsAdded, "adds: %v to %v", ex.before, ex.after)
+	}
+}
+
+func toSlice(data map[int]Value) *slice {
+	ranks := make([]int, 0, len(data))
+	for rank := range data {
+		ranks = append(ranks, rank)
+	}
+	sort.Ints(ranks)
+
+	slice := &slice{}
+	for _, rank := range ranks {
+		slice.elements = append(slice.elements, sliceElement{
+			rank:  rank,
+			value: data[rank],
+		})
+	}
+	return slice
 }

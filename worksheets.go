@@ -468,7 +468,11 @@ func (ws *Worksheet) Del(name string, index int) error {
 	return nil
 }
 
-func (ws *Worksheet) diff() map[int]Value {
+type change struct {
+	before, after Value
+}
+
+func (ws *Worksheet) diff() map[int]change {
 	allIndexes := make(map[int]bool)
 	for index := range ws.orig {
 		allIndexes[index] = true
@@ -477,18 +481,61 @@ func (ws *Worksheet) diff() map[int]Value {
 		allIndexes[index] = true
 	}
 
-	diff := make(map[int]Value)
+	diff := make(map[int]change)
 	for index := range allIndexes {
 		orig, hasOrig := ws.orig[index]
 		data, hasData := ws.data[index]
 		if hasOrig && !hasData {
-			diff[index] = &Undefined{}
+			diff[index] = change{
+				before: orig,
+				after:  &Undefined{},
+			}
 		} else if !hasOrig && hasData {
-			diff[index] = data
+			diff[index] = change{
+				before: &Undefined{},
+				after:  data,
+			}
 		} else if !orig.Equal(data) {
-			diff[index] = data
+			diff[index] = change{
+				before: orig,
+				after:  data,
+			}
 		}
 	}
 
 	return diff
+}
+
+func diffSlices(before, after *slice) ([]int, []sliceElement) {
+	var (
+		b, a          int
+		ranksOfDels   []int
+		elementsAdded []sliceElement
+	)
+	for b < len(before.elements) && a < len(after.elements) {
+		bElement, aElement := before.elements[b], after.elements[a]
+		if bElement.rank == aElement.rank {
+			if !bElement.value.Equal(aElement.value) {
+				// we've replaced the value at this rank
+				// represent as a delete and an add
+				ranksOfDels = append(ranksOfDels, bElement.rank)
+				elementsAdded = append(elementsAdded, aElement)
+			}
+			b++
+			a++
+		} else if bElement.rank < aElement.rank {
+			ranksOfDels = append(ranksOfDels, bElement.rank)
+			b++
+		} else if aElement.rank < bElement.rank {
+			elementsAdded = append(elementsAdded, aElement)
+			a++
+		}
+	}
+	for ; b < len(before.elements); b++ {
+		ranksOfDels = append(ranksOfDels, before.elements[b].rank)
+	}
+	for ; a < len(after.elements); a++ {
+		elementsAdded = append(elementsAdded, after.elements[a])
+	}
+	return ranksOfDels, elementsAdded
 }

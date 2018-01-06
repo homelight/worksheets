@@ -44,13 +44,71 @@ func (s *Zuite) TestSliceExample() {
 	require.Len(s.T(), ws.MustGetSlice("names"), 0)
 }
 
+func (s *Zuite) TestSliceOps() {
+	slice1 := newSliceWithIdAndLastRank(&tSliceType{&tTextType{}}, "a-cool-id", 0)
+
+	require.Len(s.T(), slice1.elements, 0)
+
+	slice2 := slice1.doAppend(alice)
+
+	require.Len(s.T(), slice1.elements, 0)
+	require.Len(s.T(), slice2.elements, 1)
+	require.Equal(s.T(), alice, slice2.elements[0].value)
+
+	slice3, err := slice2.doDel(0)
+	require.NoError(s.T(), err)
+
+	require.Len(s.T(), slice1.elements, 0)
+	require.Len(s.T(), slice2.elements, 1)
+	require.Equal(s.T(), sliceElement{1, alice}, slice2.elements[0])
+	require.Len(s.T(), slice3.elements, 0)
+
+	slice4 := slice3.doAppend(carol)
+
+	require.Len(s.T(), slice1.elements, 0)
+	require.Len(s.T(), slice2.elements, 1)
+	require.Equal(s.T(), sliceElement{1, alice}, slice2.elements[0])
+	require.Len(s.T(), slice3.elements, 0)
+	require.Len(s.T(), slice4.elements, 1)
+	require.Equal(s.T(), carol, slice4.elements[0].value)
+
+	slice5 := slice4.doAppend(bob)
+
+	require.Len(s.T(), slice1.elements, 0)
+	require.Len(s.T(), slice2.elements, 1)
+	require.Equal(s.T(), sliceElement{1, alice}, slice2.elements[0])
+	require.Len(s.T(), slice3.elements, 0)
+	require.Len(s.T(), slice4.elements, 1)
+	require.Equal(s.T(), sliceElement{2, carol}, slice4.elements[0])
+	require.Len(s.T(), slice5.elements, 2)
+	require.Equal(s.T(), sliceElement{2, carol}, slice5.elements[0])
+	require.Equal(s.T(), sliceElement{3, bob}, slice5.elements[1])
+
+	slice6, err := slice5.doDel(0)
+	require.NoError(s.T(), err)
+
+	require.Len(s.T(), slice1.elements, 0)
+	require.Len(s.T(), slice2.elements, 1)
+	require.Equal(s.T(), sliceElement{1, alice}, slice2.elements[0])
+	require.Len(s.T(), slice3.elements, 0)
+	require.Len(s.T(), slice4.elements, 1)
+	require.Equal(s.T(), sliceElement{2, carol}, slice4.elements[0])
+	require.Len(s.T(), slice5.elements, 2)
+	require.Equal(s.T(), sliceElement{2, carol}, slice5.elements[0])
+	require.Equal(s.T(), sliceElement{3, bob}, slice5.elements[1])
+	require.Len(s.T(), slice6.elements, 1)
+	require.Equal(s.T(), sliceElement{3, bob}, slice6.elements[0])
+}
+
 func (s *DbZuite) TestSliceSave() {
 	ws := defs.MustNewWorksheet("with_slice")
 	ws.MustAppend("names", alice)
 
 	// We're reaching into the data store to get the slice id in order to write
 	// assertions against it.
-	theSliceId := (ws.data[42].(*slice)).id
+	slice := ws.data[42].(*slice)
+	theSliceId := slice.id
+	slice.lastRank = 89
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
@@ -87,7 +145,7 @@ func (s *DbZuite) TestSliceSave() {
 			Index:       42,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`[:%s`, theSliceId),
+			Value:       fmt.Sprintf(`[:89:%s`, theSliceId),
 		},
 	}, valuesRecs)
 
@@ -106,12 +164,19 @@ func (s *DbZuite) TestSliceSave() {
 }
 
 func (s *DbZuite) TestSliceLoad() {
-	ws := defs.MustNewWorksheet("with_slice")
-	ws.MustAppend("names", alice)
-	ws.MustAppend("names", carol)
-	ws.MustAppend("names", bob)
-	ws.MustAppend("names", carol)
+	var (
+		wsId       string
+		theSliceId string
+	)
 	s.MustRunTransaction(func(tx *runner.Tx) error {
+		ws := defs.MustNewWorksheet("with_slice")
+		ws.MustAppend("names", alice)
+		ws.MustAppend("names", carol)
+		ws.MustAppend("names", bob)
+		ws.MustAppend("names", carol)
+
+		wsId, theSliceId = ws.Id(), (ws.data[42].(*slice)).id
+
 		session := s.store.Open(tx)
 		return session.Save(ws)
 	})
@@ -123,10 +188,141 @@ func (s *DbZuite) TestSliceLoad() {
 	)
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		fresh, err = session.Load("with_slice", ws.Id())
+		fresh, err = session.Load("with_slice", wsId)
 		return err
 	})
 	require.Equal(s.T(), []Value{alice, carol, bob, carol}, fresh.MustGetSlice("names"))
+
+	slice := fresh.data[42].(*slice)
+	require.Equal(s.T(), theSliceId, slice.id)
+	require.Equal(s.T(), 4, slice.lastRank)
+	require.Equal(s.T(), &tSliceType{&tTextType{}}, slice.typ)
+}
+
+func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
+	var (
+		wsId       string
+		theSliceId string
+	)
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		ws := defs.MustNewWorksheet("with_slice")
+		wsId = ws.Id()
+		ws.MustAppend("names", alice)
+		ws.MustAppend("names", bob)
+
+		wsId, theSliceId = ws.Id(), (ws.data[42].(*slice)).id
+
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		ws, err := session.Load("with_slice", wsId)
+		if err != nil {
+			return err
+		}
+		ws.MustDel("names", 0)
+
+		return session.Update(ws)
+	})
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		ws, err := session.Load("with_slice", wsId)
+		if err != nil {
+			return err
+		}
+		ws.MustAppend("names", alice)
+
+		return session.Update(ws)
+	})
+
+	wsRecs, valuesRecs, sliceElementsRecs := s.DbState()
+
+	require.Equal(s.T(), []rWorksheet{
+		{
+			Id:      wsId,
+			Version: 3,
+			Name:    "with_slice",
+		},
+	}, wsRecs)
+
+	require.Equal(s.T(), []rValue{
+		{
+			WorksheetId: wsId,
+			Index:       IndexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`"%s"`, wsId),
+		},
+		{
+			WorksheetId: wsId,
+			Index:       IndexVersion,
+			FromVersion: 1,
+			ToVersion:   1,
+			Value:       `1`,
+		},
+		{
+			WorksheetId: wsId,
+			Index:       IndexVersion,
+			FromVersion: 2,
+			ToVersion:   2,
+			Value:       `2`,
+		},
+		{
+			WorksheetId: wsId,
+			Index:       IndexVersion,
+			FromVersion: 3,
+			ToVersion:   math.MaxInt32,
+			Value:       `3`,
+		},
+		{
+			WorksheetId: wsId,
+			Index:       42,
+			FromVersion: 1,
+			ToVersion:   1,
+			Value:       fmt.Sprintf(`[:2:%s`, theSliceId),
+		},
+		{
+			WorksheetId: wsId,
+			Index:       42,
+			FromVersion: 2,
+			ToVersion:   2,
+			Value:       fmt.Sprintf(`[:2:%s`, theSliceId),
+		},
+		{
+			WorksheetId: wsId,
+			Index:       42,
+			FromVersion: 3,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`[:3:%s`, theSliceId),
+		},
+	}, valuesRecs)
+
+	require.Equal(s.T(), []rSliceElement{
+		{
+			SliceId:     theSliceId,
+			FromVersion: 1,
+			ToVersion:   1,
+			Rank:        1,
+			Value:       `"Alice"`,
+		},
+		{
+			SliceId:     theSliceId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Rank:        2,
+			Value:       `"Bob"`,
+		},
+		{
+			SliceId:     theSliceId,
+			FromVersion: 3,
+			ToVersion:   math.MaxInt32,
+			Rank:        3,
+			Value:       `"Alice"`,
+		},
+	}, sliceElementsRecs)
 }
 
 // impl notes:
@@ -136,5 +332,4 @@ func (s *DbZuite) TestSliceLoad() {
 // - test Append on non-slice field fails
 // - test append of non-assignable type e.g. putting a bool in []text
 // - test deletes on out of bound indexes
-// - denormalize things like max_index to speed up append and such
 // - support for slices of slices (may want to do this later)
