@@ -76,13 +76,6 @@ type rValue struct {
 	Value       string `db:"value"`
 }
 
-// rSlice represents a record of the worksheet_slices table.
-type rSlice struct {
-	Id          string `db:"id"`
-	WorksheetId string `db:"worksheet_id"`
-	Version     int    `db:"version"`
-}
-
 // rSliceElement represents a record of the worksheet_slice_elements table.
 type rSliceElement struct {
 	Id          int64  `db:"id"`
@@ -96,7 +89,6 @@ type rSliceElement struct {
 var tableToEntities = map[string]interface{}{
 	"worksheets":               &rWorksheet{},
 	"worksheet_values":         &rValue{},
-	"worksheet_slices":         &rSlice{},
 	"worksheet_slice_elements": &rSliceElement{},
 }
 
@@ -228,20 +220,6 @@ func (s *Session) Save(ws *Worksheet) error {
 	}
 
 	if len(slicesToInsert) != 0 {
-		// insert slices
-		insertSlices := s.tx.InsertInto("worksheet_slices").Columns("*")
-		for _, slice := range slicesToInsert {
-			insertSlices.Record(rSlice{
-				Id:          slice.id,
-				WorksheetId: ws.Id(),
-				Version:     ws.Version(),
-			})
-		}
-		if _, err := insertSlices.Exec(); err != nil {
-			return err
-		}
-
-		// insert slice elements
 		insertSliceElements := s.tx.InsertInto("worksheet_slice_elements").Columns("*").Blacklist("id")
 		for _, slice := range slicesToInsert {
 			for _, element := range slice.elements {

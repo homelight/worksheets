@@ -57,7 +57,7 @@ func (s *DbZuite) TestSliceSave() {
 		return session.Save(ws)
 	})
 
-	wsRecs, valuesRecs, slicesRecs, sliceElementsRecs := s.DbState()
+	wsRecs, valuesRecs, sliceElementsRecs := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -90,14 +90,6 @@ func (s *DbZuite) TestSliceSave() {
 			Value:       fmt.Sprintf(`[:%s`, theSliceId),
 		},
 	}, valuesRecs)
-
-	require.Equal(s.T(), []rSlice{
-		{
-			Id:          theSliceId,
-			WorksheetId: ws.Id(),
-			Version:     1,
-		},
-	}, slicesRecs)
 
 	require.Equal(s.T(), []rSliceElement{
 		{

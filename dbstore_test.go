@@ -52,7 +52,7 @@ func (s *DbZuite) TestSave() {
 		return session.Save(ws)
 	})
 
-	wsRecs, valuesRecs, _, _ := s.DbState()
+	wsRecs, valuesRecs, _ := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -110,7 +110,7 @@ func (s *DbZuite) TestUpdate() {
 		return session.Update(ws)
 	})
 
-	wsRecs, valuesRecs, _, _ := s.DbState()
+	wsRecs, valuesRecs, _ := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -191,11 +191,10 @@ func (s *DbZuite) MustRunTransaction(fn func(tx *runner.Tx) error) {
 	require.NoError(s.T(), err)
 }
 
-func (s *DbZuite) DbState() ([]rWorksheet, []rValue, []rSlice, []rSliceElement) {
+func (s *DbZuite) DbState() ([]rWorksheet, []rValue, []rSliceElement) {
 	var (
 		wsRecs            []rWorksheet
 		valuesRecs        []rValue
-		slicesRecs        []rSlice
 		sliceElementsRecs []rSliceElement
 	)
 
@@ -220,14 +219,6 @@ func (s *DbZuite) DbState() ([]rWorksheet, []rValue, []rSlice, []rSliceElement) 
 
 	if err := s.db.
 		Select("*").
-		From("worksheet_slices").
-		OrderBy("id").
-		QueryStructs(&slicesRecs); err != nil {
-		require.NoError(s.T(), err)
-	}
-
-	if err := s.db.
-		Select("*").
 		From("worksheet_slice_elements").
 		OrderBy("slice_id, rank, from_version").
 		QueryStructs(&sliceElementsRecs); err != nil {
@@ -237,5 +228,5 @@ func (s *DbZuite) DbState() ([]rWorksheet, []rValue, []rSlice, []rSliceElement) 
 		sliceElementsRecs[i].Id = 0
 	}
 
-	return wsRecs, valuesRecs, slicesRecs, sliceElementsRecs
+	return wsRecs, valuesRecs, sliceElementsRecs
 }
