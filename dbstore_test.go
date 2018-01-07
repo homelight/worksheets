@@ -186,6 +186,35 @@ func (s *DbZuite) TestUpdateUndefinedField() {
 	})
 }
 
+func (s *DbZuite) TestUpdateOnUpdateDoesNothing() {
+	ws := s.store.defs.MustNewWorksheet("simple")
+	ws.MustSet("name", alice)
+
+	require.Equal(s.T(), 1, ws.Version())
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	require.Equal(s.T(), 1, ws.Version())
+
+	ws.MustSet("name", bob)
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		return session.Update(ws)
+	})
+
+	require.Equal(s.T(), 2, ws.Version())
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		return session.Update(ws)
+	})
+
+	require.Equal(s.T(), 2, ws.Version())
+}
+
 func (s *DbZuite) MustRunTransaction(fn func(tx *runner.Tx) error) {
 	err := RunTransaction(s.db, fn)
 	require.NoError(s.T(), err)

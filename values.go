@@ -55,6 +55,7 @@ var _ []Value = []Value{
 
 	// Internals.
 	&slice{},
+	&Worksheet{},
 }
 
 // Undefined represents an undefined value.
@@ -376,4 +377,16 @@ func (value *slice) Equal(that Value) bool {
 
 func (value *slice) String() string {
 	return fmt.Sprintf("[:%d:%s", value.lastRank, value.id)
+}
+
+func (value *Worksheet) Type() Type {
+	return &tWorksheetType{value.def.name}
+}
+
+func (value *Worksheet) Equal(that Value) bool {
+	return value == that
+}
+
+func (value *Worksheet) String() string {
+	return fmt.Sprintf("*:%s", value.Id())
 }

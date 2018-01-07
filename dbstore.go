@@ -192,6 +192,23 @@ func (s *Session) Load(name, id string) (*Worksheet, error) {
 	return ws, nil
 }
 
+func (s *Session) SaveOrUpdate(ws *Worksheet) error {
+	var count int
+	if err := s.tx.
+		Select("count(*)").
+		From("worksheets").
+		Where("id = $1", ws.Id()).
+		QueryScalar(&count); err != nil {
+		return err
+	}
+
+	if count == 0 {
+		return s.Save(ws)
+	} else {
+		return s.Update(ws)
+	}
+}
+
 func (s *Session) Save(ws *Worksheet) error {
 	// insert rWorksheet
 	_, err := s.tx.
@@ -208,7 +225,10 @@ func (s *Session) Save(ws *Worksheet) error {
 	}
 
 	// insert rValues
-	var slicesToInsert []*slice
+	var (
+		slicesToInsert      []*slice
+		worksheetsToCascade []*Worksheet
+	)
 	insertValues := s.tx.InsertInto("worksheet_values").Columns("*").Blacklist("id")
 	for index, value := range ws.data {
 		insertValues.Record(rValue{
@@ -219,8 +239,11 @@ func (s *Session) Save(ws *Worksheet) error {
 			Value:       value.String(),
 		})
 
-		if slice, ok := value.(*slice); ok {
-			slicesToInsert = append(slicesToInsert, slice)
+		switch v := value.(type) {
+		case *slice:
+			slicesToInsert = append(slicesToInsert, v)
+		case *Worksheet:
+			worksheetsToCascade = append(worksheetsToCascade, v)
 		}
 	}
 	if _, err := insertValues.Exec(); err != nil {
@@ -241,6 +264,12 @@ func (s *Session) Save(ws *Worksheet) error {
 			}
 		}
 		if _, err := insertSliceElements.Exec(); err != nil {
+			return err
+		}
+	}
+
+	for _, wsToCascade := range worksheetsToCascade {
+		if err := s.SaveOrUpdate(wsToCascade); err != nil {
 			return err
 		}
 	}
@@ -266,6 +295,11 @@ func (s *Session) Update(ws *Worksheet) error {
 		ws.data[IndexVersion] = oldVersionValue
 		return d
 	}()
+
+	// no change, i.e. only the version would change
+	if len(diff) == 1 {
+		return nil
+	}
 
 	// split the diff into the various changes we need to do
 	var (

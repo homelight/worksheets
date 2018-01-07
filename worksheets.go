@@ -75,6 +75,8 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 	defs, err := p.parseWorksheets()
 	if err != nil {
 		return nil, err
+	} else if p.next() != "" || len(defs) == 0 {
+		return nil, fmt.Errorf("expecting worksheet")
 	}
 
 	err = processOptions(defs, opts...)
@@ -87,6 +89,17 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 		for _, field := range def.fields {
 			if _, ok := field.computedBy.(*tExternal); ok {
 				return nil, fmt.Errorf("plugins: missing plugin for %s.%s", def.name, field.name)
+			}
+		}
+	}
+
+	// Resolve worksheet refs types
+	for _, def := range defs {
+		for _, field := range def.fields {
+			if refTyp, ok := field.typ.(*tWorksheetType); ok {
+				if _, ok := defs[refTyp.name]; !ok {
+					return nil, fmt.Errorf("unknown worksheet %s referenced in field %s.%s", refTyp.name, def.name, field.name)
+				}
 			}
 		}
 	}

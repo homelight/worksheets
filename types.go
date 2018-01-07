@@ -80,9 +80,10 @@ func (typ *tSliceType) String() string {
 }
 
 func (typ *tWorksheetType) AssignableTo(u Type) bool {
-	panic("not implemented")
+	other, ok := u.(*tWorksheetType)
+	return ok && typ.name == other.name
 }
 
 func (typ *tWorksheetType) String() string {
-	panic("not implemented")
+	return typ.name
 }

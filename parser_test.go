@@ -67,19 +67,6 @@ func (s *Zuite) TestParser_parseWorksheet() {
 	}
 }
 
-func (s *Zuite) TestParser_parseWorksheetErrors() {
-	cases := []string{
-		"worksheet simple {\n\t42:full_name\n\ttext 42:happy bool\n}",
-		"worksheet simple {\n\t42:same_name\n\ttext 43:same_name bool\n}",
-	}
-	for _, input := range cases {
-		p := newParser(strings.NewReader(input))
-		_, err := p.parseWorksheet()
-		require.NotNil(s.T(), err)
-		// TODO(pascal): verify error messages are nice
-	}
-}
-
 func (s *Zuite) TestParser_parseExpressionOrExternal() {
 	cases := map[string]expression{
 		`external`: &tExternal{},
@@ -277,7 +264,7 @@ func (s *Zuite) TestParser_parseType() {
 		`bool`:      &tBoolType{},
 		`number[5]`: &tNumberType{5},
 		`[]bool`:    &tSliceType{&tBoolType{}},
-		`[]foobar`:  &tSliceType{&tWorksheetType{"foobar"}},
+		`foobar`:    &tWorksheetType{name: "foobar"},
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))

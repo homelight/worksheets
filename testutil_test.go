@@ -35,6 +35,10 @@ worksheet simple {
 
 worksheet with_slice {
 	42:names []text
+}
+
+worksheet with_refs {
+	87:simple simple
 }`))
 
 type Zuite struct {

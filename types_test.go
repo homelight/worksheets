@@ -60,3 +60,17 @@ func (s *Zuite) TestTypeNotAssignableTo() {
 		assert.False(s.T(), ex.left.AssignableTo(ex.right), "%s should not be assignable to %s", ex.left, ex.right)
 	}
 }
+
+func (s *Zuite) TestTypeString() {
+	cases := map[Type]string{
+		&tUndefinedType{}:         "undefined",
+		&tTextType{}:              "text",
+		&tBoolType{}:              "bool",
+		&tNumberType{1}:           "number[1]",
+		&tSliceType{&tBoolType{}}: "[]bool",
+		&tWorksheetType{"simple"}: "simple",
+	}
+	for typ, expected := range cases {
+		assert.Equal(s.T(), expected, typ.String(), expected)
+	}
+}

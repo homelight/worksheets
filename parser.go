@@ -141,9 +141,6 @@ func (p *parser) parseWorksheets() (map[string]*tWorksheet, error) {
 		}
 		wsDefs[def.name] = def
 	}
-	if len(wsDefs) == 0 {
-		return nil, fmt.Errorf("no worksheets defined")
-	}
 
 	return wsDefs, nil
 }
@@ -652,7 +649,7 @@ func (p *parser) parseType() (Type, error) {
 			}
 			return &tNumberType{scale}, nil
 		default:
-			return &tWorksheetType{name}, nil
+			return &tWorksheetType{name: name}, nil
 		}
 
 	case "slice":
