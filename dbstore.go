@@ -96,6 +96,22 @@ func (s *Session) Load(name, id string) (*Worksheet, error) {
 	graph := make(map[string]*Worksheet)
 	return s.load(graph, name, id)
 }
+
+func (s *Session) Save(ws *Worksheet) error {
+	graph := make(map[string]bool)
+	return s.save(graph, ws)
+}
+
+func (s *Session) Update(ws *Worksheet) error {
+	graph := make(map[string]bool)
+	return s.update(graph, ws)
+}
+
+func (s *Session) SaveOrUpdate(ws *Worksheet) error {
+	graph := make(map[string]bool)
+	return s.saveOrUpdate(graph, ws)
+}
+
 func (s *Session) load(graph map[string]*Worksheet, name, id string) (*Worksheet, error) {
 	wsRef := fmt.Sprintf("%s:%s", name, id)
 
@@ -216,7 +232,12 @@ func (s *Session) load(graph map[string]*Worksheet, name, id string) (*Worksheet
 	return ws, nil
 }
 
-func (s *Session) SaveOrUpdate(ws *Worksheet) error {
+func (s *Session) saveOrUpdate(graph map[string]bool, ws *Worksheet) error {
+	if _, ok := graph[ws.Id()]; ok {
+		return nil
+	}
+	graph[ws.Id()] = true
+
 	var count int
 	if err := s.tx.
 		Select("count(*)").
@@ -233,7 +254,12 @@ func (s *Session) SaveOrUpdate(ws *Worksheet) error {
 	}
 }
 
-func (s *Session) Save(ws *Worksheet) error {
+func (s *Session) save(graph map[string]bool, ws *Worksheet) error {
+	if _, ok := graph[ws.Id()]; ok {
+		return nil
+	}
+	graph[ws.Id()] = true
+
 	// insert rWorksheet
 	_, err := s.tx.
 		InsertInto("worksheets").
@@ -293,7 +319,7 @@ func (s *Session) Save(ws *Worksheet) error {
 	}
 
 	for _, wsToCascade := range worksheetsToCascade {
-		if err := s.SaveOrUpdate(wsToCascade); err != nil {
+		if err := s.saveOrUpdate(graph, wsToCascade); err != nil {
 			return err
 		}
 	}
@@ -306,7 +332,12 @@ func (s *Session) Save(ws *Worksheet) error {
 	return nil
 }
 
-func (s *Session) Update(ws *Worksheet) error {
+func (s *Session) update(graph map[string]bool, ws *Worksheet) error {
+	if _, ok := graph[ws.Id()]; ok {
+		return nil
+	}
+	graph[ws.Id()] = true
+
 	oldVersion := ws.Version()
 	newVersion := oldVersion + 1
 	newVersionValue := MustNewValue(strconv.Itoa(newVersion))

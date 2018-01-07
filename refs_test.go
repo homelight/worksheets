@@ -392,6 +392,53 @@ func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 	require.Empty(s.T(), ws.diff())
 }
 
+func (s *DbZuite) TestRefsSave_withCycles() {
+	ws := defs.MustNewWorksheet("with_refs_and_cycles")
+	ws.MustSet("point_to_me", ws)
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	wsRecs, valuesRecs, _ := s.DbState()
+
+	require.Equal(s.T(), []rWorksheet{
+		{
+			Id:      ws.Id(),
+			Version: 1,
+			Name:    "with_refs_and_cycles",
+		},
+	}, wsRecs)
+
+	require.Equal(s.T(), []rValue{
+		{
+			WorksheetId: ws.Id(),
+			Index:       IndexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+		},
+		{
+			WorksheetId: ws.Id(),
+			Index:       IndexVersion,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `1`,
+		},
+		{
+			WorksheetId: ws.Id(),
+			Index:       404,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`*:%s`, ws.Id()),
+		},
+	}, valuesRecs)
+
+	// Upon Save, orig needs to be set to data.
+	require.Empty(s.T(), ws.diff())
+}
+
 func (s *DbZuite) TestRefsLoad_noCycles() {
 	var (
 		wsId     = "d55cba7e-d08f-43df-bcd7-f48c2ecf6da7"

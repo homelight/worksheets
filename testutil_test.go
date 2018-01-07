@@ -42,7 +42,7 @@ worksheet with_refs {
 }
 
 worksheet with_refs_and_cycles {
-	87:point_to_me with_refs_and_cycles
+	404:point_to_me with_refs_and_cycles
 }`))
 
 type Zuite struct {
