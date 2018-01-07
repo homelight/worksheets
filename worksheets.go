@@ -295,7 +295,7 @@ func (ws *Worksheet) set(field *tField, value Value) error {
 	// type check
 	litType := value.Type()
 	if ok := litType.AssignableTo(field.typ); !ok {
-		return fmt.Errorf("cannot assign %s to %s", value, field.typ)
+		return fmt.Errorf("cannot assign value of type %s to field of type %s", litType, field.typ)
 	}
 
 	// store
@@ -427,11 +427,6 @@ func (ws *Worksheet) get(name string) (*tField, Value, error) {
 	value, ok := ws.data[index]
 	if !ok {
 		return field, &Undefined{}, nil
-	}
-
-	// type check
-	if ok := value.Type().AssignableTo(field.typ); !ok {
-		return nil, nil, fmt.Errorf("cannot assign %s to %s", value, field.typ)
 	}
 
 	return field, value, nil
