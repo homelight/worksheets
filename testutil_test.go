@@ -38,6 +38,7 @@ worksheet with_slice {
 }
 
 worksheet with_refs {
+	46:some_flag bool
 	87:simple simple
 }
 

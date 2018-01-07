@@ -351,6 +351,15 @@ func (s *Session) update(graph map[string]bool, ws *Worksheet) error {
 		return d
 	}()
 
+	// cascade worksheets
+	for _, value := range ws.data {
+		if wsToCascade, ok := value.(*Worksheet); ok {
+			if err := s.saveOrUpdate(graph, wsToCascade); err != nil {
+				return err
+			}
+		}
+	}
+
 	// no change, i.e. only the version would change
 	if len(diff) == 1 {
 		return nil

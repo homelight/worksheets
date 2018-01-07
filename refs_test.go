@@ -503,3 +503,341 @@ func (s *DbZuite) TestRefsLoad_withCycles() {
 	value := fresh.MustGet("point_to_me")
 	require.True(s.T(), fresh == value)
 }
+
+func (s *DbZuite) TestRefsUpdate_updateParentNoChangeInChild() {
+	var (
+		ws       = defs.MustNewWorksheet("with_refs")
+		simple   = defs.MustNewWorksheet("simple")
+		wsId     = "d55cba7e-d08f-43df-bcd7-f48c2ecf6da7"
+		simpleId = "e310c9b6-fc48-4b29-8a66-eeafa9a8ec16"
+	)
+
+	// We forcibly set both worksheets' identifiers to have a known ordering
+	// when comparing the db state.
+	ws.data[IndexId] = NewText(wsId)
+	simple.data[IndexId] = NewText(simpleId)
+
+	// Initial state.
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		ws.MustSet("simple", simple)
+		ws.MustSet("some_flag", NewBool(false))
+
+		simple.MustSet("name", carol)
+
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	// Update.
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		ws.MustSet("some_flag", NewBool(true))
+		return session.Update(ws)
+	})
+
+	wsRecs, valuesRecs, _ := s.DbState()
+
+	require.Equal(s.T(), []rWorksheet{
+		{
+			Id:      wsId,
+			Version: 2,
+			Name:    "with_refs",
+		},
+		{
+			Id:      simpleId,
+			Version: 1,
+			Name:    "simple",
+		},
+	}, wsRecs)
+
+	require.Equal(s.T(), []rValue{
+		{
+			WorksheetId: wsId,
+			Index:       IndexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+		},
+		{
+			WorksheetId: wsId,
+			Index:       IndexVersion,
+			FromVersion: 1,
+			ToVersion:   1,
+			Value:       `1`,
+		},
+		{
+			WorksheetId: wsId,
+			Index:       IndexVersion,
+			FromVersion: 2,
+			ToVersion:   math.MaxInt32,
+			Value:       `2`,
+		},
+		{
+			WorksheetId: wsId,
+			Index:       46,
+			FromVersion: 1,
+			ToVersion:   1,
+			Value:       `false`,
+		},
+		{
+			WorksheetId: wsId,
+			Index:       46,
+			FromVersion: 2,
+			ToVersion:   math.MaxInt32,
+			Value:       `true`,
+		},
+		{
+			WorksheetId: wsId,
+			Index:       87,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`*:%s`, simpleId),
+		},
+		{
+			WorksheetId: simpleId,
+			Index:       IndexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`"%s"`, simpleId),
+		},
+		{
+			WorksheetId: simpleId,
+			Index:       IndexVersion,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `1`,
+		},
+		{
+			WorksheetId: simpleId,
+			Index:       83,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `"Carol"`,
+		},
+	}, valuesRecs)
+
+	// Upon Update, there should be no more changes to persist.
+	require.Empty(s.T(), ws.diff())
+}
+
+func (s *DbZuite) TestRefsUpdate_updateParentWithChangesInChild() {
+	var (
+		ws       = defs.MustNewWorksheet("with_refs")
+		simple   = defs.MustNewWorksheet("simple")
+		wsId     = "d55cba7e-d08f-43df-bcd7-f48c2ecf6da7"
+		simpleId = "e310c9b6-fc48-4b29-8a66-eeafa9a8ec16"
+	)
+
+	// We forcibly set both worksheets' identifiers to have a known ordering
+	// when comparing the db state.
+	ws.data[IndexId] = NewText(wsId)
+	simple.data[IndexId] = NewText(simpleId)
+
+	// Initial state.
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		ws.MustSet("simple", simple)
+		ws.MustSet("some_flag", NewBool(false))
+
+		simple.MustSet("name", carol)
+
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	// Update.
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		ws.MustSet("some_flag", NewBool(true))
+		simple.MustSet("name", bob)
+		return session.Update(ws)
+	})
+
+	wsRecs, valuesRecs, _ := s.DbState()
+
+	require.Equal(s.T(), []rWorksheet{
+		{
+			Id:      wsId,
+			Version: 2,
+			Name:    "with_refs",
+		},
+		{
+			Id:      simpleId,
+			Version: 2,
+			Name:    "simple",
+		},
+	}, wsRecs)
+
+	require.Equal(s.T(), []rValue{
+		{
+			WorksheetId: wsId,
+			Index:       IndexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+		},
+		{
+			WorksheetId: wsId,
+			Index:       IndexVersion,
+			FromVersion: 1,
+			ToVersion:   1,
+			Value:       `1`,
+		},
+		{
+			WorksheetId: wsId,
+			Index:       IndexVersion,
+			FromVersion: 2,
+			ToVersion:   math.MaxInt32,
+			Value:       `2`,
+		},
+		{
+			WorksheetId: wsId,
+			Index:       46,
+			FromVersion: 1,
+			ToVersion:   1,
+			Value:       `false`,
+		},
+		{
+			WorksheetId: wsId,
+			Index:       46,
+			FromVersion: 2,
+			ToVersion:   math.MaxInt32,
+			Value:       `true`,
+		},
+		{
+			WorksheetId: wsId,
+			Index:       87,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`*:%s`, simpleId),
+		},
+		{
+			WorksheetId: simpleId,
+			Index:       IndexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`"%s"`, simpleId),
+		},
+		{
+			WorksheetId: simpleId,
+			Index:       IndexVersion,
+			FromVersion: 1,
+			ToVersion:   1,
+			Value:       `1`,
+		},
+		{
+			WorksheetId: simpleId,
+			Index:       IndexVersion,
+			FromVersion: 2,
+			ToVersion:   math.MaxInt32,
+			Value:       `2`,
+		},
+		{
+			WorksheetId: simpleId,
+			Index:       83,
+			FromVersion: 1,
+			ToVersion:   1,
+			Value:       `"Carol"`,
+		},
+		{
+			WorksheetId: simpleId,
+			Index:       83,
+			FromVersion: 2,
+			ToVersion:   math.MaxInt32,
+			Value:       `"Bob"`,
+		},
+	}, valuesRecs)
+
+	// Upon Update, there should be no more changes to persist.
+	require.Empty(s.T(), ws.diff())
+}
+
+func (s *DbZuite) TestRefsUpdate_updateParentWithChildRequiringToBeSaved() {
+	var (
+		ws       = defs.MustNewWorksheet("with_refs")
+		simple   = defs.MustNewWorksheet("simple")
+		wsId     = "d55cba7e-d08f-43df-bcd7-f48c2ecf6da7"
+		simpleId = "e310c9b6-fc48-4b29-8a66-eeafa9a8ec16"
+	)
+
+	// We forcibly set both worksheets' identifiers to have a known ordering
+	// when comparing the db state.
+	ws.data[IndexId] = NewText(wsId)
+	simple.data[IndexId] = NewText(simpleId)
+
+	// Initial state: simple is not attached to ws, and will therefore not be
+	// persisted.
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	// Update: we attach simple, which should now be persisted.
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		ws.MustSet("simple", simple)
+		return session.Update(ws)
+	})
+
+	wsRecs, valuesRecs, _ := s.DbState()
+
+	require.Equal(s.T(), []rWorksheet{
+		{
+			Id:      wsId,
+			Version: 2,
+			Name:    "with_refs",
+		},
+		{
+			Id:      simpleId,
+			Version: 1,
+			Name:    "simple",
+		},
+	}, wsRecs)
+
+	require.Equal(s.T(), []rValue{
+		{
+			WorksheetId: wsId,
+			Index:       IndexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+		},
+		{
+			WorksheetId: wsId,
+			Index:       IndexVersion,
+			FromVersion: 1,
+			ToVersion:   1,
+			Value:       `1`,
+		},
+		{
+			WorksheetId: wsId,
+			Index:       IndexVersion,
+			FromVersion: 2,
+			ToVersion:   math.MaxInt32,
+			Value:       `2`,
+		},
+		{
+			WorksheetId: wsId,
+			Index:       87,
+			FromVersion: 2,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`*:%s`, simpleId),
+		},
+		{
+			WorksheetId: simpleId,
+			Index:       IndexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`"%s"`, simpleId),
+		},
+		{
+			WorksheetId: simpleId,
+			Index:       IndexVersion,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `1`,
+		},
+	}, valuesRecs)
+
+	// Upon Update, there should be no more changes to persist.
+	require.Empty(s.T(), ws.diff())
+}
