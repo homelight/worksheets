@@ -76,9 +76,20 @@ type rValue struct {
 	Value       string `db:"value"`
 }
 
+// rSliceElement represents a record of the worksheet_slice_elements table.
+type rSliceElement struct {
+	Id          int64  `db:"id"`
+	SliceId     string `db:"slice_id"`
+	Rank        int    `db:"rank"`
+	FromVersion int    `db:"from_version"`
+	ToVersion   int    `db:"to_version"`
+	Value       string `db:"value"`
+}
+
 var tableToEntities = map[string]interface{}{
-	"worksheets":       &rWorksheet{},
-	"worksheet_values": &rWorksheet{},
+	"worksheets":               &rWorksheet{},
+	"worksheet_values":         &rValue{},
+	"worksheet_slice_elements": &rSliceElement{},
 }
 
 func (s *Session) Load(name, id string) (*Worksheet, error) {
@@ -99,7 +110,11 @@ func (s *Session) Load(name, id string) (*Worksheet, error) {
 		return nil, fmt.Errorf("unknown worksheet %s:%s", name, id)
 	}
 
-	var valuesRecs []rValue
+	var (
+		valuesRecs   []rValue
+		slicesToLoad = make(map[string]*slice)
+		slicesIds    []interface{}
+	)
 	err = s.tx.
 		Select("*").
 		From("worksheet_values").
@@ -110,13 +125,68 @@ func (s *Session) Load(name, id string) (*Worksheet, error) {
 		return nil, err
 	}
 	for _, valueRec := range valuesRecs {
-		value, err := NewValue(valueRec.Value)
+		index := valueRec.Index
+
+		// field
+		field, ok := ws.def.fieldsByIndex[index]
+		if !ok {
+			return nil, fmt.Errorf("unknown value with field index %d", index)
+		}
+
+		// type dependent treatment
+		var value Value
+		switch t := field.typ.(type) {
+		case *tSliceType:
+			if !strings.HasPrefix(valueRec.Value, "[:") {
+				return nil, fmt.Errorf("unreadable value for slice %s", valueRec.Value)
+			}
+			parts := strings.Split(valueRec.Value, ":")
+			if len(parts) != 3 {
+				return nil, fmt.Errorf("unreadable value for slice %s", valueRec.Value)
+			}
+			lastRank, err := strconv.Atoi(parts[1])
+			if err != nil {
+				return nil, fmt.Errorf("unreadable value for slice %s", valueRec.Value)
+			}
+			slice := newSliceWithIdAndLastRank(t, parts[2], lastRank)
+			slicesToLoad[slice.id] = slice
+			slicesIds = append(slicesIds, slice.id)
+			value, err = slice, nil
+		default:
+			value, err = NewValue(valueRec.Value)
+		}
 		if err != nil {
 			return nil, err
 		}
-		index := valueRec.Index
+
+		// set orig and data
 		ws.orig[index] = value
 		ws.data[index] = value
+	}
+
+	if len(slicesToLoad) != 0 {
+		var sliceElementsRecs []rSliceElement
+		err = s.tx.
+			Select("*").
+			From("worksheet_slice_elements").
+			Where(inClause("slice_id", len(slicesIds)), slicesIds...).
+			Where("from_version <= $1 and $1 <= to_version", wsRec.Version).
+			OrderBy("slice_id, rank").
+			QueryStructs(&sliceElementsRecs)
+		if err != nil {
+			return nil, err
+		}
+		for _, sliceElementsRec := range sliceElementsRecs {
+			value, err := NewValue(sliceElementsRec.Value) // wrong, this could be a slice too!
+			if err != nil {
+				return nil, err
+			}
+			slice := slicesToLoad[sliceElementsRec.SliceId]
+			slice.elements = append(slice.elements, sliceElement{
+				rank:  sliceElementsRec.Rank,
+				value: value,
+			})
+		}
 	}
 
 	return ws, nil
@@ -138,18 +208,41 @@ func (s *Session) Save(ws *Worksheet) error {
 	}
 
 	// insert rValues
-	insert := s.tx.InsertInto("worksheet_values").Columns("*").Blacklist("id")
+	var slicesToInsert []*slice
+	insertValues := s.tx.InsertInto("worksheet_values").Columns("*").Blacklist("id")
 	for index, value := range ws.data {
-		insert.Record(rValue{
+		insertValues.Record(rValue{
 			WorksheetId: ws.Id(),
 			Index:       index,
 			FromVersion: ws.Version(),
 			ToVersion:   math.MaxInt32,
 			Value:       value.String(),
 		})
+
+		if slice, ok := value.(*slice); ok {
+			slicesToInsert = append(slicesToInsert, slice)
+		}
 	}
-	if _, err := insert.Exec(); err != nil {
+	if _, err := insertValues.Exec(); err != nil {
 		return err
+	}
+
+	if len(slicesToInsert) != 0 {
+		insertSliceElements := s.tx.InsertInto("worksheet_slice_elements").Columns("*").Blacklist("id")
+		for _, slice := range slicesToInsert {
+			for _, element := range slice.elements {
+				insertSliceElements.Record(rSliceElement{
+					SliceId:     slice.id,
+					Rank:        element.rank,
+					FromVersion: ws.Version(),
+					ToVersion:   math.MaxInt32,
+					Value:       element.value.String(),
+				})
+			}
+		}
+		if _, err := insertSliceElements.Exec(); err != nil {
+			return err
+		}
 	}
 
 	// now we can update ws itself to reflect the save
@@ -166,7 +259,7 @@ func (s *Session) Update(ws *Worksheet) error {
 	newVersionValue := MustNewValue(strconv.Itoa(newVersion))
 
 	// diff
-	diff := func() map[int]Value {
+	diff := func() map[int]change {
 		oldVersionValue := ws.data[IndexVersion]
 		ws.data[IndexVersion] = MustNewValue(strconv.Itoa(newVersion))
 		d := ws.diff()
@@ -174,50 +267,96 @@ func (s *Session) Update(ws *Worksheet) error {
 		return d
 	}()
 
-	// diff indexes
-	allDiffIndexes := make([]interface{}, len(diff))
-	for index := range diff {
-		allDiffIndexes = append(allDiffIndexes, index)
+	// split the diff into the various changes we need to do
+	var (
+		valuesToUpdate      = make([]int, 0, len(diff))
+		slicesRanksOfDels   = make(map[string][]int)
+		slicesElementsAdded = make(map[string][]sliceElement)
+	)
+	for index, change := range diff {
+		valuesToUpdate = append(valuesToUpdate, index)
+		if sliceBefore, ok := change.before.(*slice); ok {
+			if sliceAfter, ok := change.after.(*slice); ok {
+				if sliceBefore.id == sliceAfter.id {
+					ranksOfDels, elementsAdded := diffSlices(sliceBefore, sliceAfter)
+
+					sliceId := sliceBefore.id
+					if len(ranksOfDels) != 0 {
+						slicesRanksOfDels[sliceId] = ranksOfDels
+					}
+					if len(elementsAdded) != 0 {
+						slicesElementsAdded[sliceId] = elementsAdded
+					}
+				}
+			}
+		}
 	}
-	allDiffIndexes = append(allDiffIndexes, IndexVersion)
 
 	// update old rValues
-	result, err := s.tx.
+	if _, err := s.tx.
 		Update("worksheet_values").
 		Set("to_version", oldVersion).
 		Where("worksheet_id = $1", ws.Id()).
 		Where("from_version <= $1 and $1 <= to_version", oldVersion).
-		Where(inClause("index", len(allDiffIndexes)), allDiffIndexes...).
-		Exec()
-	if err != nil {
+		Where(inClause("index", len(valuesToUpdate)), ughconvert(valuesToUpdate)...).
+		Exec(); err != nil {
 		return err
 	}
 
 	// insert new rValues
 	insert := s.tx.InsertInto("worksheet_values").Columns("*").Blacklist("id")
-	for index, value := range diff {
+	for _, index := range valuesToUpdate {
+		change := diff[index]
 		insert.Record(rValue{
 			WorksheetId: ws.Id(),
 			Index:       index,
 			FromVersion: newVersion,
 			ToVersion:   math.MaxInt32,
-			Value:       value.String(),
+			Value:       change.after.String(),
 		})
 	}
 	if _, err := insert.Exec(); err != nil {
 		return err
 	}
 
+	// slices: deleted elements
+	for sliceId, ranks := range slicesRanksOfDels {
+		if _, err := s.tx.
+			Update("worksheet_slice_elements").
+			Set("to_version", oldVersion).
+			Where("slice_id = $1", sliceId).
+			Where("from_version <= $1 and $1 <= to_version", oldVersion).
+			Where(inClause("rank", len(ranks)), ughconvert(ranks)...).
+			Exec(); err != nil {
+			return err
+		}
+	}
+
+	// slices: added elements
+	for sliceId, adds := range slicesElementsAdded {
+		insert := s.tx.InsertInto("worksheet_slice_elements").Columns("*").Blacklist("id")
+		for _, add := range adds {
+			insert.Record(rSliceElement{
+				SliceId:     sliceId,
+				FromVersion: newVersion,
+				ToVersion:   math.MaxInt32,
+				Rank:        add.rank,
+				Value:       add.value.String(),
+			})
+		}
+		if _, err := insert.Exec(); err != nil {
+			return err
+		}
+	}
+
 	// update rWorksheet
-	result, err = s.tx.
+	if result, err := s.tx.
 		Update("worksheets").
 		Set("version", newVersion).
 		Where("id = $1 and version = $2", ws.Id(), oldVersion).
-		Exec()
-	if err != nil {
+		Exec(); err != nil {
 		return err
-	}
-	if result.RowsAffected != 1 {
+	} else if result.RowsAffected != 1 {
 		return fmt.Errorf("concurrent update detected")
 	}
 
@@ -236,4 +375,12 @@ func inClause(column string, num int) string {
 		vars[i] = fmt.Sprintf("$%d", i+1)
 	}
 	return fmt.Sprintf("%s in (%s)", column, strings.Join(vars, ", "))
+}
+
+func ughconvert(ids []int) []interface{} {
+	convert := make([]interface{}, len(ids))
+	for i := range ids {
+		convert[i] = ids[i]
+	}
+	return convert
 }

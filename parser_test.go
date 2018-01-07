@@ -276,6 +276,8 @@ func (s *Zuite) TestParser_parseType() {
 		`text`:      &tTextType{},
 		`bool`:      &tBoolType{},
 		`number[5]`: &tNumberType{5},
+		`[]bool`:    &tSliceType{&tBoolType{}},
+		`[]foobar`:  &tSliceType{&tWorksheetType{"foobar"}},
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))

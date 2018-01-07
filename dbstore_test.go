@@ -52,7 +52,7 @@ func (s *DbZuite) TestSave() {
 		return session.Save(ws)
 	})
 
-	wsRecs, valuesRecs := s.DbState()
+	wsRecs, valuesRecs, _ := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -64,7 +64,6 @@ func (s *DbZuite) TestSave() {
 
 	require.Equal(s.T(), []rValue{
 		{
-			Id:          IdAt(valuesRecs, 0),
 			WorksheetId: ws.Id(),
 			Index:       IndexId,
 			FromVersion: 1,
@@ -72,7 +71,6 @@ func (s *DbZuite) TestSave() {
 			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
 		},
 		{
-			Id:          IdAt(valuesRecs, 1),
 			WorksheetId: ws.Id(),
 			Index:       IndexVersion,
 			FromVersion: 1,
@@ -80,7 +78,6 @@ func (s *DbZuite) TestSave() {
 			Value:       `1`,
 		},
 		{
-			Id:          IdAt(valuesRecs, 2),
 			WorksheetId: ws.Id(),
 			Index:       83,
 			FromVersion: 1,
@@ -113,7 +110,7 @@ func (s *DbZuite) TestUpdate() {
 		return session.Update(ws)
 	})
 
-	wsRecs, valuesRecs := s.DbState()
+	wsRecs, valuesRecs, _ := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -125,7 +122,6 @@ func (s *DbZuite) TestUpdate() {
 
 	require.Equal(s.T(), []rValue{
 		{
-			Id:          IdAt(valuesRecs, 0),
 			WorksheetId: ws.Id(),
 			Index:       IndexId,
 			FromVersion: 1,
@@ -133,7 +129,6 @@ func (s *DbZuite) TestUpdate() {
 			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
 		},
 		{
-			Id:          IdAt(valuesRecs, 1),
 			WorksheetId: ws.Id(),
 			Index:       IndexVersion,
 			FromVersion: 1,
@@ -141,7 +136,6 @@ func (s *DbZuite) TestUpdate() {
 			Value:       `1`,
 		},
 		{
-			Id:          IdAt(valuesRecs, 2),
 			WorksheetId: ws.Id(),
 			Index:       IndexVersion,
 			FromVersion: 2,
@@ -149,7 +143,6 @@ func (s *DbZuite) TestUpdate() {
 			Value:       `2`,
 		},
 		{
-			Id:          IdAt(valuesRecs, 3),
 			WorksheetId: ws.Id(),
 			Index:       83,
 			FromVersion: 1,
@@ -157,7 +150,6 @@ func (s *DbZuite) TestUpdate() {
 			Value:       `"Alice"`,
 		},
 		{
-			Id:          IdAt(valuesRecs, 4),
 			WorksheetId: ws.Id(),
 			Index:       83,
 			FromVersion: 2,
@@ -194,22 +186,16 @@ func (s *DbZuite) TestUpdateUndefinedField() {
 	})
 }
 
-func IdAt(s []rValue, index int) int64 {
-	if 0 <= index && index < len(s) {
-		return s[index].Id
-	}
-	return 0
-}
-
 func (s *DbZuite) MustRunTransaction(fn func(tx *runner.Tx) error) {
 	err := RunTransaction(s.db, fn)
 	require.NoError(s.T(), err)
 }
 
-func (s *DbZuite) DbState() ([]rWorksheet, []rValue) {
+func (s *DbZuite) DbState() ([]rWorksheet, []rValue, []rSliceElement) {
 	var (
-		wsRecs     []rWorksheet
-		valuesRecs []rValue
+		wsRecs            []rWorksheet
+		valuesRecs        []rValue
+		sliceElementsRecs []rSliceElement
 	)
 
 	if err := s.db.
@@ -227,6 +213,20 @@ func (s *DbZuite) DbState() ([]rWorksheet, []rValue) {
 		QueryStructs(&valuesRecs); err != nil {
 		require.NoError(s.T(), err)
 	}
+	for i := range valuesRecs {
+		valuesRecs[i].Id = 0
+	}
 
-	return wsRecs, valuesRecs
+	if err := s.db.
+		Select("*").
+		From("worksheet_slice_elements").
+		OrderBy("slice_id, rank, from_version").
+		QueryStructs(&sliceElementsRecs); err != nil {
+		require.NoError(s.T(), err)
+	}
+	for i := range sliceElementsRecs {
+		sliceElementsRecs[i].Id = 0
+	}
+
+	return wsRecs, valuesRecs, sliceElementsRecs
 }

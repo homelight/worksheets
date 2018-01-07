@@ -17,6 +17,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/satori/go.uuid"
 )
 
 var (
@@ -44,12 +46,15 @@ type Value interface {
 	String() string
 }
 
-// Assert that all literals are Value.
 var _ []Value = []Value{
+	// Assert that all literals are Value.
 	&Undefined{},
 	&Number{},
 	&Text{},
 	&Bool{},
+
+	// Internals.
+	&slice{},
 }
 
 // Undefined represents an undefined value.
@@ -285,4 +290,90 @@ func (value *Bool) Equal(that Value) bool {
 
 func (value *Bool) String() string {
 	return strconv.FormatBool(value.value)
+}
+
+type sliceElement struct {
+	rank  int
+	value Value
+}
+
+func (el sliceElement) String() string {
+	return fmt.Sprintf("%d:%s", el.rank, el.value)
+}
+
+type slice struct {
+	id       string
+	lastRank int
+	typ      *tSliceType
+	elements []sliceElement
+}
+
+func newSlice(typ *tSliceType) *slice {
+	return &slice{
+		id:  uuid.NewV4().String(),
+		typ: typ,
+	}
+}
+
+func newSliceWithIdAndLastRank(typ *tSliceType, id string, lastRank int) *slice {
+	return &slice{
+		id:       id,
+		typ:      typ,
+		lastRank: lastRank,
+	}
+}
+
+func (value *slice) doAppend(element Value) (*slice, error) {
+	if !element.Type().AssignableTo(value.typ.elementType) {
+		return nil, fmt.Errorf("cannot append %s to %s", element.Type(), value.Type())
+	}
+
+	nextRank := value.lastRank + 1
+	value.lastRank++
+
+	slice := &slice{
+		id:       value.id,
+		typ:      value.typ,
+		lastRank: value.lastRank,
+		elements: append(value.elements, sliceElement{
+			rank:  nextRank,
+			value: element,
+		}),
+	}
+	return slice, nil
+}
+
+func (value *slice) doDel(index int) (*slice, error) {
+	if value == nil || index < 0 || len(value.elements) <= index {
+		return nil, fmt.Errorf("index out of range")
+	}
+
+	var elements []sliceElement
+	for i := 0; i < len(value.elements); i++ {
+		if i != index {
+			elements = append(elements, value.elements[i])
+		}
+	}
+	return &slice{
+		id:       value.id,
+		typ:      value.typ,
+		lastRank: value.lastRank,
+		// odd bug with this method... should investigate
+		// elements: append(value.elements[:index], value.elements[index+1:]...),
+		elements: elements,
+	}, nil
+}
+
+func (value *slice) Type() Type {
+	return value.typ
+}
+
+func (value *slice) Equal(that Value) bool {
+	// Since slices structs are meant to be immutable, pointer equality is how
+	// we check equality. See doXxx funcs for more details.
+	return value == that
+}
+
+func (value *slice) String() string {
+	return fmt.Sprintf("[:%d:%s", value.lastRank, value.id)
 }

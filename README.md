@@ -46,6 +46,10 @@ If you want to contribute, you can get tests running locally as follows:
 5. `$ go get -t ./...`
 6. `$ go test -v ./...` (for all tests), or `$ go test -v ./... -testify.m <TestName>` (for individual tests)
 
+To update your schema, you can simply re-run
+
+1. `$ psql -U ws_user ws_test -f schema.sql`
+
 # Worksheet Definition
 
 All centers around the concept of a `worksheet` which is constituted of typed named fields

@@ -81,6 +81,14 @@ type tNumberType struct {
 	scale int
 }
 
+type tSliceType struct {
+	elementType Type
+}
+
+type tWorksheetType struct {
+	name string
+}
+
 var (
 	// tokens
 	pLacco      = newTokenPattern("{", "\\{")
@@ -599,40 +607,71 @@ func (p *parser) parseRound() (*tRound, error) {
 }
 
 func (p *parser) parseType() (Type, error) {
-	name, err := p.nextAndCheck(pName)
-	if err != nil {
-		return nil, err
+	choice, ok := p.peekWithChoice([]*tokenPattern{
+		pName,
+		pLbracket,
+	}, []string{
+		"base",
+		"slice",
+	})
+	if !ok {
+		return nil, fmt.Errorf("expecting type")
 	}
 
-	switch name {
-	case "text":
-		return &tTextType{}, nil
-	case "bool":
-		return &tBoolType{}, nil
-	case "undefined":
-		return &tUndefinedType{}, nil
-	case "number":
-		_, err := p.nextAndCheck(pLbracket)
+	switch choice {
+	case "base":
+		name, err := p.nextAndCheck(pName)
 		if err != nil {
 			return nil, err
 		}
-		sScale, err := p.nextAndCheck(pIndex)
-		if err != nil {
-			return nil, err
-		}
-		scale, err := strconv.Atoi(sScale)
-		if err != nil {
-			// unexpected since sIndex should conform to pIndex
-			panic(err)
-		}
-		_, err = p.nextAndCheck(pRbracket)
-		if err != nil {
-			return nil, err
-		}
-		return &tNumberType{scale}, nil
-	}
 
-	return nil, fmt.Errorf("unknown type %s", name)
+		switch name {
+		case "text":
+			return &tTextType{}, nil
+		case "bool":
+			return &tBoolType{}, nil
+		case "undefined":
+			return &tUndefinedType{}, nil
+		case "number":
+			_, err := p.nextAndCheck(pLbracket)
+			if err != nil {
+				return nil, err
+			}
+			sScale, err := p.nextAndCheck(pIndex)
+			if err != nil {
+				return nil, err
+			}
+			scale, err := strconv.Atoi(sScale)
+			if err != nil {
+				// unexpected since sIndex should conform to pIndex
+				panic(err)
+			}
+			_, err = p.nextAndCheck(pRbracket)
+			if err != nil {
+				return nil, err
+			}
+			return &tNumberType{scale}, nil
+		default:
+			return &tWorksheetType{name}, nil
+		}
+
+	case "slice":
+		p.next()
+		_, err := p.nextAndCheck(pRbracket)
+		if err != nil {
+			return nil, err
+		}
+
+		elementType, err := p.parseType()
+		if err != nil {
+			return nil, err
+		}
+
+		return &tSliceType{elementType}, nil
+
+	default:
+		panic(fmt.Sprintf("unknown choice %s", choice))
+	}
 }
 
 func (p *parser) parseLiteral() (Value, error) {

@@ -60,6 +60,14 @@ type Options struct {
 	Plugins map[string]map[string]ComputedBy
 }
 
+func MustNewDefinitions(reader io.Reader, opts ...Options) *Definitions {
+	defs, err := NewDefinitions(reader, opts...)
+	if err != nil {
+		panic(err)
+	}
+	return defs
+}
+
 // NewDefinitions parses one or more worksheet definitions, and creates worksheet
 // models from them.
 func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
@@ -251,6 +259,10 @@ func (ws *Worksheet) Set(name string, value Value) error {
 		return fmt.Errorf("cannot assign to computed field %s", name)
 	}
 
+	if _, ok := field.typ.(*tSliceType); ok {
+		return fmt.Errorf("Set on slice field %s, use Append, or Del", name)
+	}
+
 	err := ws.set(field, value)
 	return err
 }
@@ -335,30 +347,149 @@ func (ws *Worksheet) MustGet(name string) Value {
 	return value
 }
 
-// TODO(pascal): need to think about proper return type here, should be consistent with Set
+func (ws *Worksheet) MustGetSlice(name string) []Value {
+	slice, err := ws.GetSlice(name)
+	if err != nil {
+		panic(err)
+	}
+	return slice
+}
+
+func (ws *Worksheet) GetSlice(name string) ([]Value, error) {
+	_, slice, err := ws.getSlice(name)
+	if err != nil {
+		return nil, err
+	} else if slice == nil {
+		return nil, nil
+	}
+
+	var values []Value
+	for _, element := range slice.elements {
+		values = append(values, element.value)
+	}
+	return values, nil
+}
+
+func (ws *Worksheet) getSlice(name string) (*tField, *slice, error) {
+	field, value, err := ws.get(name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if _, ok := field.typ.(*tSliceType); !ok {
+		return field, nil, fmt.Errorf("GetSlice on non-slice field %s, use Get", name)
+	}
+
+	if _, ok := value.(*Undefined); ok {
+		return field, nil, nil
+	}
+
+	return field, value.(*slice), nil
+}
+
+// Get gets a value for base types, e.g. text, number, or bool.
+// For other kinds of values, use specific getters such as `GetSlice`.
 func (ws *Worksheet) Get(name string) (Value, error) {
+	field, value, err := ws.get(name)
+
+	if _, ok := field.typ.(*tSliceType); ok {
+		return nil, fmt.Errorf("Get on slice field %s, use GetSlice", name)
+	}
+
+	return value, err
+}
+
+func (ws *Worksheet) get(name string) (*tField, Value, error) {
 	// lookup field by name
 	field, ok := ws.def.fieldsByName[name]
 	if !ok {
-		return nil, fmt.Errorf("unknown field %s", name)
+		return nil, nil, fmt.Errorf("unknown field %s", name)
 	}
 	index := field.index
 
 	// is a value set for this field?
 	value, ok := ws.data[index]
 	if !ok {
-		return &Undefined{}, nil
+		return field, &Undefined{}, nil
 	}
 
 	// type check
 	if ok := value.Type().AssignableTo(field.typ); !ok {
-		return nil, fmt.Errorf("cannot assign %s to %s", value, field.typ)
+		return nil, nil, fmt.Errorf("cannot assign %s to %s", value, field.typ)
 	}
 
-	return value, nil
+	return field, value, nil
 }
 
-func (ws *Worksheet) diff() map[int]Value {
+func (ws *Worksheet) MustAppend(name string, value Value) {
+	if err := ws.Append(name, value); err != nil {
+		panic(err)
+	}
+}
+
+func (ws *Worksheet) Append(name string, element Value) error {
+	// lookup field by name
+	field, ok := ws.def.fieldsByName[name]
+	if !ok {
+		return fmt.Errorf("unknown field %s", name)
+	}
+	index := field.index
+
+	sliceType, ok := field.typ.(*tSliceType)
+	if !ok {
+		return fmt.Errorf("Append on non-slice field %s", name)
+	}
+
+	// is a value set for this field?
+	value, ok := ws.data[index]
+	if !ok {
+		value = newSlice(sliceType)
+		ws.data[index] = value
+	}
+
+	// append
+	slice := value.(*slice)
+	slice, err := slice.doAppend(element)
+	if err != nil {
+		return err
+	}
+	ws.data[index] = slice
+
+	return nil
+}
+
+func (ws *Worksheet) MustDel(name string, index int) {
+	if err := ws.Del(name, index); err != nil {
+		panic(err)
+	}
+}
+
+func (ws *Worksheet) Del(name string, index int) error {
+	field, slice, err := ws.getSlice(name)
+	if err != nil {
+		if field != nil {
+			if _, ok := field.typ.(*tSliceType); !ok {
+				return fmt.Errorf("Del on non-slice field %s", name)
+			}
+		}
+		return err
+	}
+
+	slice, err = slice.doDel(index)
+	if err != nil {
+		return err
+	}
+
+	ws.data[field.index] = slice
+
+	return nil
+}
+
+type change struct {
+	before, after Value
+}
+
+func (ws *Worksheet) diff() map[int]change {
 	allIndexes := make(map[int]bool)
 	for index := range ws.orig {
 		allIndexes[index] = true
@@ -367,18 +498,61 @@ func (ws *Worksheet) diff() map[int]Value {
 		allIndexes[index] = true
 	}
 
-	diff := make(map[int]Value)
+	diff := make(map[int]change)
 	for index := range allIndexes {
 		orig, hasOrig := ws.orig[index]
 		data, hasData := ws.data[index]
 		if hasOrig && !hasData {
-			diff[index] = &Undefined{}
+			diff[index] = change{
+				before: orig,
+				after:  &Undefined{},
+			}
 		} else if !hasOrig && hasData {
-			diff[index] = data
+			diff[index] = change{
+				before: &Undefined{},
+				after:  data,
+			}
 		} else if !orig.Equal(data) {
-			diff[index] = data
+			diff[index] = change{
+				before: orig,
+				after:  data,
+			}
 		}
 	}
 
 	return diff
+}
+
+func diffSlices(before, after *slice) ([]int, []sliceElement) {
+	var (
+		b, a          int
+		ranksOfDels   []int
+		elementsAdded []sliceElement
+	)
+	for b < len(before.elements) && a < len(after.elements) {
+		bElement, aElement := before.elements[b], after.elements[a]
+		if bElement.rank == aElement.rank {
+			if !bElement.value.Equal(aElement.value) {
+				// we've replaced the value at this rank
+				// represent as a delete and an add
+				ranksOfDels = append(ranksOfDels, bElement.rank)
+				elementsAdded = append(elementsAdded, aElement)
+			}
+			b++
+			a++
+		} else if bElement.rank < aElement.rank {
+			ranksOfDels = append(ranksOfDels, bElement.rank)
+			b++
+		} else if aElement.rank < bElement.rank {
+			elementsAdded = append(elementsAdded, aElement)
+			a++
+		}
+	}
+	for ; b < len(before.elements); b++ {
+		ranksOfDels = append(ranksOfDels, before.elements[b].rank)
+	}
+	for ; a < len(after.elements); a++ {
+		elementsAdded = append(elementsAdded, after.elements[a])
+	}
+	return ranksOfDels, elementsAdded
 }
