@@ -404,6 +404,9 @@ func (ws *Worksheet) getSlice(name string) (*tField, *slice, error) {
 // For other kinds of values, use specific getters such as `GetSlice`.
 func (ws *Worksheet) Get(name string) (Value, error) {
 	field, value, err := ws.get(name)
+	if err != nil {
+		return nil, err
+	}
 
 	if _, ok := field.typ.(*tSliceType); ok {
 		return nil, fmt.Errorf("Get on slice field %s, use GetSlice", name)

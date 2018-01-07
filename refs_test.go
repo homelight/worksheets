@@ -391,3 +391,68 @@ func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 	// Upon Save, orig needs to be set to data.
 	require.Empty(s.T(), ws.diff())
 }
+
+func (s *DbZuite) TestRefsLoad_noCycles() {
+	var (
+		wsId     = "d55cba7e-d08f-43df-bcd7-f48c2ecf6da7"
+		simpleId = "e310c9b6-fc48-4b29-8a66-eeafa9a8ec16"
+	)
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		ws := defs.MustNewWorksheet("with_refs")
+		simple := defs.MustNewWorksheet("simple")
+		ws.MustSet("simple", simple)
+		simple.MustSet("name", bob)
+
+		// We forcibly set both worksheets' identifiers to have a known ordering
+		// when comparing the db state.
+		ws.data[IndexId] = NewText(wsId)
+		simple.data[IndexId] = NewText(simpleId)
+
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	// Load into a fresh worksheet, and inspect.
+	var (
+		fresh *Worksheet
+		err   error
+	)
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		fresh, err = session.Load("with_refs", wsId)
+		return err
+	})
+
+	value := fresh.MustGet("simple")
+	simple, ok := value.(*Worksheet)
+	require.True(s.T(), ok)
+	require.Equal(s.T(), `"Bob"`, simple.MustGet("name").String())
+}
+
+func (s *DbZuite) TestRefsLoad_withCycles() {
+	var wsId string
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		ws := defs.MustNewWorksheet("with_refs_and_cycles")
+		wsId = ws.Id()
+		ws.MustSet("point_to_me", ws)
+
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	// Load into a fresh worksheet, and inspect.
+	var (
+		fresh *Worksheet
+		err   error
+	)
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		fresh, err = session.Load("with_refs_and_cycles", wsId)
+		return err
+	})
+
+	value := fresh.MustGet("point_to_me")
+	require.True(s.T(), fresh == value)
+}

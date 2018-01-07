@@ -93,22 +93,34 @@ var tableToEntities = map[string]interface{}{
 }
 
 func (s *Session) Load(name, id string) (*Worksheet, error) {
+	graph := make(map[string]*Worksheet)
+	return s.load(graph, name, id)
+}
+func (s *Session) load(graph map[string]*Worksheet, name, id string) (*Worksheet, error) {
+	wsRef := fmt.Sprintf("%s:%s", name, id)
+
+	if ws, ok := graph[wsRef]; ok {
+		return ws, nil
+	}
+
 	ws, err := s.defs.newUninitializedWorksheet(name)
 	if err != nil {
 		return nil, err
 	}
 
-	var wsRec rWorksheet
-	err = s.tx.
+	var wsRecs []rWorksheet
+	if err = s.tx.
 		Select("*").
 		From("worksheets").
 		Where("id = $1 and name = $2", id, name).
-		QueryStruct(&wsRec)
-	if err != nil {
-		return nil, err
-	} else if len(wsRec.Name) == 0 {
+		QueryStructs(&wsRecs); err != nil {
+		return nil, fmt.Errorf("unable to load worksheets records: %s", err)
+	} else if len(wsRecs) == 0 {
 		return nil, fmt.Errorf("unknown worksheet %s:%s", name, id)
 	}
+
+	wsRec := wsRecs[0]
+	graph[wsRef] = ws
 
 	var (
 		valuesRecs   []rValue
@@ -152,6 +164,18 @@ func (s *Session) Load(name, id string) (*Worksheet, error) {
 			slicesToLoad[slice.id] = slice
 			slicesIds = append(slicesIds, slice.id)
 			value, err = slice, nil
+		case *tWorksheetType:
+			if !strings.HasPrefix(valueRec.Value, "*:") {
+				return nil, fmt.Errorf("unreadable value for ref %s", valueRec.Value)
+			}
+			parts := strings.Split(valueRec.Value, ":")
+			if len(parts) != 2 {
+				return nil, fmt.Errorf("unreadable value for ref %s", valueRec.Value)
+			}
+			value, err = s.load(graph, t.name, parts[1])
+			if err != nil {
+				return nil, fmt.Errorf("unable to load referenced worksheet %s: %s", parts[1], err)
+			}
 		default:
 			value, err = NewValue(valueRec.Value)
 		}
