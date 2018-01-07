@@ -76,7 +76,7 @@ func (typ *tSliceType) AssignableTo(u Type) bool {
 }
 
 func (typ *tSliceType) String() string {
-	panic("not implemented")
+	return fmt.Sprintf("[]%s", typ.elementType)
 }
 
 func (typ *tWorksheetType) AssignableTo(u Type) bool {

@@ -23,9 +23,11 @@ import (
 func (s *Zuite) TestSliceExample() {
 	ws := defs.MustNewWorksheet("with_slice")
 
+	require.False(s.T(), ws.MustIsSet("names"))
 	require.Len(s.T(), ws.MustGetSlice("names"), 0)
 
 	ws.MustAppend("names", alice)
+	require.True(s.T(), ws.MustIsSet("names"))
 	require.Equal(s.T(), []Value{alice}, ws.MustGetSlice("names"))
 
 	ws.MustAppend("names", bob)
@@ -44,12 +46,67 @@ func (s *Zuite) TestSliceExample() {
 	require.Len(s.T(), ws.MustGetSlice("names"), 0)
 }
 
+func (s *Zuite) TestSliceErrors_getOnSliceFailsEvenIfUndefined() {
+	ws := defs.MustNewWorksheet("with_slice")
+	_, err := ws.Get("names")
+	require.EqualError(s.T(), err, "Get on slice field names, use GetSlice")
+}
+
+func (s *Zuite) TestSliceErrors_setOnSliceFailsEvenIfUndefined() {
+	ws := defs.MustNewWorksheet("with_slice")
+	err := ws.Set("names", alice)
+	require.EqualError(s.T(), err, "Set on slice field names, use Append, or Del")
+}
+
+func (s *Zuite) TestSliceErrors_appendOfNonAssignableValue() {
+	ws := defs.MustNewWorksheet("with_slice")
+	err := ws.Append("names", NewBool(true))
+	require.EqualError(s.T(), err, "cannot append bool to []text")
+}
+
+func (s *Zuite) TestSliceErrors_delOutOfBound() {
+	var err error
+	ws := defs.MustNewWorksheet("with_slice")
+
+	// no slice
+	err = ws.Del("names", 0)
+	require.EqualError(s.T(), err, "index out of range")
+
+	// slice with one element
+	ws.MustAppend("names", alice)
+
+	err = ws.Del("names", -1)
+	require.EqualError(s.T(), err, "index out of range")
+
+	err = ws.Del("names", 1)
+	require.EqualError(s.T(), err, "index out of range")
+}
+
+func (s *Zuite) TestSliceErrors_getSliceOnNonSliceFailsEvenIfUndefined() {
+	ws := defs.MustNewWorksheet("simple")
+	_, err := ws.GetSlice("name")
+	require.EqualError(s.T(), err, "GetSlice on non-slice field name, use Get")
+}
+
+func (s *Zuite) TestSliceErrors_appendOnNonSliceFailsEvenIfUndefined() {
+	ws := defs.MustNewWorksheet("simple")
+	err := ws.Append("name", alice)
+	require.EqualError(s.T(), err, "Append on non-slice field name")
+}
+
+func (s *Zuite) TestSliceErrors_delOnNonSliceFailsEvenIfUndefined() {
+	ws := defs.MustNewWorksheet("simple")
+	err := ws.Del("name", 0)
+	require.EqualError(s.T(), err, "Del on non-slice field name")
+}
+
 func (s *Zuite) TestSliceOps() {
 	slice1 := newSliceWithIdAndLastRank(&tSliceType{&tTextType{}}, "a-cool-id", 0)
 
 	require.Len(s.T(), slice1.elements, 0)
 
-	slice2 := slice1.doAppend(alice)
+	slice2, err := slice1.doAppend(alice)
+	require.NoError(s.T(), err)
 
 	require.Len(s.T(), slice1.elements, 0)
 	require.Len(s.T(), slice2.elements, 1)
@@ -63,7 +120,8 @@ func (s *Zuite) TestSliceOps() {
 	require.Equal(s.T(), sliceElement{1, alice}, slice2.elements[0])
 	require.Len(s.T(), slice3.elements, 0)
 
-	slice4 := slice3.doAppend(carol)
+	slice4, err := slice3.doAppend(carol)
+	require.NoError(s.T(), err)
 
 	require.Len(s.T(), slice1.elements, 0)
 	require.Len(s.T(), slice2.elements, 1)
@@ -72,7 +130,8 @@ func (s *Zuite) TestSliceOps() {
 	require.Len(s.T(), slice4.elements, 1)
 	require.Equal(s.T(), carol, slice4.elements[0].value)
 
-	slice5 := slice4.doAppend(bob)
+	slice5, err := slice4.doAppend(bob)
+	require.NoError(s.T(), err)
 
 	require.Len(s.T(), slice1.elements, 0)
 	require.Len(s.T(), slice2.elements, 1)
@@ -324,12 +383,3 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 		},
 	}, sliceElementsRecs)
 }
-
-// impl notes:
-// - when loading from DB, must order by index
-// - test Get on slice type fails, even if it is undefined
-// - test GetSlice on non-slice field fails
-// - test Append on non-slice field fails
-// - test append of non-assignable type e.g. putting a bool in []text
-// - test deletes on out of bound indexes
-// - support for slices of slices (may want to do this later)

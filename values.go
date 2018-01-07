@@ -323,7 +323,11 @@ func newSliceWithIdAndLastRank(typ *tSliceType, id string, lastRank int) *slice 
 	}
 }
 
-func (value *slice) doAppend(element Value) *slice {
+func (value *slice) doAppend(element Value) (*slice, error) {
+	if !element.Type().AssignableTo(value.typ.elementType) {
+		return nil, fmt.Errorf("cannot append %s to %s", element.Type(), value.Type())
+	}
+
 	nextRank := value.lastRank + 1
 	value.lastRank++
 
@@ -336,12 +340,12 @@ func (value *slice) doAppend(element Value) *slice {
 			value: element,
 		}),
 	}
-	return slice
+	return slice, nil
 }
 
 func (value *slice) doDel(index int) (*slice, error) {
-	if index < 0 || len(value.elements) <= index {
-		return nil, fmt.Errorf("index out-of-bound")
+	if value == nil || index < 0 || len(value.elements) <= index {
+		return nil, fmt.Errorf("index out of range")
 	}
 
 	var elements []sliceElement

@@ -259,6 +259,10 @@ func (ws *Worksheet) Set(name string, value Value) error {
 		return fmt.Errorf("cannot assign to computed field %s", name)
 	}
 
+	if _, ok := field.typ.(*tSliceType); ok {
+		return fmt.Errorf("Set on slice field %s, use Append, or Del", name)
+	}
+
 	err := ws.set(field, value)
 	return err
 }
@@ -373,7 +377,7 @@ func (ws *Worksheet) getSlice(name string) (*tField, *slice, error) {
 	}
 
 	if _, ok := field.typ.(*tSliceType); !ok {
-		return nil, nil, fmt.Errorf("GetSlice on non-slice field %s", name)
+		return field, nil, fmt.Errorf("GetSlice on non-slice field %s, use Get", name)
 	}
 
 	if _, ok := value.(*Undefined); ok {
@@ -386,7 +390,12 @@ func (ws *Worksheet) getSlice(name string) (*tField, *slice, error) {
 // Get gets a value for base types, e.g. text, number, or bool.
 // For other kinds of values, use specific getters such as `GetSlice`.
 func (ws *Worksheet) Get(name string) (Value, error) {
-	_, value, err := ws.get(name)
+	field, value, err := ws.get(name)
+
+	if _, ok := field.typ.(*tSliceType); ok {
+		return nil, fmt.Errorf("Get on slice field %s, use GetSlice", name)
+	}
+
 	return value, err
 }
 
@@ -440,7 +449,10 @@ func (ws *Worksheet) Append(name string, element Value) error {
 
 	// append
 	slice := value.(*slice)
-	slice = slice.doAppend(element)
+	slice, err := slice.doAppend(element)
+	if err != nil {
+		return err
+	}
 	ws.data[index] = slice
 
 	return nil
@@ -455,6 +467,11 @@ func (ws *Worksheet) MustDel(name string, index int) {
 func (ws *Worksheet) Del(name string, index int) error {
 	field, slice, err := ws.getSlice(name)
 	if err != nil {
+		if field != nil {
+			if _, ok := field.typ.(*tSliceType); !ok {
+				return fmt.Errorf("Del on non-slice field %s", name)
+			}
+		}
 		return err
 	}
 
