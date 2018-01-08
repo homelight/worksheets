@@ -36,59 +36,6 @@ func newParser(src io.Reader) *parser {
 	}
 }
 
-type tWorksheet struct {
-	name          string
-	fields        []*tField
-	fieldsByName  map[string]*tField
-	fieldsByIndex map[int]*tField
-
-	// derived values handling
-	externals  map[int]ComputedBy
-	dependents map[int][]int
-}
-
-func (ws *tWorksheet) addField(field *tField) error {
-	if _, ok := ws.fieldsByName[field.name]; ok {
-		return fmt.Errorf("multiple fields with name %s", field.name)
-	}
-
-	if _, ok := ws.fieldsByIndex[field.index]; ok {
-		return fmt.Errorf("multiple fields with index %d", field.index)
-	}
-
-	ws.fields = append(ws.fields, field)
-	ws.fieldsByName[field.name] = field
-	ws.fieldsByIndex[field.index] = field
-
-	return nil
-}
-
-type tField struct {
-	index      int
-	name       string
-	typ        Type
-	computedBy expression
-	// also need constrainedBy *tExpression
-}
-
-type tUndefinedType struct{}
-
-type tTextType struct{}
-
-type tBoolType struct{}
-
-type tNumberType struct {
-	scale int
-}
-
-type tSliceType struct {
-	elementType Type
-}
-
-type tWorksheetType struct {
-	name string
-}
-
 var (
 	// tokens
 	pLacco      = newTokenPattern("{", "\\{")
@@ -257,50 +204,6 @@ func (p *parser) parseField() (*tField, error) {
 	}
 
 	return f, nil
-}
-
-type tOp string
-
-const (
-	opPlus     tOp = "plus"
-	opMinus        = "minus"
-	opMult         = "mult"
-	opDiv          = "div"
-	opNot          = "not"
-	opEqual        = "equal"
-	opNotEqual     = "not-equal"
-	opOr           = "or"
-	opAnd          = "and"
-)
-
-type tRound struct {
-	mode  RoundingMode
-	scale int
-}
-
-func (t *tRound) String() string {
-	return fmt.Sprintf("%s %d", t.mode, t.scale)
-}
-
-type tExternal struct{}
-
-type tUnop struct {
-	op   tOp
-	expr expression
-}
-
-type tBinop struct {
-	op          tOp
-	left, right expression
-	round       *tRound
-}
-
-func (t *tBinop) String() string {
-	return fmt.Sprintf("binop(%s, %s, %s, %s)", t.op, t.left, t.right, t.round)
-}
-
-type tVar struct {
-	name string
 }
 
 // parseExpressionOrExternal

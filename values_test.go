@@ -17,6 +17,10 @@ import (
 )
 
 func (s *Zuite) TestValueString() {
+	ws := defs.MustNewWorksheet("simple")
+	ws.MustSet("name", alice)
+	ws.MustSet("age", MustNewValue("73"))
+
 	cases := map[Value]string{
 		&Undefined{}: "undefined",
 
@@ -30,6 +34,16 @@ func (s *Zuite) TestValueString() {
 		&Number{123, &tNumberType{2}}:   "1.23",
 		&Number{123, &tNumberType{3}}:   "0.123",
 		&Number{123, &tNumberType{4}}:   "0.0123",
+
+		&slice{elements: []sliceElement{
+			{value: &Number{123, &tNumberType{1}}},
+		}}: "[12.3]",
+		&slice{elements: []sliceElement{
+			{value: &Bool{true}},
+			{value: &Bool{false}},
+		}}: "[true false]",
+
+		ws: `worksheet[age:73 name:"Alice"]`,
 	}
 	for value, expected := range cases {
 		assert.Equal(s.T(), expected, value.String())
