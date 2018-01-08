@@ -15,6 +15,7 @@ package worksheets
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -376,17 +377,47 @@ func (value *slice) Equal(that Value) bool {
 }
 
 func (value *slice) String() string {
-	return fmt.Sprintf("[:%d:%s", value.lastRank, value.id)
+	var buffer bytes.Buffer
+	buffer.WriteRune('[')
+	for i, element := range value.elements {
+		if i != 0 {
+			buffer.WriteRune(' ')
+		}
+		buffer.WriteString(element.value.String())
+	}
+	buffer.WriteRune(']')
+	return buffer.String()
 }
 
-func (value *Worksheet) Type() Type {
-	return &tWorksheetType{value.def.name}
+func (ws *Worksheet) Type() Type {
+	return &tWorksheetType{ws.def.name}
 }
 
-func (value *Worksheet) Equal(that Value) bool {
-	return value == that
+func (ws *Worksheet) Equal(that Value) bool {
+	return ws == that
 }
 
-func (value *Worksheet) String() string {
-	return fmt.Sprintf("*:%s", value.Id())
+func (ws *Worksheet) String() string {
+	fieldNames := make([]string, 0, len(ws.data)-2)
+	for index := range ws.data {
+		if index != IndexId && index != IndexVersion {
+			fieldNames = append(fieldNames, ws.def.fieldsByIndex[index].name)
+		}
+	}
+	sort.Strings(fieldNames)
+
+	var buffer bytes.Buffer
+	buffer.WriteString("worksheet[")
+	for i, fieldName := range fieldNames {
+		value := ws.data[ws.def.fieldsByName[fieldName].index]
+
+		if i != 0 {
+			buffer.WriteRune(' ')
+		}
+		buffer.WriteString(fieldName)
+		buffer.WriteRune(':')
+		buffer.WriteString(value.String())
+	}
+	buffer.WriteRune(']')
+	return buffer.String()
 }

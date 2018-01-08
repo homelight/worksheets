@@ -101,19 +101,28 @@ func (s *Session) Load(name, id string) (*Worksheet, error) {
 	return loader.loadWorksheet(name, id)
 }
 
+func (s *Session) SaveOrUpdate(ws *Worksheet) error {
+	p := &persister{
+		s:     s,
+		graph: make(map[string]bool),
+	}
+	return p.saveOrUpdate(ws)
+}
+
 func (s *Session) Save(ws *Worksheet) error {
-	graph := make(map[string]bool)
-	return s.save(graph, ws)
+	p := &persister{
+		s:     s,
+		graph: make(map[string]bool),
+	}
+	return p.save(ws)
 }
 
 func (s *Session) Update(ws *Worksheet) error {
-	graph := make(map[string]bool)
-	return s.update(graph, ws)
-}
-
-func (s *Session) SaveOrUpdate(ws *Worksheet) error {
-	graph := make(map[string]bool)
-	return s.saveOrUpdate(graph, ws)
+	p := &persister{
+		s:     s,
+		graph: make(map[string]bool),
+	}
+	return p.update(ws)
 }
 
 type loader struct {
@@ -167,7 +176,7 @@ func (l *loader) loadWorksheet(name, id string) (*Worksheet, error) {
 		}
 
 		// load, and potentially defer hydration of value
-		value, err := l.loadValue(field.typ, valueRec.Value)
+		value, err := l.readValue(field.typ, valueRec.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -199,7 +208,7 @@ func (l *loader) loadWorksheet(name, id string) (*Worksheet, error) {
 		}
 		for _, sliceElementsRec := range sliceElementsRecs {
 			slice := slicesToHydrate[sliceElementsRec.SliceId]
-			value, err := l.loadValue(slice.typ.elementType, sliceElementsRec.Value)
+			value, err := l.readValue(slice.typ.elementType, sliceElementsRec.Value)
 			if err != nil {
 				return nil, err
 			}
@@ -213,8 +222,10 @@ func (l *loader) loadWorksheet(name, id string) (*Worksheet, error) {
 	return ws, nil
 }
 
-func (l *loader) loadValue(typ Type, value string) (Value, error) {
+func (l *loader) readValue(typ Type, value string) (Value, error) {
 	switch t := typ.(type) {
+	case *tTextType:
+		return NewText(value), nil
 	case *tSliceType:
 		if !strings.HasPrefix(value, "[:") {
 			return nil, fmt.Errorf("unreadable value for slice %s", value)
@@ -254,14 +265,14 @@ func (l *loader) nextSlicesToHydrate() map[string]*slice {
 	return slicesToHydrate
 }
 
-func (s *Session) saveOrUpdate(graph map[string]bool, ws *Worksheet) error {
-	if _, ok := graph[ws.Id()]; ok {
-		return nil
-	}
-	graph[ws.Id()] = true
+type persister struct {
+	s     *Session
+	graph map[string]bool
+}
 
+func (p *persister) saveOrUpdate(ws *Worksheet) error {
 	var count int
-	if err := s.tx.
+	if err := p.s.tx.
 		Select("count(*)").
 		From("worksheets").
 		Where("id = $1", ws.Id()).
@@ -270,30 +281,30 @@ func (s *Session) saveOrUpdate(graph map[string]bool, ws *Worksheet) error {
 	}
 
 	if count == 0 {
-		return s.Save(ws)
+		return p.save(ws)
 	} else {
-		return s.Update(ws)
+		return p.update(ws)
 	}
 }
 
-func (s *Session) save(graph map[string]bool, ws *Worksheet) error {
+func (p *persister) save(ws *Worksheet) error {
 	// already done?
-	if _, ok := graph[ws.Id()]; ok {
+	if _, ok := p.graph[ws.Id()]; ok {
 		return nil
 	}
-	graph[ws.Id()] = true
+	p.graph[ws.Id()] = true
 
 	// cascade worksheets
 	for _, value := range ws.data {
 		for _, wsToCascade := range worksheetsToCascade(value) {
-			if err := s.saveOrUpdate(graph, wsToCascade); err != nil {
+			if err := p.saveOrUpdate(wsToCascade); err != nil {
 				return err
 			}
 		}
 	}
 
 	// insert rWorksheet
-	_, err := s.tx.
+	_, err := p.s.tx.
 		InsertInto("worksheets").
 		Columns("*").
 		Record(&rWorksheet{
@@ -308,14 +319,14 @@ func (s *Session) save(graph map[string]bool, ws *Worksheet) error {
 
 	// insert rValues
 	var slicesToInsert []*slice
-	insertValues := s.tx.InsertInto("worksheet_values").Columns("*").Blacklist("id")
+	insertValues := p.s.tx.InsertInto("worksheet_values").Columns("*").Blacklist("id")
 	for index, value := range ws.data {
 		insertValues.Record(rValue{
 			WorksheetId: ws.Id(),
 			Index:       index,
 			FromVersion: ws.Version(),
 			ToVersion:   math.MaxInt32,
-			Value:       value.String(),
+			Value:       p.writeValue(value),
 		})
 
 		if slice, ok := value.(*slice); ok {
@@ -327,7 +338,7 @@ func (s *Session) save(graph map[string]bool, ws *Worksheet) error {
 	}
 
 	if len(slicesToInsert) != 0 {
-		insertSliceElements := s.tx.InsertInto("worksheet_slice_elements").Columns("*").Blacklist("id")
+		insertSliceElements := p.s.tx.InsertInto("worksheet_slice_elements").Columns("*").Blacklist("id")
 		for _, slice := range slicesToInsert {
 			for _, element := range slice.elements {
 				insertSliceElements.Record(rSliceElement{
@@ -335,7 +346,7 @@ func (s *Session) save(graph map[string]bool, ws *Worksheet) error {
 					Rank:        element.rank,
 					FromVersion: ws.Version(),
 					ToVersion:   math.MaxInt32,
-					Value:       element.value.String(),
+					Value:       p.writeValue(element.value),
 				})
 			}
 		}
@@ -352,17 +363,17 @@ func (s *Session) save(graph map[string]bool, ws *Worksheet) error {
 	return nil
 }
 
-func (s *Session) update(graph map[string]bool, ws *Worksheet) error {
+func (p *persister) update(ws *Worksheet) error {
 	// already done?
-	if _, ok := graph[ws.Id()]; ok {
+	if _, ok := p.graph[ws.Id()]; ok {
 		return nil
 	}
-	graph[ws.Id()] = true
+	p.graph[ws.Id()] = true
 
 	// cascade worksheets
 	for _, value := range ws.data {
 		for _, wsToCascade := range worksheetsToCascade(value) {
-			if err := s.saveOrUpdate(graph, wsToCascade); err != nil {
+			if err := p.saveOrUpdate(wsToCascade); err != nil {
 				return err
 			}
 		}
@@ -412,7 +423,7 @@ func (s *Session) update(graph map[string]bool, ws *Worksheet) error {
 	}
 
 	// update old rValues
-	if _, err := s.tx.
+	if _, err := p.s.tx.
 		Update("worksheet_values").
 		Set("to_version", oldVersion).
 		Where("worksheet_id = $1", ws.Id()).
@@ -423,7 +434,7 @@ func (s *Session) update(graph map[string]bool, ws *Worksheet) error {
 	}
 
 	// insert new rValues
-	insert := s.tx.InsertInto("worksheet_values").Columns("*").Blacklist("id")
+	insert := p.s.tx.InsertInto("worksheet_values").Columns("*").Blacklist("id")
 	for _, index := range valuesToUpdate {
 		change := diff[index]
 		insert.Record(rValue{
@@ -431,7 +442,7 @@ func (s *Session) update(graph map[string]bool, ws *Worksheet) error {
 			Index:       index,
 			FromVersion: newVersion,
 			ToVersion:   math.MaxInt32,
-			Value:       change.after.String(),
+			Value:       p.writeValue(change.after),
 		})
 	}
 	if _, err := insert.Exec(); err != nil {
@@ -440,7 +451,7 @@ func (s *Session) update(graph map[string]bool, ws *Worksheet) error {
 
 	// slices: deleted elements
 	for sliceId, ranks := range slicesRanksOfDels {
-		if _, err := s.tx.
+		if _, err := p.s.tx.
 			Update("worksheet_slice_elements").
 			Set("to_version", oldVersion).
 			Where("slice_id = $1", sliceId).
@@ -453,14 +464,14 @@ func (s *Session) update(graph map[string]bool, ws *Worksheet) error {
 
 	// slices: added elements
 	for sliceId, adds := range slicesElementsAdded {
-		insert := s.tx.InsertInto("worksheet_slice_elements").Columns("*").Blacklist("id")
+		insert := p.s.tx.InsertInto("worksheet_slice_elements").Columns("*").Blacklist("id")
 		for _, add := range adds {
 			insert.Record(rSliceElement{
 				SliceId:     sliceId,
 				FromVersion: newVersion,
 				ToVersion:   math.MaxInt32,
 				Rank:        add.rank,
-				Value:       add.value.String(),
+				Value:       p.writeValue(add.value),
 			})
 		}
 		if _, err := insert.Exec(); err != nil {
@@ -469,7 +480,7 @@ func (s *Session) update(graph map[string]bool, ws *Worksheet) error {
 	}
 
 	// update rWorksheet
-	if result, err := s.tx.
+	if result, err := p.s.tx.
 		Update("worksheets").
 		Set("version", newVersion).
 		Where("id = $1 and version = $2", ws.Id(), oldVersion).
@@ -486,6 +497,19 @@ func (s *Session) update(graph map[string]bool, ws *Worksheet) error {
 	}
 
 	return nil
+}
+
+func (p *persister) writeValue(value Value) string {
+	switch v := value.(type) {
+	case *Text:
+		return v.value
+	case *slice:
+		return fmt.Sprintf("[:%d:%s", v.lastRank, v.id)
+	case *Worksheet:
+		return fmt.Sprintf("*:%s", v.Id())
+	default:
+		return value.String()
+	}
 }
 
 func inClause(column string, num int) string {

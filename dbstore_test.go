@@ -13,7 +13,6 @@
 package worksheets
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/stretchr/testify/require"
@@ -68,7 +67,7 @@ func (s *DbZuite) TestSave() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+			Value:       ws.Id(),
 		},
 		{
 			WorksheetId: ws.Id(),
@@ -82,7 +81,7 @@ func (s *DbZuite) TestSave() {
 			Index:       83,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       `"Alice"`,
+			Value:       `Alice`,
 		},
 	}, valuesRecs)
 
@@ -126,7 +125,7 @@ func (s *DbZuite) TestUpdate() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+			Value:       ws.Id(),
 		},
 		{
 			WorksheetId: ws.Id(),
@@ -147,14 +146,14 @@ func (s *DbZuite) TestUpdate() {
 			Index:       83,
 			FromVersion: 1,
 			ToVersion:   1,
-			Value:       `"Alice"`,
+			Value:       `Alice`,
 		},
 		{
 			WorksheetId: ws.Id(),
 			Index:       83,
 			FromVersion: 2,
 			ToVersion:   math.MaxInt32,
-			Value:       `"Bob"`,
+			Value:       `Bob`,
 		},
 	}, valuesRecs)
 

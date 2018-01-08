@@ -76,7 +76,7 @@ func (s *DbZuite) TestRefsSave_noDataInRefWorksheet() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+			Value:       ws.Id(),
 		},
 		{
 			WorksheetId: wsId,
@@ -97,7 +97,7 @@ func (s *DbZuite) TestRefsSave_noDataInRefWorksheet() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, simpleId),
+			Value:       simpleId,
 		},
 		{
 			WorksheetId: simpleId,
@@ -155,7 +155,7 @@ func (s *DbZuite) TestRefsSave_withDataInRefWorksheet() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+			Value:       ws.Id(),
 		},
 		{
 			WorksheetId: wsId,
@@ -176,7 +176,7 @@ func (s *DbZuite) TestRefsSave_withDataInRefWorksheet() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, simpleId),
+			Value:       simpleId,
 		},
 		{
 			WorksheetId: simpleId,
@@ -190,7 +190,7 @@ func (s *DbZuite) TestRefsSave_withDataInRefWorksheet() {
 			Index:       83,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       `"Alice"`,
+			Value:       `Alice`,
 		},
 		{
 			WorksheetId: simpleId,
@@ -253,7 +253,7 @@ func (s *DbZuite) TestRefsSave_refWorksheetAlreadySaved() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+			Value:       ws.Id(),
 		},
 		{
 			WorksheetId: wsId,
@@ -274,7 +274,7 @@ func (s *DbZuite) TestRefsSave_refWorksheetAlreadySaved() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, simpleId),
+			Value:       simpleId,
 		},
 		{
 			WorksheetId: simpleId,
@@ -341,7 +341,7 @@ func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+			Value:       ws.Id(),
 		},
 		{
 			WorksheetId: wsId,
@@ -362,7 +362,7 @@ func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, simpleId),
+			Value:       simpleId,
 		},
 		{
 			WorksheetId: simpleId,
@@ -383,14 +383,14 @@ func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 			Index:       83,
 			FromVersion: 1,
 			ToVersion:   1,
-			Value:       `"Bob"`,
+			Value:       `Bob`,
 		},
 		{
 			WorksheetId: simpleId,
 			Index:       83,
 			FromVersion: 2,
 			ToVersion:   math.MaxInt32,
-			Value:       `"Carol"`,
+			Value:       `Carol`,
 		},
 	}, valuesRecs)
 
@@ -423,7 +423,7 @@ func (s *DbZuite) TestRefsSave_withCycles() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+			Value:       ws.Id(),
 		},
 		{
 			WorksheetId: ws.Id(),
@@ -562,7 +562,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentNoChangeInChild() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+			Value:       ws.Id(),
 		},
 		{
 			WorksheetId: wsId,
@@ -604,7 +604,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentNoChangeInChild() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, simpleId),
+			Value:       simpleId,
 		},
 		{
 			WorksheetId: simpleId,
@@ -618,7 +618,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentNoChangeInChild() {
 			Index:       83,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       `"Carol"`,
+			Value:       `Carol`,
 		},
 	}, valuesRecs)
 
@@ -679,7 +679,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChangesInChild() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+			Value:       ws.Id(),
 		},
 		{
 			WorksheetId: wsId,
@@ -721,7 +721,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChangesInChild() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, simpleId),
+			Value:       simpleId,
 		},
 		{
 			WorksheetId: simpleId,
@@ -742,14 +742,14 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChangesInChild() {
 			Index:       83,
 			FromVersion: 1,
 			ToVersion:   1,
-			Value:       `"Carol"`,
+			Value:       `Carol`,
 		},
 		{
 			WorksheetId: simpleId,
 			Index:       83,
 			FromVersion: 2,
 			ToVersion:   math.MaxInt32,
-			Value:       `"Bob"`,
+			Value:       `Bob`,
 		},
 	}, valuesRecs)
 
@@ -805,7 +805,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChildRequiringToBeSaved() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+			Value:       ws.Id(),
 		},
 		{
 			WorksheetId: wsId,
@@ -833,7 +833,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChildRequiringToBeSaved() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, simpleId),
+			Value:       simpleId,
 		},
 		{
 			WorksheetId: simpleId,

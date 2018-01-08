@@ -190,7 +190,7 @@ func (s *DbZuite) TestSliceSave() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, ws.Id()),
+			Value:       ws.Id(),
 		},
 		{
 			WorksheetId: ws.Id(),
@@ -214,7 +214,7 @@ func (s *DbZuite) TestSliceSave() {
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Rank:        1,
-			Value:       `"Alice"`,
+			Value:       `Alice`,
 		},
 	}, sliceElementsRecs)
 
@@ -313,7 +313,7 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, wsId),
+			Value:       wsId,
 		},
 		{
 			WorksheetId: wsId,
@@ -365,21 +365,21 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 			FromVersion: 1,
 			ToVersion:   1,
 			Rank:        1,
-			Value:       `"Alice"`,
+			Value:       `Alice`,
 		},
 		{
 			SliceId:     theSliceId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Rank:        2,
-			Value:       `"Bob"`,
+			Value:       `Bob`,
 		},
 		{
 			SliceId:     theSliceId,
 			FromVersion: 3,
 			ToVersion:   math.MaxInt32,
 			Rank:        3,
-			Value:       `"Alice"`,
+			Value:       `Alice`,
 		},
 	}, sliceElementsRecs)
 }
@@ -441,7 +441,7 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, wsId),
+			Value:       wsId,
 		},
 		{
 			WorksheetId: wsId,
@@ -462,7 +462,7 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, simple1Id),
+			Value:       simple1Id,
 		},
 		{
 			WorksheetId: simple1Id,
@@ -476,14 +476,14 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 			Index:       83,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       `"Alice"`,
+			Value:       `Alice`,
 		},
 		{
 			WorksheetId: simple2Id,
 			Index:       IndexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       fmt.Sprintf(`"%s"`, simple2Id),
+			Value:       simple2Id,
 		},
 		{
 			WorksheetId: simple2Id,
@@ -497,7 +497,7 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 			Index:       83,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
-			Value:       `"Bob"`,
+			Value:       `Bob`,
 		},
 	}, valuesRecs)
 
