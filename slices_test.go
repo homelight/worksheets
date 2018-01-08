@@ -383,3 +383,157 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 		},
 	}, sliceElementsRecs)
 }
+
+func (s *DbZuite) TestSliceOfRefs_saveLoad() {
+	var (
+		wsId      = "d55cba7e-d08f-43df-bcd7-f48c2ecf6da7"
+		wsSliceId string
+		simple1Id = "e310c9b6-fc48-4b29-8a66-eeafa9a8ec16"
+		simple2Id = "ff982d9b-5859-4c88-9fbf-14af5ee08ce2"
+	)
+
+	// Initial state.
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		ws := defs.MustNewWorksheet("with_slice_of_refs")
+		simple1 := defs.MustNewWorksheet("simple")
+		simple2 := defs.MustNewWorksheet("simple")
+		ws.MustAppend("many_simples", simple1)
+		ws.MustAppend("many_simples", simple2)
+		simple1.MustSet("name", alice)
+		simple2.MustSet("name", bob)
+
+		// We forcibly set worksheets' identifiers to have a known ordering when
+		// comparing the db state.
+		ws.data[IndexId] = NewText(wsId)
+		simple1.data[IndexId] = NewText(simple1Id)
+		simple2.data[IndexId] = NewText(simple2Id)
+
+		// We keep the slice' identifier handy for assertions.
+		wsSliceId = (ws.data[42].(*slice)).id
+
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	wsRecs, valuesRecs, sliceElementsRecs := s.DbState()
+
+	require.Equal(s.T(), []rWorksheet{
+		{
+			Id:      wsId,
+			Version: 1,
+			Name:    "with_slice_of_refs",
+		},
+		{
+			Id:      simple1Id,
+			Version: 1,
+			Name:    "simple",
+		},
+		{
+			Id:      simple2Id,
+			Version: 1,
+			Name:    "simple",
+		},
+	}, wsRecs)
+
+	require.Equal(s.T(), []rValue{
+		{
+			WorksheetId: wsId,
+			Index:       IndexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`"%s"`, wsId),
+		},
+		{
+			WorksheetId: wsId,
+			Index:       IndexVersion,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `1`,
+		},
+		{
+			WorksheetId: wsId,
+			Index:       42,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`[:2:%s`, wsSliceId),
+		},
+		{
+			WorksheetId: simple1Id,
+			Index:       IndexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`"%s"`, simple1Id),
+		},
+		{
+			WorksheetId: simple1Id,
+			Index:       IndexVersion,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `1`,
+		},
+		{
+			WorksheetId: simple1Id,
+			Index:       83,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `"Alice"`,
+		},
+		{
+			WorksheetId: simple2Id,
+			Index:       IndexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       fmt.Sprintf(`"%s"`, simple2Id),
+		},
+		{
+			WorksheetId: simple2Id,
+			Index:       IndexVersion,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `1`,
+		},
+		{
+			WorksheetId: simple2Id,
+			Index:       83,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `"Bob"`,
+		},
+	}, valuesRecs)
+
+	require.Equal(s.T(), []rSliceElement{
+		{
+			SliceId:     wsSliceId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Rank:        1,
+			Value:       fmt.Sprintf("*:%s", simple1Id),
+		},
+		{
+			SliceId:     wsSliceId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Rank:        2,
+			Value:       fmt.Sprintf("*:%s", simple2Id),
+		},
+	}, sliceElementsRecs)
+
+	// Load into a fresh worksheet, and look at the slice.
+	var fresh *Worksheet
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		var err error
+		fresh, err = session.Load("with_slice_of_refs", wsId)
+		return err
+	})
+
+	// Ensure everything was properly loaded.
+	slice := fresh.MustGetSlice("many_simples")
+	require.Len(s.T(), slice, 2)
+
+	simple1 := slice[0].(*Worksheet)
+	require.Equal(s.T(), `"Alice"`, simple1.MustGet("name").String())
+
+	simple2 := slice[1].(*Worksheet)
+	require.Equal(s.T(), `"Bob"`, simple2.MustGet("name").String())
+}
