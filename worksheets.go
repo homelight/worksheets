@@ -75,6 +75,8 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 	defs, err := p.parseWorksheets()
 	if err != nil {
 		return nil, err
+	} else if p.next() != "" || len(defs) == 0 {
+		return nil, fmt.Errorf("expecting worksheet")
 	}
 
 	err = processOptions(defs, opts...)
@@ -87,6 +89,17 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 		for _, field := range def.fields {
 			if _, ok := field.computedBy.(*tExternal); ok {
 				return nil, fmt.Errorf("plugins: missing plugin for %s.%s", def.name, field.name)
+			}
+		}
+	}
+
+	// Resolve worksheet refs types
+	for _, def := range defs {
+		for _, field := range def.fields {
+			if refTyp, ok := field.typ.(*tWorksheetType); ok {
+				if _, ok := defs[refTyp.name]; !ok {
+					return nil, fmt.Errorf("unknown worksheet %s referenced in field %s.%s", refTyp.name, def.name, field.name)
+				}
 			}
 		}
 	}
@@ -282,7 +295,7 @@ func (ws *Worksheet) set(field *tField, value Value) error {
 	// type check
 	litType := value.Type()
 	if ok := litType.AssignableTo(field.typ); !ok {
-		return fmt.Errorf("cannot assign %s to %s", value, field.typ)
+		return fmt.Errorf("cannot assign value of type %s to field of type %s", litType, field.typ)
 	}
 
 	// store
@@ -391,6 +404,9 @@ func (ws *Worksheet) getSlice(name string) (*tField, *slice, error) {
 // For other kinds of values, use specific getters such as `GetSlice`.
 func (ws *Worksheet) Get(name string) (Value, error) {
 	field, value, err := ws.get(name)
+	if err != nil {
+		return nil, err
+	}
 
 	if _, ok := field.typ.(*tSliceType); ok {
 		return nil, fmt.Errorf("Get on slice field %s, use GetSlice", name)
@@ -411,11 +427,6 @@ func (ws *Worksheet) get(name string) (*tField, Value, error) {
 	value, ok := ws.data[index]
 	if !ok {
 		return field, &Undefined{}, nil
-	}
-
-	// type check
-	if ok := value.Type().AssignableTo(field.typ); !ok {
-		return nil, nil, fmt.Errorf("cannot assign %s to %s", value, field.typ)
 	}
 
 	return field, value, nil

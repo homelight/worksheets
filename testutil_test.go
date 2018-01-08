@@ -35,6 +35,19 @@ worksheet simple {
 
 worksheet with_slice {
 	42:names []text
+}
+
+worksheet with_slice_of_refs {
+	42:many_simples []simple
+}
+
+worksheet with_refs {
+	46:some_flag bool
+	87:simple simple
+}
+
+worksheet with_refs_and_cycles {
+	404:point_to_me with_refs_and_cycles
 }`))
 
 type Zuite struct {

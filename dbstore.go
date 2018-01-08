@@ -93,35 +93,68 @@ var tableToEntities = map[string]interface{}{
 }
 
 func (s *Session) Load(name, id string) (*Worksheet, error) {
-	ws, err := s.defs.newUninitializedWorksheet(name)
+	loader := &loader{
+		s:               s,
+		graph:           make(map[string]*Worksheet),
+		slicesToHydrate: make(map[string]*slice),
+	}
+	return loader.loadWorksheet(name, id)
+}
+
+func (s *Session) Save(ws *Worksheet) error {
+	graph := make(map[string]bool)
+	return s.save(graph, ws)
+}
+
+func (s *Session) Update(ws *Worksheet) error {
+	graph := make(map[string]bool)
+	return s.update(graph, ws)
+}
+
+func (s *Session) SaveOrUpdate(ws *Worksheet) error {
+	graph := make(map[string]bool)
+	return s.saveOrUpdate(graph, ws)
+}
+
+type loader struct {
+	s               *Session
+	graph           map[string]*Worksheet
+	slicesToHydrate map[string]*slice
+}
+
+func (l *loader) loadWorksheet(name, id string) (*Worksheet, error) {
+	wsRef := fmt.Sprintf("%s:%s", name, id)
+
+	if ws, ok := l.graph[wsRef]; ok {
+		return ws, nil
+	}
+
+	ws, err := l.s.defs.newUninitializedWorksheet(name)
 	if err != nil {
 		return nil, err
 	}
 
-	var wsRec rWorksheet
-	err = s.tx.
+	var wsRecs []rWorksheet
+	if err = l.s.tx.
 		Select("*").
 		From("worksheets").
 		Where("id = $1 and name = $2", id, name).
-		QueryStruct(&wsRec)
-	if err != nil {
-		return nil, err
-	} else if len(wsRec.Name) == 0 {
+		QueryStructs(&wsRecs); err != nil {
+		return nil, fmt.Errorf("unable to load worksheets records: %s", err)
+	} else if len(wsRecs) == 0 {
 		return nil, fmt.Errorf("unknown worksheet %s:%s", name, id)
 	}
 
-	var (
-		valuesRecs   []rValue
-		slicesToLoad = make(map[string]*slice)
-		slicesIds    []interface{}
-	)
-	err = s.tx.
+	wsRec := wsRecs[0]
+	l.graph[wsRef] = ws
+
+	var valuesRecs []rValue
+	if err := l.s.tx.
 		Select("*").
 		From("worksheet_values").
 		Where("worksheet_id = $1", id).
 		Where("from_version <= $1 and $1 <= to_version", wsRec.Version).
-		QueryStructs(&valuesRecs)
-	if err != nil {
+		QueryStructs(&valuesRecs); err != nil {
 		return nil, err
 	}
 	for _, valueRec := range valuesRecs {
@@ -133,28 +166,8 @@ func (s *Session) Load(name, id string) (*Worksheet, error) {
 			return nil, fmt.Errorf("unknown value with field index %d", index)
 		}
 
-		// type dependent treatment
-		var value Value
-		switch t := field.typ.(type) {
-		case *tSliceType:
-			if !strings.HasPrefix(valueRec.Value, "[:") {
-				return nil, fmt.Errorf("unreadable value for slice %s", valueRec.Value)
-			}
-			parts := strings.Split(valueRec.Value, ":")
-			if len(parts) != 3 {
-				return nil, fmt.Errorf("unreadable value for slice %s", valueRec.Value)
-			}
-			lastRank, err := strconv.Atoi(parts[1])
-			if err != nil {
-				return nil, fmt.Errorf("unreadable value for slice %s", valueRec.Value)
-			}
-			slice := newSliceWithIdAndLastRank(t, parts[2], lastRank)
-			slicesToLoad[slice.id] = slice
-			slicesIds = append(slicesIds, slice.id)
-			value, err = slice, nil
-		default:
-			value, err = NewValue(valueRec.Value)
-		}
+		// load, and potentially defer hydration of value
+		value, err := l.loadValue(field.typ, valueRec.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -164,9 +177,17 @@ func (s *Session) Load(name, id string) (*Worksheet, error) {
 		ws.data[index] = value
 	}
 
-	if len(slicesToLoad) != 0 {
+	for {
+		slicesToHydrate := l.nextSlicesToHydrate()
+		if len(slicesToHydrate) == 0 {
+			break
+		}
+		slicesIds := make([]interface{}, len(slicesToHydrate))
+		for _, slice := range slicesToHydrate {
+			slicesIds = append(slicesIds, slice.id)
+		}
 		var sliceElementsRecs []rSliceElement
-		err = s.tx.
+		err = l.s.tx.
 			Select("*").
 			From("worksheet_slice_elements").
 			Where(inClause("slice_id", len(slicesIds)), slicesIds...).
@@ -177,11 +198,11 @@ func (s *Session) Load(name, id string) (*Worksheet, error) {
 			return nil, err
 		}
 		for _, sliceElementsRec := range sliceElementsRecs {
-			value, err := NewValue(sliceElementsRec.Value) // wrong, this could be a slice too!
+			slice := slicesToHydrate[sliceElementsRec.SliceId]
+			value, err := l.loadValue(slice.typ.elementType, sliceElementsRec.Value)
 			if err != nil {
 				return nil, err
 			}
-			slice := slicesToLoad[sliceElementsRec.SliceId]
 			slice.elements = append(slice.elements, sliceElement{
 				rank:  sliceElementsRec.Rank,
 				value: value,
@@ -192,7 +213,85 @@ func (s *Session) Load(name, id string) (*Worksheet, error) {
 	return ws, nil
 }
 
-func (s *Session) Save(ws *Worksheet) error {
+func (l *loader) loadValue(typ Type, value string) (Value, error) {
+	switch t := typ.(type) {
+	case *tSliceType:
+		if !strings.HasPrefix(value, "[:") {
+			return nil, fmt.Errorf("unreadable value for slice %s", value)
+		}
+		parts := strings.Split(value, ":")
+		if len(parts) != 3 {
+			return nil, fmt.Errorf("unreadable value for slice %s", value)
+		}
+		lastRank, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return nil, fmt.Errorf("unreadable value for slice %s", value)
+		}
+		slice := newSliceWithIdAndLastRank(t, parts[2], lastRank)
+		l.slicesToHydrate[slice.id] = slice
+		return slice, nil
+	case *tWorksheetType:
+		if !strings.HasPrefix(value, "*:") {
+			return nil, fmt.Errorf("unreadable value for ref %s", value)
+		}
+		parts := strings.Split(value, ":")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("unreadable value for ref %s", value)
+		}
+		value, err := l.loadWorksheet(t.name, parts[1])
+		if err != nil {
+			return nil, fmt.Errorf("unable to load referenced worksheet %s: %s", parts[1], err)
+		}
+		return value, nil
+	default:
+		return NewValue(value)
+	}
+}
+
+func (l *loader) nextSlicesToHydrate() map[string]*slice {
+	slicesToHydrate := l.slicesToHydrate
+	l.slicesToHydrate = make(map[string]*slice)
+	return slicesToHydrate
+}
+
+func (s *Session) saveOrUpdate(graph map[string]bool, ws *Worksheet) error {
+	if _, ok := graph[ws.Id()]; ok {
+		return nil
+	}
+	graph[ws.Id()] = true
+
+	var count int
+	if err := s.tx.
+		Select("count(*)").
+		From("worksheets").
+		Where("id = $1", ws.Id()).
+		QueryScalar(&count); err != nil {
+		return err
+	}
+
+	if count == 0 {
+		return s.Save(ws)
+	} else {
+		return s.Update(ws)
+	}
+}
+
+func (s *Session) save(graph map[string]bool, ws *Worksheet) error {
+	// already done?
+	if _, ok := graph[ws.Id()]; ok {
+		return nil
+	}
+	graph[ws.Id()] = true
+
+	// cascade worksheets
+	for _, value := range ws.data {
+		for _, wsToCascade := range worksheetsToCascade(value) {
+			if err := s.saveOrUpdate(graph, wsToCascade); err != nil {
+				return err
+			}
+		}
+	}
+
 	// insert rWorksheet
 	_, err := s.tx.
 		InsertInto("worksheets").
@@ -253,7 +352,22 @@ func (s *Session) Save(ws *Worksheet) error {
 	return nil
 }
 
-func (s *Session) Update(ws *Worksheet) error {
+func (s *Session) update(graph map[string]bool, ws *Worksheet) error {
+	// already done?
+	if _, ok := graph[ws.Id()]; ok {
+		return nil
+	}
+	graph[ws.Id()] = true
+
+	// cascade worksheets
+	for _, value := range ws.data {
+		for _, wsToCascade := range worksheetsToCascade(value) {
+			if err := s.saveOrUpdate(graph, wsToCascade); err != nil {
+				return err
+			}
+		}
+	}
+
 	oldVersion := ws.Version()
 	newVersion := oldVersion + 1
 	newVersionValue := MustNewValue(strconv.Itoa(newVersion))
@@ -266,6 +380,11 @@ func (s *Session) Update(ws *Worksheet) error {
 		ws.data[IndexVersion] = oldVersionValue
 		return d
 	}()
+
+	// no change, i.e. only the version would change
+	if len(diff) == 1 {
+		return nil
+	}
 
 	// split the diff into the various changes we need to do
 	var (
@@ -383,4 +502,19 @@ func ughconvert(ids []int) []interface{} {
 		convert[i] = ids[i]
 	}
 	return convert
+}
+
+func worksheetsToCascade(value Value) []*Worksheet {
+	switch v := value.(type) {
+	case *Worksheet:
+		return []*Worksheet{v}
+	case *slice:
+		var result []*Worksheet
+		for _, element := range v.elements {
+			result = append(result, worksheetsToCascade(element.value)...)
+		}
+		return result
+	default:
+		return nil
+	}
 }

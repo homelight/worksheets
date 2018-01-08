@@ -51,19 +51,31 @@ func (s *Zuite) TestExample() {
 	require.False(s.T(), isSet)
 }
 
-func (s *Zuite) TestWorksheetNew_zeroDefs() {
-	wsDefs := []string{
-		``,
-		` `,
-		`some text`,
-		`not a worksheet`,
-		`work sheet`,
+func (s *Zuite) TestNewDefinitionsErrors() {
+	cases := map[string]string{
+		// crap input
+		``:                `expecting worksheet`,
+		` `:               `expecting worksheet`,
+		`some text`:       `expecting worksheet`,
+		`not a worksheet`: `expecting worksheet`,
+		`work sheet`:      `expecting worksheet`,
+
+		// worksheet semantics
+		`worksheet simple {
+			42:full_name ext
+			42:happy bool
+		}`: `multiple fields with index 42`,
+		`worksheet simple {
+			42:same_name text
+			43:same_name text
+		}`: `multiple fields with name same_name`,
+		`worksheet ref_to_worksheet {
+			89:ref_here some_other_worksheet
+		}`: `unknown worksheet some_other_worksheet referenced in field ref_to_worksheet.ref_here`,
 	}
-	for _, def := range wsDefs {
-		_, err := NewDefinitions(strings.NewReader(def))
-		if assert.Error(s.T(), err) {
-			require.Equal(s.T(), "no worksheets defined", err.Error())
-		}
+	for input, msg := range cases {
+		_, err := NewDefinitions(strings.NewReader(input))
+		assert.EqualError(s.T(), err, msg, input)
 	}
 }
 
