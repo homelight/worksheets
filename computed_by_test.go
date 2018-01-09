@@ -32,7 +32,7 @@ func (s *Zuite) TestWorksheet_externalComputedBy() {
 				1:hello_name text computed_by { external }
 			}`,
 			nil,
-			"plugins: missing plugin for simple.hello_name",
+			"simple.hello_name: missing plugin for external computed_by",
 		},
 		{
 			`worksheet simple {}`,

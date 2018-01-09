@@ -27,20 +27,13 @@ type tWorksheet struct {
 	dependents map[int][]int
 }
 
-func (ws *tWorksheet) addField(field *tField) error {
-	if _, ok := ws.fieldsByName[field.name]; ok {
-		return fmt.Errorf("multiple fields with name %s", field.name)
-	}
-
-	if _, ok := ws.fieldsByIndex[field.index]; ok {
-		return fmt.Errorf("multiple fields with index %d", field.index)
-	}
-
+func (ws *tWorksheet) addField(field *tField) {
 	ws.fields = append(ws.fields, field)
+
+	// Clobbering due to name reuse, or index reuse, is checked by validating
+	// the tree.
 	ws.fieldsByName[field.name] = field
 	ws.fieldsByIndex[field.index] = field
-
-	return nil
 }
 
 type tField struct {

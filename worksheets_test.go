@@ -60,16 +60,22 @@ func (s *Zuite) TestNewDefinitionsErrors() {
 
 		// worksheet semantics
 		`worksheet simple {
-			42:full_name ext
+			0:no_can_do_with_zero bool
+		}`: `simple.no_can_do_with_zero: index cannot be zero`,
+
+		`worksheet simple {
+			42:full_name text
 			42:happy bool
-		}`: `multiple fields with index 42`,
+		}`: `simple.happy: index 42 cannot be reused`,
+
 		`worksheet simple {
 			42:same_name text
 			43:same_name text
-		}`: `multiple fields with name same_name`,
+		}`: `simple.same_name: multiple fields named same_name`,
+
 		`worksheet ref_to_worksheet {
 			89:ref_here some_other_worksheet
-		}`: `unknown worksheet some_other_worksheet referenced in field ref_to_worksheet.ref_here`,
+		}`: `ref_to_worksheet.ref_here: unknown worksheet some_other_worksheet referenced`,
 	}
 	for input, msg := range cases {
 		_, err := NewDefinitions(strings.NewReader(input))
