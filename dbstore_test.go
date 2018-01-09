@@ -61,7 +61,7 @@ func (s *DbZuite) TestSave() {
 		},
 	}, wsRecs)
 
-	require.Equal(s.T(), []rValue{
+	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: ws.Id(),
 			Index:       IndexId,
@@ -119,7 +119,7 @@ func (s *DbZuite) TestUpdate() {
 		},
 	}, wsRecs)
 
-	require.Equal(s.T(), []rValue{
+	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: ws.Id(),
 			Index:       IndexId,
@@ -185,6 +185,90 @@ func (s *DbZuite) TestUpdateUndefinedField() {
 	})
 }
 
+func (s *DbZuite) TestProperlyLoadUndefinedField() {
+	var wsId string
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		ws := defs.MustNewWorksheet("simple")
+		wsId = ws.Id()
+		ws.MustSet("age", MustNewValue("123456"))
+
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+
+		ws, err := session.Load("simple", wsId)
+		if err != nil {
+			return err
+		}
+		ws.MustUnset("age")
+
+		return session.Update(ws)
+	})
+
+	// Fresh load should show age as being unset.
+	var fresh *Worksheet
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		var err error
+		fresh, err = session.Load("simple", wsId)
+		return err
+	})
+
+	require.False(s.T(), fresh.MustIsSet("age"))
+
+	// Lastly, check db state.
+	wsRecs, valuesRecs, _ := s.DbState()
+
+	require.Equal(s.T(), []rWorksheet{
+		{
+			Id:      wsId,
+			Version: 2,
+			Name:    "simple",
+		},
+	}, wsRecs)
+
+	require.Equal(s.T(), []rValueForTesting{
+		{
+			WorksheetId: wsId,
+			Index:       IndexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       wsId,
+		},
+		{
+			WorksheetId: wsId,
+			Index:       IndexVersion,
+			FromVersion: 1,
+			ToVersion:   1,
+			Value:       `1`,
+		},
+		{
+			WorksheetId: wsId,
+			Index:       IndexVersion,
+			FromVersion: 2,
+			ToVersion:   math.MaxInt32,
+			Value:       `2`,
+		},
+		{
+			WorksheetId: wsId,
+			Index:       91,
+			FromVersion: 1,
+			ToVersion:   1,
+			Value:       `123456`,
+		},
+		{
+			WorksheetId: wsId,
+			Index:       91,
+			FromVersion: 2,
+			ToVersion:   math.MaxInt32,
+			IsUndefined: true,
+		},
+	}, valuesRecs)
+}
+
 func (s *DbZuite) TestUpdateOnUpdateDoesNothing() {
 	ws := s.store.defs.MustNewWorksheet("simple")
 	ws.MustSet("name", alice)
@@ -217,44 +301,4 @@ func (s *DbZuite) TestUpdateOnUpdateDoesNothing() {
 func (s *DbZuite) MustRunTransaction(fn func(tx *runner.Tx) error) {
 	err := RunTransaction(s.db, fn)
 	require.NoError(s.T(), err)
-}
-
-func (s *DbZuite) DbState() ([]rWorksheet, []rValue, []rSliceElement) {
-	var (
-		wsRecs            []rWorksheet
-		valuesRecs        []rValue
-		sliceElementsRecs []rSliceElement
-	)
-
-	if err := s.db.
-		Select("*").
-		From("worksheets").
-		OrderBy("id").
-		QueryStructs(&wsRecs); err != nil {
-		require.NoError(s.T(), err)
-	}
-
-	if err := s.db.
-		Select("*").
-		From("worksheet_values").
-		OrderBy("worksheet_id, index, from_version").
-		QueryStructs(&valuesRecs); err != nil {
-		require.NoError(s.T(), err)
-	}
-	for i := range valuesRecs {
-		valuesRecs[i].Id = 0
-	}
-
-	if err := s.db.
-		Select("*").
-		From("worksheet_slice_elements").
-		OrderBy("slice_id, rank, from_version").
-		QueryStructs(&sliceElementsRecs); err != nil {
-		require.NoError(s.T(), err)
-	}
-	for i := range sliceElementsRecs {
-		sliceElementsRecs[i].Id = 0
-	}
-
-	return wsRecs, valuesRecs, sliceElementsRecs
 }

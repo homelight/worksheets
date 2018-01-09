@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	_ "github.com/lib/pq"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
@@ -59,4 +60,90 @@ func (s *DbZuite) TearDownSuite() {
 
 func TestRunAllTheDbTests(t *testing.T) {
 	suite.Run(t, new(DbZuite))
+}
+
+type rValueForTesting struct {
+	WorksheetId string
+	Index       int
+	FromVersion int
+	ToVersion   int
+	Value       string
+	IsUndefined bool
+}
+
+type rSliceElementForTesting struct {
+	SliceId     string
+	Rank        int
+	FromVersion int
+	ToVersion   int
+	Value       string
+	IsUndefined bool
+}
+
+func (s *DbZuite) DbState() ([]rWorksheet, []rValueForTesting, []rSliceElementForTesting) {
+	var (
+		err                 error
+		wsRecs              []rWorksheet
+		dbValuesRecs        []rValue
+		dbSliceElementsRecs []rSliceElement
+	)
+
+	err = s.db.
+		Select("*").
+		From("worksheets").
+		OrderBy("id").
+		QueryStructs(&wsRecs)
+	require.NoError(s.T(), err)
+
+	s.db.
+		Select("*").
+		From("worksheet_values").
+		OrderBy("worksheet_id, index, from_version").
+		QueryStructs(&dbValuesRecs)
+	require.NoError(s.T(), err)
+
+	err = s.db.
+		Select("*").
+		From("worksheet_slice_elements").
+		OrderBy("slice_id, rank, from_version").
+		QueryStructs(&dbSliceElementsRecs)
+	require.NoError(s.T(), err)
+
+	// rValue to rValueForTesting
+	valuesRecs := make([]rValueForTesting, len(dbValuesRecs))
+	for i, dbValueRec := range dbValuesRecs {
+		valuesRecs[i] = rValueForTesting{
+			WorksheetId: dbValueRec.WorksheetId,
+			Index:       dbValueRec.Index,
+			FromVersion: dbValueRec.FromVersion,
+			ToVersion:   dbValueRec.ToVersion,
+		}
+		if dbValueRec.Value.Valid {
+			valuesRecs[i].Value = dbValueRec.Value.String
+		} else {
+			valuesRecs[i].IsUndefined = true
+		}
+	}
+
+	// rSliceElement to rSliceElementForTesting
+	sliceElementsRecs := make([]rSliceElementForTesting, len(dbSliceElementsRecs))
+	for i, dbSliceElementRec := range dbSliceElementsRecs {
+		sliceElementsRecs[i] = rSliceElementForTesting{
+			SliceId:     dbSliceElementRec.SliceId,
+			Rank:        dbSliceElementRec.Rank,
+			FromVersion: dbSliceElementRec.FromVersion,
+			ToVersion:   dbSliceElementRec.ToVersion,
+		}
+		if dbSliceElementRec.Value.Valid {
+			sliceElementsRecs[i].Value = dbSliceElementRec.Value.String
+		} else {
+			sliceElementsRecs[i].IsUndefined = true
+		}
+	}
+
+	return wsRecs, valuesRecs, sliceElementsRecs
+}
+
+func p(v string) *string {
+	return &v
 }

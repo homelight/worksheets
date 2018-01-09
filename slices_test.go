@@ -58,6 +58,12 @@ func (s *Zuite) TestSliceErrors_setOnSliceFailsEvenIfUndefined() {
 	require.EqualError(s.T(), err, "Set on slice field names, use Append, or Del")
 }
 
+func (s *Zuite) TestSliceErrors_unsetOnSliceFailsEvenIfUndefined() {
+	ws := defs.MustNewWorksheet("with_slice")
+	err := ws.Unset("names")
+	require.EqualError(s.T(), err, "Unset on slice field names, must use Del")
+}
+
 func (s *Zuite) TestSliceErrors_appendOfNonAssignableValue() {
 	ws := defs.MustNewWorksheet("with_slice")
 	err := ws.Append("names", NewBool(true))
@@ -184,7 +190,7 @@ func (s *DbZuite) TestSliceSave() {
 		},
 	}, wsRecs)
 
-	require.Equal(s.T(), []rValue{
+	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: ws.Id(),
 			Index:       IndexId,
@@ -208,7 +214,7 @@ func (s *DbZuite) TestSliceSave() {
 		},
 	}, valuesRecs)
 
-	require.Equal(s.T(), []rSliceElement{
+	require.Equal(s.T(), []rSliceElementForTesting{
 		{
 			SliceId:     theSliceId,
 			FromVersion: 1,
@@ -307,7 +313,7 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 		},
 	}, wsRecs)
 
-	require.Equal(s.T(), []rValue{
+	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: wsId,
 			Index:       IndexId,
@@ -359,7 +365,7 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 		},
 	}, valuesRecs)
 
-	require.Equal(s.T(), []rSliceElement{
+	require.Equal(s.T(), []rSliceElementForTesting{
 		{
 			SliceId:     theSliceId,
 			FromVersion: 1,
@@ -435,7 +441,7 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 		},
 	}, wsRecs)
 
-	require.Equal(s.T(), []rValue{
+	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: wsId,
 			Index:       IndexId,
@@ -501,7 +507,7 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 		},
 	}, valuesRecs)
 
-	require.Equal(s.T(), []rSliceElement{
+	require.Equal(s.T(), []rSliceElementForTesting{
 		{
 			SliceId:     wsSliceId,
 			FromVersion: 1,
@@ -536,4 +542,46 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 
 	simple2 := slice[1].(*Worksheet)
 	require.Equal(s.T(), `"Bob"`, simple2.MustGet("name").String())
+}
+
+func (s *DbZuite) TestSliceUpdate_appendUndefinedAndEnsureItLoadsCorrectly() {
+	var wsId string
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		ws := defs.MustNewWorksheet("with_slice")
+		wsId = ws.Id()
+		ws.MustAppend("names", NewUndefined())
+
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		ws, err := session.Load("with_slice", wsId)
+		if err != nil {
+			return err
+		}
+		ws.MustAppend("names", alice)
+		ws.MustAppend("names", NewUndefined())
+
+		return session.Update(ws)
+	})
+
+	var fresh *Worksheet
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		ws, err := session.Load("with_slice", wsId)
+		if err != nil {
+			return err
+		}
+
+		fresh = ws
+		return nil
+	})
+
+	require.Equal(s.T(), []Value{
+		&Undefined{},
+		alice,
+		&Undefined{},
+	}, fresh.MustGetSlice("names"))
 }
