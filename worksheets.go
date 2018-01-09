@@ -344,6 +344,11 @@ func (ws *Worksheet) MustUnset(name string) {
 }
 
 func (ws *Worksheet) Unset(name string) error {
+	if field, ok := ws.def.fieldsByName[name]; ok {
+		if _, ok := field.typ.(*tSliceType); ok {
+			return fmt.Errorf("Unset on slice field names, must use Del")
+		}
+	}
 	return ws.Set(name, NewUndefined())
 }
 

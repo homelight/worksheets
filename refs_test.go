@@ -70,7 +70,7 @@ func (s *DbZuite) TestRefsSave_noDataInRefWorksheet() {
 		},
 	}, wsRecs)
 
-	require.Equal(s.T(), []rValue{
+	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: wsId,
 			Index:       IndexId,
@@ -149,7 +149,7 @@ func (s *DbZuite) TestRefsSave_withDataInRefWorksheet() {
 		},
 	}, wsRecs)
 
-	require.Equal(s.T(), []rValue{
+	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: wsId,
 			Index:       IndexId,
@@ -247,7 +247,7 @@ func (s *DbZuite) TestRefsSave_refWorksheetAlreadySaved() {
 		},
 	}, wsRecs)
 
-	require.Equal(s.T(), []rValue{
+	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: wsId,
 			Index:       IndexId,
@@ -335,7 +335,7 @@ func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 		},
 	}, wsRecs)
 
-	require.Equal(s.T(), []rValue{
+	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: wsId,
 			Index:       IndexId,
@@ -417,7 +417,7 @@ func (s *DbZuite) TestRefsSave_withCycles() {
 		},
 	}, wsRecs)
 
-	require.Equal(s.T(), []rValue{
+	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: ws.Id(),
 			Index:       IndexId,
@@ -556,7 +556,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentNoChangeInChild() {
 		},
 	}, wsRecs)
 
-	require.Equal(s.T(), []rValue{
+	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: wsId,
 			Index:       IndexId,
@@ -673,7 +673,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChangesInChild() {
 		},
 	}, wsRecs)
 
-	require.Equal(s.T(), []rValue{
+	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: wsId,
 			Index:       IndexId,
@@ -799,7 +799,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChildRequiringToBeSaved() {
 		},
 	}, wsRecs)
 
-	require.Equal(s.T(), []rValue{
+	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: wsId,
 			Index:       IndexId,
