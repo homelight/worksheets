@@ -84,21 +84,38 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 		return nil, err
 	}
 
-	// Any unresolved externals?
 	for _, def := range defs {
+		var (
+			indexesUsed = make(map[int]bool)
+			namesUsed   = make(map[string]bool)
+		)
 		for _, field := range def.fields {
-			if _, ok := field.computedBy.(*tExternal); ok {
-				return nil, fmt.Errorf("plugins: missing plugin for %s.%s", def.name, field.name)
+			// Any bad index?
+			if field.index == 0 {
+				return nil, fmt.Errorf("%s.%s: index cannot be zero", def.name, field.name)
 			}
-		}
-	}
 
-	// Resolve worksheet refs types
-	for _, def := range defs {
-		for _, field := range def.fields {
+			// Any index reused?
+			if _, ok := indexesUsed[field.index]; ok {
+				return nil, fmt.Errorf("%s.%s: index %d cannot be reused", def.name, field.name, field.index)
+			}
+			indexesUsed[field.index] = true
+
+			// Any names reused?
+			if _, ok := namesUsed[field.name]; ok {
+				return nil, fmt.Errorf("%s.%s: multiple fields named %s", def.name, field.name, field.name)
+			}
+			namesUsed[field.name] = true
+
+			// Any unresolved externals?
+			if _, ok := field.computedBy.(*tExternal); ok {
+				return nil, fmt.Errorf("%s.%s: missing plugin for external computed_by", def.name, field.name)
+			}
+
+			// Any unknown refs types?
 			if refTyp, ok := field.typ.(*tWorksheetType); ok {
 				if _, ok := defs[refTyp.name]; !ok {
-					return nil, fmt.Errorf("unknown worksheet %s referenced in field %s.%s", refTyp.name, def.name, field.name)
+					return nil, fmt.Errorf("%s.%s: unknown worksheet %s referenced", def.name, field.name, refTyp.name)
 				}
 			}
 		}

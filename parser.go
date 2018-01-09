@@ -98,20 +98,16 @@ func (p *parser) parseWorksheet() (*tWorksheet, error) {
 		fieldsByName:  make(map[string]*tField),
 		fieldsByIndex: make(map[int]*tField),
 	}
-	if err := ws.addField(&tField{
+	ws.addField(&tField{
 		index: IndexId,
 		name:  "id",
 		typ:   &tTextType{},
-	}); err != nil {
-		panic("unexpected")
-	}
-	if err := ws.addField(&tField{
+	})
+	ws.addField(&tField{
 		index: IndexVersion,
 		name:  "version",
 		typ:   &tNumberType{},
-	}); err != nil {
-		panic("unexpected")
-	}
+	})
 
 	_, err := p.nextAndCheck(pWorksheet)
 	if err != nil {
@@ -134,9 +130,7 @@ func (p *parser) parseWorksheet() (*tWorksheet, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := ws.addField(field); err != nil {
-			return nil, err
-		}
+		ws.addField(field)
 	}
 
 	_, err = p.nextAndCheck(pRacco)
