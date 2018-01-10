@@ -253,7 +253,7 @@ func (s *DbZuite) TestSliceLoad() {
 	)
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		fresh, err = session.Load("with_slice", wsId)
+		fresh, err = session.Load(wsId)
 		return err
 	})
 	require.Equal(s.T(), []Value{alice, carol, bob, carol}, fresh.MustGetSlice("names"))
@@ -283,7 +283,7 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		ws, err := session.Load("with_slice", wsId)
+		ws, err := session.Load(wsId)
 		if err != nil {
 			return err
 		}
@@ -294,7 +294,7 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		ws, err := session.Load("with_slice", wsId)
+		ws, err := session.Load(wsId)
 		if err != nil {
 			return err
 		}
@@ -529,7 +529,7 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
 		var err error
-		fresh, err = session.Load("with_slice_of_refs", wsId)
+		fresh, err = session.Load(wsId)
 		return err
 	})
 
@@ -557,7 +557,7 @@ func (s *DbZuite) TestSliceUpdate_appendUndefinedAndEnsureItLoadsCorrectly() {
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		ws, err := session.Load("with_slice", wsId)
+		ws, err := session.Load(wsId)
 		if err != nil {
 			return err
 		}
@@ -570,7 +570,7 @@ func (s *DbZuite) TestSliceUpdate_appendUndefinedAndEnsureItLoadsCorrectly() {
 	var fresh *Worksheet
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		ws, err := session.Load("with_slice", wsId)
+		ws, err := session.Load(wsId)
 		if err != nil {
 			return err
 		}

@@ -473,7 +473,7 @@ func (s *DbZuite) TestRefsLoad_noCycles() {
 	)
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		fresh, err = session.Load("with_refs", wsId)
+		fresh, err = session.Load(wsId)
 		return err
 	})
 
@@ -502,7 +502,7 @@ func (s *DbZuite) TestRefsLoad_withCycles() {
 	)
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		fresh, err = session.Load("with_refs_and_cycles", wsId)
+		fresh, err = session.Load(wsId)
 		return err
 	})
 

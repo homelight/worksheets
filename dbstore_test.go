@@ -32,7 +32,7 @@ func (s *DbZuite) TestExample() {
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
 		var err error
-		wsFromStore, err = session.Load("simple", ws.Id())
+		wsFromStore, err = session.Load(ws.Id())
 		return err
 	})
 
@@ -199,7 +199,7 @@ func (s *DbZuite) TestProperlyLoadUndefinedField() {
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
 
-		ws, err := session.Load("simple", wsId)
+		ws, err := session.Load(wsId)
 		if err != nil {
 			return err
 		}
@@ -213,7 +213,7 @@ func (s *DbZuite) TestProperlyLoadUndefinedField() {
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
 		var err error
-		fresh, err = session.Load("simple", wsId)
+		fresh, err = session.Load(wsId)
 		return err
 	})
 
