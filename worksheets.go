@@ -113,12 +113,8 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 			}
 
 			// Any unknown refs types?
-			if refTyp, ok := field.typ.(*Definition); ok {
-				refDef, ok := defs[refTyp.name]
-				if !ok {
-					return nil, fmt.Errorf("%s.%s: unknown worksheet %s referenced", def.name, field.name, refTyp.name)
-				}
-				field.typ = refDef
+			if err := resolveRefTypes(fmt.Sprintf("%s.%s", def.name, field.name), defs, field); err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -147,6 +143,35 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 	return &Definitions{
 		defs: defs,
 	}, nil
+}
+
+func resolveRefTypes(niceFieldName string, defs map[string]*Definition, locus interface{}) error {
+	switch locus.(type) {
+	case *tField:
+		field := locus.(*tField)
+		if refTyp, ok := field.typ.(*Definition); ok {
+			refDef, ok := defs[refTyp.name]
+			if !ok {
+				return fmt.Errorf("%s: unknown worksheet %s referenced", niceFieldName, refTyp.name)
+			}
+			field.typ = refDef
+		}
+		if _, ok := field.typ.(*tSliceType); ok {
+			return resolveRefTypes(niceFieldName, defs, field.typ)
+		}
+	case *tSliceType:
+		sliceType := locus.(*tSliceType)
+		if refTyp, ok := sliceType.elementType.(*Definition); ok {
+			refDef, ok := defs[refTyp.name]
+			if !ok {
+				return fmt.Errorf("%s: unknown worksheet %s referenced", niceFieldName, refTyp.name)
+			}
+			sliceType.elementType = refDef
+		}
+		return resolveRefTypes(niceFieldName, defs, sliceType.elementType)
+	}
+
+	return nil
 }
 
 func processOptions(defs map[string]*Definition, opts ...Options) error {

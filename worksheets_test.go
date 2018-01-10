@@ -76,6 +76,14 @@ func (s *Zuite) TestNewDefinitionsErrors() {
 		`worksheet ref_to_worksheet {
 			89:ref_here some_other_worksheet
 		}`: `ref_to_worksheet.ref_here: unknown worksheet some_other_worksheet referenced`,
+
+		`worksheet refs_to_worksheet {
+			89:refs_here []some_other_worksheet
+		}`: `refs_to_worksheet.refs_here: unknown worksheet some_other_worksheet referenced`,
+
+		`worksheet refs_to_worksheet {
+			89:refs_here [][]some_other_worksheet
+		}`: `refs_to_worksheet.refs_here: unknown worksheet some_other_worksheet referenced`,
 	}
 	for input, msg := range cases {
 		_, err := NewDefinitions(strings.NewReader(input))
@@ -127,10 +135,19 @@ func (s *Zuite) TestWorksheetNew_refTypesMustBeResolved() {
 
 		worksheet even_simpler {
 			5:not_it simple
-		}`))
-	simpleDef := defs.defs["simple"]
-	evenSimplerDef := defs.defs["even_simpler"]
+		}
 
+		worksheet refs_in_slices {
+			6:many_simples  []simple
+			7:many_simplers [][]even_simpler
+		}`))
+	var (
+		simpleDef       = defs.defs["simple"]
+		evenSimplerDef  = defs.defs["even_simpler"]
+		refsInSlicesDef = defs.defs["refs_in_slices"]
+	)
+
+	// refs
 	cases := []struct {
 		parent *Definition
 		field  string
@@ -148,6 +165,14 @@ func (s *Zuite) TestWorksheetNew_refTypesMustBeResolved() {
 			"type of field %s.%s should resolve to def of %s",
 			ex.parent, ex.field, ex.child)
 	}
+
+	// slices
+	manySimplesTyp := refsInSlicesDef.fieldsByName["many_simples"].typ.(*tSliceType)
+	assert.True(s.T(), manySimplesTyp.elementType == simpleDef)
+
+	manySimplersTyp := refsInSlicesDef.fieldsByName["many_simplers"].typ.(*tSliceType)
+	manySimplersElemTyp := manySimplersTyp.elementType.(*tSliceType)
+	assert.True(s.T(), manySimplersElemTyp.elementType == evenSimplerDef)
 }
 
 func (s *Zuite) TestWorksheetGet_undefinedIfNoValue() {
