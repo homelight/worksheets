@@ -26,7 +26,7 @@ import (
 // Store ... TODO(pascal): write about abstraction.
 type Store interface {
 	// Load loads the worksheet with identifier `id` from the store.
-	Load(name, id string) (*Worksheet, error)
+	Load(id string) (*Worksheet, error)
 
 	// Save saves a new worksheet to the store.
 	Save(ws *Worksheet) error
@@ -94,13 +94,13 @@ var tableToEntities = map[string]interface{}{
 	"worksheet_slice_elements": &rSliceElement{},
 }
 
-func (s *Session) Load(name, id string) (*Worksheet, error) {
+func (s *Session) Load(id string) (*Worksheet, error) {
 	loader := &loader{
 		s:               s,
 		graph:           make(map[string]*Worksheet),
 		slicesToHydrate: make(map[string]*slice),
 	}
-	return loader.loadWorksheet(name, id)
+	return loader.loadWorksheet(id)
 }
 
 func (s *Session) SaveOrUpdate(ws *Worksheet) error {
@@ -133,31 +133,30 @@ type loader struct {
 	slicesToHydrate map[string]*slice
 }
 
-func (l *loader) loadWorksheet(name, id string) (*Worksheet, error) {
-	wsRef := fmt.Sprintf("%s:%s", name, id)
-
-	if ws, ok := l.graph[wsRef]; ok {
+func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
+	if ws, ok := l.graph[id]; ok {
 		return ws, nil
 	}
 
-	ws, err := l.s.defs.newUninitializedWorksheet(name)
+	var wsRecs []rWorksheet
+	if err := l.s.tx.
+		Select("*").
+		From("worksheets").
+		Where("id = $1", id).
+		QueryStructs(&wsRecs); err != nil {
+		return nil, fmt.Errorf("unable to load worksheets records: %s", err)
+	} else if len(wsRecs) == 0 {
+		return nil, fmt.Errorf("unknown worksheet with id %s", id)
+	}
+
+	wsRec := wsRecs[0]
+
+	ws, err := l.s.defs.newUninitializedWorksheet(wsRec.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	var wsRecs []rWorksheet
-	if err = l.s.tx.
-		Select("*").
-		From("worksheets").
-		Where("id = $1 and name = $2", id, name).
-		QueryStructs(&wsRecs); err != nil {
-		return nil, fmt.Errorf("unable to load worksheets records: %s", err)
-	} else if len(wsRecs) == 0 {
-		return nil, fmt.Errorf("unknown worksheet %s:%s", name, id)
-	}
-
-	wsRec := wsRecs[0]
-	l.graph[wsRef] = ws
+	l.graph[id] = ws
 
 	var valuesRecs []rValue
 	if err := l.s.tx.
@@ -258,7 +257,7 @@ func (l *loader) readValue(typ Type, optValue dat.NullString) (Value, error) {
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("unreadable value for ref %s", value)
 		}
-		value, err := l.loadWorksheet(t.name, parts[1])
+		value, err := l.loadWorksheet(parts[1])
 		if err != nil {
 			return nil, fmt.Errorf("unable to load referenced worksheet %s: %s", parts[1], err)
 		}
