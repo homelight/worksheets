@@ -134,9 +134,7 @@ type loader struct {
 }
 
 func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
-	wsRef := fmt.Sprintf("%s", id)
-
-	if ws, ok := l.graph[wsRef]; ok {
+	if ws, ok := l.graph[id]; ok {
 		return ws, nil
 	}
 
@@ -158,7 +156,7 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 		return nil, err
 	}
 
-	l.graph[wsRef] = ws
+	l.graph[id] = ws
 
 	var valuesRecs []rValue
 	if err := l.s.tx.
