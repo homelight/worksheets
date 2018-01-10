@@ -300,14 +300,6 @@ func (ws *Worksheet) MustSet(name string, value Value) {
 	}
 }
 
-func (ws *Worksheet) FieldNames() []string {
-	fieldNames := []string{}
-	for fieldName, _ := range ws.def.fieldsByName {
-		fieldNames = append(fieldNames, fieldName)
-	}
-	return fieldNames
-}
-
 func (ws *Worksheet) Set(name string, value Value) error {
 	// TODO(pascal): create a 'change', and then commit that change, garantee
 	// that commits are atomic, and either win or lose the race by using

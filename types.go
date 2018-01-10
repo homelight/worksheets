@@ -88,3 +88,11 @@ func (def *Definition) AssignableTo(u Type) bool {
 func (def *Definition) String() string {
 	return def.name
 }
+
+func (def *Definition) FieldNames() []string {
+	fieldNames := []string{}
+	for fieldName, _ := range def.fieldsByName {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	return fieldNames
+}

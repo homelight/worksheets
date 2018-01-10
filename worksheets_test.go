@@ -343,14 +343,17 @@ func toSlice(data map[int]Value) *slice {
 	return slice
 }
 
-func (s *Zuite) TestWorksheet_FieldNames() {
+func (s *Zuite) TestWorksheetDefinition_FieldNames() {
 	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
 	require.NoError(s.T(), err)
 
 	ws := defs.MustNewWorksheet("simple")
 
-	fields := ws.FieldNames()
-	expectedFields := []string{"id", "version", "name"}
-	require.Equal(s.T(), expectedFields, fields)
+	fields := ws.Type().(*Definition).FieldNames()
+	require.Len(s.T(), fields, 3)
 
+	expectedFields := []string{"name", "id", "version"}
+	for _, field := range expectedFields {
+		require.Contains(s.T(), fields, field)
+	}
 }
