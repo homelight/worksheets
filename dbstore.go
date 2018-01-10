@@ -146,7 +146,7 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 		QueryStructs(&wsRecs); err != nil {
 		return nil, fmt.Errorf("unable to load worksheets records: %s", err)
 	} else if len(wsRecs) == 0 {
-		return nil, fmt.Errorf("unknown worksheet %s", id)
+		return nil, fmt.Errorf("unknown worksheet with id %s", id)
 	}
 
 	wsRec := wsRecs[0]
