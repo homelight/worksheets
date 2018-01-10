@@ -250,7 +250,7 @@ func (l *loader) readValue(typ Type, optValue dat.NullString) (Value, error) {
 		slice := newSliceWithIdAndLastRank(t, parts[2], lastRank)
 		l.slicesToHydrate[slice.id] = slice
 		return slice, nil
-	case *tWorksheetType:
+	case *Definition:
 		if !strings.HasPrefix(value, "*:") {
 			return nil, fmt.Errorf("unreadable value for ref %s", value)
 		}
