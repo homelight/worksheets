@@ -32,7 +32,7 @@ var _ []Type = []Type{
 	&tBoolType{},
 	&tNumberType{},
 	&tSliceType{},
-	&tWorksheetType{},
+	&Definition{},
 }
 
 func (typ *tUndefinedType) AssignableTo(_ Type) bool {
@@ -79,11 +79,12 @@ func (typ *tSliceType) String() string {
 	return fmt.Sprintf("[]%s", typ.elementType)
 }
 
-func (typ *tWorksheetType) AssignableTo(u Type) bool {
-	other, ok := u.(*tWorksheetType)
-	return ok && typ.name == other.name
+func (def *Definition) AssignableTo(u Type) bool {
+	// Since we do type resolution, pointer equality suffices to
+	// guarantee assignability.
+	return def == u
 }
 
-func (typ *tWorksheetType) String() string {
-	return typ.name
+func (def *Definition) String() string {
+	return def.name
 }

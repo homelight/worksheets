@@ -390,7 +390,7 @@ func (value *slice) String() string {
 }
 
 func (ws *Worksheet) Type() Type {
-	return &tWorksheetType{ws.def.name}
+	return ws.def
 }
 
 func (ws *Worksheet) Equal(that Value) bool {

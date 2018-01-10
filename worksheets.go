@@ -26,13 +26,13 @@ import (
 // TODO(pascal) make sure Definitions are concurrent access safe!
 type Definitions struct {
 	// defs holds all worksheet definitions
-	defs map[string]*tWorksheet
+	defs map[string]*Definition
 }
 
 // Worksheet is ... TODO(pascal): documentation binge
 type Worksheet struct {
 	// def holds the definition of this worksheet.
-	def *tWorksheet
+	def *Definition
 
 	// orig holds the worksheet data as it was when it was initially loaded.
 	orig map[int]Value
@@ -113,10 +113,12 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 			}
 
 			// Any unknown refs types?
-			if refTyp, ok := field.typ.(*tWorksheetType); ok {
-				if _, ok := defs[refTyp.name]; !ok {
+			if refTyp, ok := field.typ.(*Definition); ok {
+				refDef, ok := defs[refTyp.name]
+				if !ok {
 					return nil, fmt.Errorf("%s.%s: unknown worksheet %s referenced", def.name, field.name, refTyp.name)
 				}
+				field.typ = refDef
 			}
 		}
 	}
@@ -147,7 +149,7 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 	}, nil
 }
 
-func processOptions(defs map[string]*tWorksheet, opts ...Options) error {
+func processOptions(defs map[string]*Definition, opts ...Options) error {
 	if len(opts) == 0 {
 		return nil
 	} else if len(opts) != 1 {
@@ -169,7 +171,7 @@ func processOptions(defs map[string]*tWorksheet, opts ...Options) error {
 	return nil
 }
 
-func attachPluginsToFields(def *tWorksheet, plugins map[string]ComputedBy) error {
+func attachPluginsToFields(def *Definition, plugins map[string]ComputedBy) error {
 	for fieldName, plugin := range plugins {
 		field, ok := def.fieldsByName[fieldName]
 		if !ok {

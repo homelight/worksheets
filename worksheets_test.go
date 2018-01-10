@@ -116,6 +116,40 @@ func (s *Zuite) TestWorksheetNew_origEmpty() {
 	require.Empty(s.T(), ws.orig)
 }
 
+func (s *Zuite) TestWorksheetNew_refTypesMustBeResolved() {
+	defs := MustNewDefinitions(strings.NewReader(`
+		worksheet simple {
+			1:me     simple
+			2:myself simple
+			3:and_i  simple
+			4:not_me even_simpler
+		}
+
+		worksheet even_simpler {
+			5:not_it simple
+		}`))
+	simpleDef := defs.defs["simple"]
+	evenSimplerDef := defs.defs["even_simpler"]
+
+	cases := []struct {
+		parent *Definition
+		field  string
+		child  *Definition
+	}{
+		{simpleDef, "me", simpleDef},
+		{simpleDef, "myself", simpleDef},
+		{simpleDef, "and_i", simpleDef},
+		{simpleDef, "not_me", evenSimplerDef},
+
+		{evenSimplerDef, "not_it", simpleDef},
+	}
+	for _, ex := range cases {
+		assert.True(s.T(), ex.parent.fieldsByName[ex.field].typ == ex.child,
+			"type of field %s.%s should resolve to def of %s",
+			ex.parent, ex.field, ex.child)
+	}
+}
+
 func (s *Zuite) TestWorksheetGet_undefinedIfNoValue() {
 	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
 	require.NoError(s.T(), err)

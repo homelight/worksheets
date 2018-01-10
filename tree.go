@@ -16,7 +16,7 @@ import (
 	"fmt"
 )
 
-type tWorksheet struct {
+type Definition struct {
 	name          string
 	fields        []*tField
 	fieldsByName  map[string]*tField
@@ -27,13 +27,13 @@ type tWorksheet struct {
 	dependents map[int][]int
 }
 
-func (ws *tWorksheet) addField(field *tField) {
-	ws.fields = append(ws.fields, field)
+func (def *Definition) addField(field *tField) {
+	def.fields = append(def.fields, field)
 
 	// Clobbering due to name reuse, or index reuse, is checked by validating
 	// the tree.
-	ws.fieldsByName[field.name] = field
-	ws.fieldsByIndex[field.index] = field
+	def.fieldsByName[field.name] = field
+	def.fieldsByIndex[field.index] = field
 }
 
 type tField struct {
@@ -56,10 +56,6 @@ type tNumberType struct {
 
 type tSliceType struct {
 	elementType Type
-}
-
-type tWorksheetType struct {
-	name string
 }
 
 type tOp string

@@ -75,8 +75,8 @@ var (
 	pNumberWithDot        = newTokenPattern("number", "\\.[0-9]*")
 )
 
-func (p *parser) parseWorksheets() (map[string]*tWorksheet, error) {
-	wsDefs := make(map[string]*tWorksheet)
+func (p *parser) parseWorksheets() (map[string]*Definition, error) {
+	wsDefs := make(map[string]*Definition)
 
 	for p.peek(pWorksheet) {
 		def, err := p.parseWorksheet()
@@ -92,9 +92,8 @@ func (p *parser) parseWorksheets() (map[string]*tWorksheet, error) {
 	return wsDefs, nil
 }
 
-func (p *parser) parseWorksheet() (*tWorksheet, error) {
-	// initialize tWorksheet
-	ws := tWorksheet{
+func (p *parser) parseWorksheet() (*Definition, error) {
+	ws := Definition{
 		fieldsByName:  make(map[string]*tField),
 		fieldsByIndex: make(map[int]*tField),
 	}
@@ -546,7 +545,7 @@ func (p *parser) parseType() (Type, error) {
 			}
 			return &tNumberType{scale}, nil
 		default:
-			return &tWorksheetType{name: name}, nil
+			return &Definition{name: name}, nil
 		}
 
 	case "slice":
