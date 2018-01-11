@@ -101,3 +101,7 @@ func (t *tBinop) String() string {
 type tVar struct {
 	name string
 }
+
+type tReturn struct {
+	expr expression
+}

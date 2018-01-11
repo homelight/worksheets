@@ -67,37 +67,42 @@ func (s *Zuite) TestParser_parseWorksheet() {
 	}
 }
 
-func (s *Zuite) TestParser_parseExpressionOrExternal() {
+func (s *Zuite) TestParser_parseStatement() {
 	cases := map[string]expression{
-		`external`: &tExternal{},
-
-		`3`:         &Number{3, &tNumberType{0}},
-		`-5.12`:     &Number{-512, &tNumberType{2}},
-		`undefined`: &Undefined{},
-		`"Alice"`:   &Text{"Alice"},
-		`true`:      &Bool{true},
-
-		`foo`: &tVar{"foo"},
-
-		`3 + 4`: &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}, nil},
-		`!foo`:  &tUnop{opNot, &tVar{"foo"}},
-
-		`(true)`:          &Bool{true},
-		`(3 + 4)`:         &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}, nil},
-		`(3) + (4)`:       &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}, nil},
-		`((((3)) + (4)))`: &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}, nil},
+		`external`:    &tExternal{},
+		`return true`: &tReturn{&Bool{true}},
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))
-		actual, err := p.parseExpressionOrExternal()
+		actual, err := p.parseStatement()
 		require.NoError(s.T(), err, input)
 		require.Equal(s.T(), "", p.next(), "%s should have reached eof", input)
 		assert.Equal(s.T(), expected, actual, input)
 	}
 }
 
-func (s *Zuite) TestParser_parseExpressionAllAboutRounding() {
+func (s *Zuite) TestParser_parseExpression() {
 	cases := map[string]expression{
+		// literals
+		`3`:         &Number{3, &tNumberType{0}},
+		`-5.12`:     &Number{-512, &tNumberType{2}},
+		`undefined`: &Undefined{},
+		`"Alice"`:   &Text{"Alice"},
+		`true`:      &Bool{true},
+
+		// var
+		`foo`: &tVar{"foo"},
+
+		// unop and binop
+		`3 + 4`: &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}, nil},
+		`!foo`:  &tUnop{opNot, &tVar{"foo"}},
+
+		// parentheses
+		`(true)`:          &Bool{true},
+		`(3 + 4)`:         &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}, nil},
+		`(3) + (4)`:       &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}, nil},
+		`((((3)) + (4)))`: &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}, nil},
+
 		// single expressions being rounded
 		`3.00 round down 1`:     &tBinop{opPlus, &Number{300, &tNumberType{2}}, &Number{0, &tNumberType{0}}, &tRound{"down", 1}},
 		`3.00 * 4 round down 5`: &tBinop{opMult, &Number{300, &tNumberType{2}}, &Number{4, &tNumberType{0}}, &tRound{"down", 5}},
@@ -148,13 +153,16 @@ func (s *Zuite) TestParser_parseExpressionAllAboutRounding() {
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))
-		actual, err := p.parseExpressionOrExternal()
+		actual, err := p.parseExpression(true)
 		require.NoError(s.T(), err, input)
 		assert.Equal(s.T(), expected, actual, input)
 	}
 }
 
 func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
+	// Parsing and evaluating expressions is an easier way to write tests for
+	// operator precedence rules. It's great when things are green... And when
+	// they are not, it's key to look at the AST to debug.
 	cases := map[string]string{
 		`3`:           `3`,
 		`3 + 4`:       `7`,
@@ -210,7 +218,7 @@ func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
 	for input, output := range cases {
 		expected := MustNewValue(output)
 		p := newParser(strings.NewReader(input))
-		expr, err := p.parseExpressionOrExternal()
+		expr, err := p.parseExpression(true)
 		require.NoError(s.T(), err, input)
 		require.Equal(s.T(), "", p.next(), "%s should have reached eof", input)
 		actual, err := expr.Compute(nil)

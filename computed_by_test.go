@@ -275,7 +275,7 @@ func (s *Zuite) TestExternalComputedBy_goodComplicated() {
 func (s *Zuite) TestSimpleExpressionsInWorksheet() {
 	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {
 		1:age number[0]
-		2:age_plus_two number[0] computed_by { age + 2 }
+		2:age_plus_two number[0] computed_by { return age + 2 }
 	}`))
 	require.NoError(s.T(), err)
 
@@ -289,10 +289,10 @@ func (s *Zuite) TestCyclicEditsIfNoIdentCheck() {
 	defs, err := NewDefinitions(strings.NewReader(`worksheet cyclic_edits {
 		1:right bool
 		2:a bool computed_by {
-			b || right
+			return b || right
 		}
 		3:b bool computed_by {
-			a || !right
+			return a || !right
 		}
 	}`))
 	require.NoError(s.T(), err)

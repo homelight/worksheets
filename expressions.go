@@ -33,6 +33,7 @@ var _ = []expression{
 	&tVar{},
 	&tUnop{},
 	&tBinop{},
+	&tReturn{},
 }
 
 func (e *tExternal) Args() []string {
@@ -207,6 +208,14 @@ func (e *tBinop) Compute(ws *Worksheet) (Value, error) {
 	}
 
 	return result, nil
+}
+
+func (e *tReturn) Args() []string {
+	return e.expr.Args()
+}
+
+func (e *tReturn) Compute(ws *Worksheet) (Value, error) {
+	return e.expr.Compute(ws)
 }
 
 type ePlugin struct {
