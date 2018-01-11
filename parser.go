@@ -61,6 +61,7 @@ var (
 	pTrue       = newTokenPattern("true", "true")
 	pFalse      = newTokenPattern("false", "false")
 	pRound      = newTokenPattern("round", "round")
+	pReturn     = newTokenPattern("return", "return")
 	pUp         = newTokenPattern(string(ModeUp), string(ModeUp))
 	pDown       = newTokenPattern(string(ModeDown), string(ModeDown))
 	pHalf       = newTokenPattern(string(ModeHalf), string(ModeHalf))
@@ -178,7 +179,7 @@ func (p *parser) parseField() (*tField, error) {
 			return nil, err
 		}
 
-		computedBy, err = p.parseExpressionOrExternal()
+		computedBy, err = p.parseStatement()
 		if err != nil {
 			return nil, err
 		}
@@ -199,44 +200,33 @@ func (p *parser) parseField() (*tField, error) {
 	return f, nil
 }
 
-// parseExpressionOrExternal
+// parseStatement
 //
 //  := 'external'
-//   | parseExpression
-func (p *parser) parseExpressionOrExternal() (expression, error) {
+//   | return parseExpression
+func (p *parser) parseStatement() (expression, error) {
 	choice, ok := p.peekWithChoice([]*tokenPattern{
 		pExternal,
-		pUndefined,
-		pTrue,
-		pFalse,
-		pNumber,
-		pMinus,
-		pText,
-		pName,
-		pLparen,
-		pNot,
+		pReturn,
 	}, []string{
 		"external",
-		"expr",
-		"expr",
-		"expr",
-		"expr",
-		"expr",
-		"expr",
-		"expr",
-		"expr",
-		"expr",
+		"return",
 	})
 	if !ok {
-		return nil, fmt.Errorf("expecting expression or external")
+		return nil, fmt.Errorf("expecting statement")
 	}
 	switch choice {
 	case "external":
 		p.next()
 		return &tExternal{}, nil
 
-	case "expr":
-		return p.parseExpression(true)
+	case "return":
+		p.next()
+		expr, err := p.parseExpression(true)
+		if err != nil {
+			return nil, err
+		}
+		return &tReturn{expr}, nil
 
 	default:
 		panic(fmt.Sprintf("nextAndChoice returned '%s'", choice))
