@@ -13,6 +13,8 @@
 package worksheets
 
 import (
+	"strings"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -72,5 +74,36 @@ func (s *Zuite) TestTypeString() {
 	}
 	for typ, expected := range cases {
 		assert.Equal(s.T(), expected, typ.String(), expected)
+	}
+}
+
+func (s *Zuite) TestWorksheetDefinition_Fields() {
+	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
+	require.NoError(s.T(), err)
+
+	ws := defs.MustNewWorksheet("simple")
+
+	fields := ws.Type().(*Definition).Fields()
+	require.Len(s.T(), fields, 3)
+
+	expectedFields := []*Field{
+		{
+			index: 1,
+			name:  "name",
+			typ:   &tTextType{},
+		},
+		{
+			index: -2,
+			name:  "id",
+			typ:   &tTextType{},
+		},
+		{
+			index: -1,
+			name:  "version",
+			typ:   &tNumberType{},
+		},
+	}
+	for _, field := range expectedFields {
+		require.Contains(s.T(), fields, field)
 	}
 }

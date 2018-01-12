@@ -93,10 +93,6 @@ func (def *Definition) FieldByName(name string) *Field {
 	return def.fieldsByName[name]
 }
 
-func (def *Definition) FieldNames() []string {
-	fieldNames := []string{}
-	for fieldName, _ := range def.fieldsByName {
-		fieldNames = append(fieldNames, fieldName)
-	}
-	return fieldNames
+func (def *Definition) Fields() []*Field {
+	return def.fields
 }
