@@ -62,8 +62,12 @@ type tNumberType struct {
 	scale int
 }
 
-type tSliceType struct {
+type SliceType struct {
 	elementType Type
+}
+
+func (s *SliceType) ElementType() Type {
+	return s.elementType
 }
 
 type tOp string

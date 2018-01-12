@@ -167,11 +167,11 @@ func (s *Zuite) TestWorksheetNew_refTypesMustBeResolved() {
 	}
 
 	// slices
-	manySimplesTyp := refsInSlicesDef.fieldsByName["many_simples"].typ.(*tSliceType)
+	manySimplesTyp := refsInSlicesDef.fieldsByName["many_simples"].typ.(*SliceType)
 	assert.True(s.T(), manySimplesTyp.elementType == simpleDef)
 
-	manySimplersTyp := refsInSlicesDef.fieldsByName["many_simplers"].typ.(*tSliceType)
-	manySimplersElemTyp := manySimplersTyp.elementType.(*tSliceType)
+	manySimplersTyp := refsInSlicesDef.fieldsByName["many_simplers"].typ.(*SliceType)
+	manySimplersElemTyp := manySimplersTyp.elementType.(*SliceType)
 	assert.True(s.T(), manySimplersElemTyp.elementType == evenSimplerDef)
 }
 

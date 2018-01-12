@@ -67,7 +67,7 @@ func (s *Zuite) TestTypeString() {
 		&tTextType{}:                "text",
 		&tBoolType{}:                "bool",
 		&tNumberType{1}:             "number[1]",
-		&tSliceType{&tBoolType{}}:   "[]bool",
+		&SliceType{&tBoolType{}}:    "[]bool",
 		&Definition{name: "simple"}: "simple",
 	}
 	for typ, expected := range cases {

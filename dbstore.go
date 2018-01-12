@@ -234,7 +234,7 @@ func (l *loader) readValue(typ Type, optValue dat.NullString) (Value, error) {
 	switch t := typ.(type) {
 	case *tTextType:
 		return NewText(value), nil
-	case *tSliceType:
+	case *SliceType:
 		if !strings.HasPrefix(value, "[:") {
 			return nil, fmt.Errorf("unreadable value for slice %s", value)
 		}

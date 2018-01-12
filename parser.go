@@ -550,7 +550,7 @@ func (p *parser) parseType() (Type, error) {
 			return nil, err
 		}
 
-		return &tSliceType{elementType}, nil
+		return &SliceType{elementType}, nil
 
 	default:
 		panic(fmt.Sprintf("unknown choice %s", choice))

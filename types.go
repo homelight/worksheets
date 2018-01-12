@@ -31,7 +31,7 @@ var _ []Type = []Type{
 	&tTextType{},
 	&tBoolType{},
 	&tNumberType{},
-	&tSliceType{},
+	&SliceType{},
 	&Definition{},
 }
 
@@ -70,12 +70,12 @@ func (typ *tNumberType) String() string {
 	return fmt.Sprintf("number[%d]", typ.scale)
 }
 
-func (typ *tSliceType) AssignableTo(u Type) bool {
-	other, ok := u.(*tSliceType)
+func (typ *SliceType) AssignableTo(u Type) bool {
+	other, ok := u.(*SliceType)
 	return ok && typ.elementType.AssignableTo(other.elementType)
 }
 
-func (typ *tSliceType) String() string {
+func (typ *SliceType) String() string {
 	return fmt.Sprintf("[]%s", typ.elementType)
 }
 
