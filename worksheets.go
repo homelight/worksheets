@@ -147,8 +147,8 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 
 func resolveRefTypes(niceFieldName string, defs map[string]*Definition, locus interface{}) error {
 	switch locus.(type) {
-	case *tField:
-		field := locus.(*tField)
+	case *Field:
+		field := locus.(*Field)
 		if refTyp, ok := field.typ.(*Definition); ok {
 			refDef, ok := defs[refTyp.name]
 			if !ok {
@@ -324,7 +324,7 @@ func (ws *Worksheet) Set(name string, value Value) error {
 	return err
 }
 
-func (ws *Worksheet) set(field *tField, value Value) error {
+func (ws *Worksheet) set(field *Field, value Value) error {
 	index := field.index
 
 	// ident
@@ -432,7 +432,7 @@ func (ws *Worksheet) GetSlice(name string) ([]Value, error) {
 	return values, nil
 }
 
-func (ws *Worksheet) getSlice(name string) (*tField, *slice, error) {
+func (ws *Worksheet) getSlice(name string) (*Field, *slice, error) {
 	field, value, err := ws.get(name)
 	if err != nil {
 		return nil, nil, err
@@ -464,7 +464,7 @@ func (ws *Worksheet) Get(name string) (Value, error) {
 	return value, err
 }
 
-func (ws *Worksheet) get(name string) (*tField, Value, error) {
+func (ws *Worksheet) get(name string) (*Field, Value, error) {
 	// lookup field by name
 	field, ok := ws.def.fieldsByName[name]
 	if !ok {
