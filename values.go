@@ -78,6 +78,10 @@ type Bool struct {
 	value bool
 }
 
+func (value *Bool) Value() bool {
+	return value.value
+}
+
 func NewValue(value string) (Value, error) {
 	reader := strings.NewReader(value)
 	p := newParser(reader)
@@ -260,6 +264,10 @@ func NewText(value string) Value {
 
 func (value *Text) Type() Type {
 	return &tTextType{}
+}
+
+func (value *Text) Value() string {
+	return value.value
 }
 
 func (value *Text) String() string {
