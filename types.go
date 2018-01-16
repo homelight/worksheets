@@ -31,8 +31,16 @@ var _ []Type = []Type{
 	&tTextType{},
 	&tBoolType{},
 	&tNumberType{},
-	&tSliceType{},
+	&SliceType{},
 	&Definition{},
+}
+
+type SliceType struct {
+	elementType Type
+}
+
+func (s *SliceType) ElementType() Type {
+	return s.elementType
 }
 
 func (typ *tUndefinedType) AssignableTo(_ Type) bool {
@@ -70,12 +78,12 @@ func (typ *tNumberType) String() string {
 	return fmt.Sprintf("number[%d]", typ.scale)
 }
 
-func (typ *tSliceType) AssignableTo(u Type) bool {
-	other, ok := u.(*tSliceType)
+func (typ *SliceType) AssignableTo(u Type) bool {
+	other, ok := u.(*SliceType)
 	return ok && typ.elementType.AssignableTo(other.elementType)
 }
 
-func (typ *tSliceType) String() string {
+func (typ *SliceType) String() string {
 	return fmt.Sprintf("[]%s", typ.elementType)
 }
 
@@ -89,10 +97,10 @@ func (def *Definition) String() string {
 	return def.name
 }
 
-func (def *Definition) FieldNames() []string {
-	fieldNames := []string{}
-	for fieldName, _ := range def.fieldsByName {
-		fieldNames = append(fieldNames, fieldName)
-	}
-	return fieldNames
+func (def *Definition) FieldByName(name string) *Field {
+	return def.fieldsByName[name]
+}
+
+func (def *Definition) Fields() []*Field {
+	return def.fields
 }

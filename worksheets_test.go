@@ -167,11 +167,11 @@ func (s *Zuite) TestWorksheetNew_refTypesMustBeResolved() {
 	}
 
 	// slices
-	manySimplesTyp := refsInSlicesDef.fieldsByName["many_simples"].typ.(*tSliceType)
+	manySimplesTyp := refsInSlicesDef.fieldsByName["many_simples"].typ.(*SliceType)
 	assert.True(s.T(), manySimplesTyp.elementType == simpleDef)
 
-	manySimplersTyp := refsInSlicesDef.fieldsByName["many_simplers"].typ.(*tSliceType)
-	manySimplersElemTyp := manySimplersTyp.elementType.(*tSliceType)
+	manySimplersTyp := refsInSlicesDef.fieldsByName["many_simplers"].typ.(*SliceType)
+	manySimplersElemTyp := manySimplersTyp.elementType.(*SliceType)
 	assert.True(s.T(), manySimplersElemTyp.elementType == evenSimplerDef)
 }
 
@@ -341,19 +341,4 @@ func toSlice(data map[int]Value) *slice {
 		})
 	}
 	return slice
-}
-
-func (s *Zuite) TestWorksheetDefinition_FieldNames() {
-	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
-	require.NoError(s.T(), err)
-
-	ws := defs.MustNewWorksheet("simple")
-
-	fields := ws.Type().(*Definition).FieldNames()
-	require.Len(s.T(), fields, 3)
-
-	expectedFields := []string{"name", "id", "version"}
-	for _, field := range expectedFields {
-		require.Contains(s.T(), fields, field)
-	}
 }

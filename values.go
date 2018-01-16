@@ -306,18 +306,18 @@ func (el sliceElement) String() string {
 type slice struct {
 	id       string
 	lastRank int
-	typ      *tSliceType
+	typ      *SliceType
 	elements []sliceElement
 }
 
-func newSlice(typ *tSliceType) *slice {
+func newSlice(typ *SliceType) *slice {
 	return &slice{
 		id:  uuid.NewV4().String(),
 		typ: typ,
 	}
 }
 
-func newSliceWithIdAndLastRank(typ *tSliceType, id string, lastRank int) *slice {
+func newSliceWithIdAndLastRank(typ *SliceType, id string, lastRank int) *slice {
 	return &slice{
 		id:       id,
 		typ:      typ,

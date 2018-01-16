@@ -18,16 +18,16 @@ import (
 
 type Definition struct {
 	name          string
-	fields        []*tField
-	fieldsByName  map[string]*tField
-	fieldsByIndex map[int]*tField
+	fields        []*Field
+	fieldsByName  map[string]*Field
+	fieldsByIndex map[int]*Field
 
 	// derived values handling
 	externals  map[int]ComputedBy
 	dependents map[int][]int
 }
 
-func (def *Definition) addField(field *tField) {
+func (def *Definition) addField(field *Field) {
 	def.fields = append(def.fields, field)
 
 	// Clobbering due to name reuse, or index reuse, is checked by validating
@@ -36,12 +36,20 @@ func (def *Definition) addField(field *tField) {
 	def.fieldsByIndex[field.index] = field
 }
 
-type tField struct {
+type Field struct {
 	index      int
 	name       string
 	typ        Type
 	computedBy expression
 	// also need constrainedBy *tExpression
+}
+
+func (f *Field) Type() Type {
+	return f.typ
+}
+
+func (f *Field) Name() string {
+	return f.name
 }
 
 type tUndefinedType struct{}
@@ -52,10 +60,6 @@ type tBoolType struct{}
 
 type tNumberType struct {
 	scale int
-}
-
-type tSliceType struct {
-	elementType Type
 }
 
 type tOp string

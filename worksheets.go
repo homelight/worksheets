@@ -147,8 +147,8 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 
 func resolveRefTypes(niceFieldName string, defs map[string]*Definition, locus interface{}) error {
 	switch locus.(type) {
-	case *tField:
-		field := locus.(*tField)
+	case *Field:
+		field := locus.(*Field)
 		if refTyp, ok := field.typ.(*Definition); ok {
 			refDef, ok := defs[refTyp.name]
 			if !ok {
@@ -156,11 +156,11 @@ func resolveRefTypes(niceFieldName string, defs map[string]*Definition, locus in
 			}
 			field.typ = refDef
 		}
-		if _, ok := field.typ.(*tSliceType); ok {
+		if _, ok := field.typ.(*SliceType); ok {
 			return resolveRefTypes(niceFieldName, defs, field.typ)
 		}
-	case *tSliceType:
-		sliceType := locus.(*tSliceType)
+	case *SliceType:
+		sliceType := locus.(*SliceType)
 		if refTyp, ok := sliceType.elementType.(*Definition); ok {
 			refDef, ok := defs[refTyp.name]
 			if !ok {
@@ -316,7 +316,7 @@ func (ws *Worksheet) Set(name string, value Value) error {
 		return fmt.Errorf("cannot assign to computed field %s", name)
 	}
 
-	if _, ok := field.typ.(*tSliceType); ok {
+	if _, ok := field.typ.(*SliceType); ok {
 		return fmt.Errorf("Set on slice field %s, use Append, or Del", name)
 	}
 
@@ -324,7 +324,7 @@ func (ws *Worksheet) Set(name string, value Value) error {
 	return err
 }
 
-func (ws *Worksheet) set(field *tField, value Value) error {
+func (ws *Worksheet) set(field *Field, value Value) error {
 	index := field.index
 
 	// ident
@@ -372,7 +372,7 @@ func (ws *Worksheet) MustUnset(name string) {
 
 func (ws *Worksheet) Unset(name string) error {
 	if field, ok := ws.def.fieldsByName[name]; ok {
-		if _, ok := field.typ.(*tSliceType); ok {
+		if _, ok := field.typ.(*SliceType); ok {
 			return fmt.Errorf("Unset on slice field names, must use Del")
 		}
 	}
@@ -432,13 +432,13 @@ func (ws *Worksheet) GetSlice(name string) ([]Value, error) {
 	return values, nil
 }
 
-func (ws *Worksheet) getSlice(name string) (*tField, *slice, error) {
+func (ws *Worksheet) getSlice(name string) (*Field, *slice, error) {
 	field, value, err := ws.get(name)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if _, ok := field.typ.(*tSliceType); !ok {
+	if _, ok := field.typ.(*SliceType); !ok {
 		return field, nil, fmt.Errorf("GetSlice on non-slice field %s, use Get", name)
 	}
 
@@ -457,14 +457,14 @@ func (ws *Worksheet) Get(name string) (Value, error) {
 		return nil, err
 	}
 
-	if _, ok := field.typ.(*tSliceType); ok {
+	if _, ok := field.typ.(*SliceType); ok {
 		return nil, fmt.Errorf("Get on slice field %s, use GetSlice", name)
 	}
 
 	return value, err
 }
 
-func (ws *Worksheet) get(name string) (*tField, Value, error) {
+func (ws *Worksheet) get(name string) (*Field, Value, error) {
 	// lookup field by name
 	field, ok := ws.def.fieldsByName[name]
 	if !ok {
@@ -495,7 +495,7 @@ func (ws *Worksheet) Append(name string, element Value) error {
 	}
 	index := field.index
 
-	sliceType, ok := field.typ.(*tSliceType)
+	sliceType, ok := field.typ.(*SliceType)
 	if !ok {
 		return fmt.Errorf("Append on non-slice field %s", name)
 	}
@@ -528,7 +528,7 @@ func (ws *Worksheet) Del(name string, index int) error {
 	field, slice, err := ws.getSlice(name)
 	if err != nil {
 		if field != nil {
-			if _, ok := field.typ.(*tSliceType); !ok {
+			if _, ok := field.typ.(*SliceType); !ok {
 				return fmt.Errorf("Del on non-slice field %s", name)
 			}
 		}

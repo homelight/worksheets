@@ -95,15 +95,15 @@ func (p *parser) parseWorksheets() (map[string]*Definition, error) {
 
 func (p *parser) parseWorksheet() (*Definition, error) {
 	ws := Definition{
-		fieldsByName:  make(map[string]*tField),
-		fieldsByIndex: make(map[int]*tField),
+		fieldsByName:  make(map[string]*Field),
+		fieldsByIndex: make(map[int]*Field),
 	}
-	ws.addField(&tField{
+	ws.addField(&Field{
 		index: IndexId,
 		name:  "id",
 		typ:   &tTextType{},
 	})
-	ws.addField(&tField{
+	ws.addField(&Field{
 		index: IndexVersion,
 		name:  "version",
 		typ:   &tNumberType{},
@@ -141,7 +141,7 @@ func (p *parser) parseWorksheet() (*Definition, error) {
 	return &ws, nil
 }
 
-func (p *parser) parseField() (*tField, error) {
+func (p *parser) parseField() (*Field, error) {
 	sIndex, err := p.nextAndCheck(pIndex)
 	if err != nil {
 		return nil, err
@@ -190,7 +190,7 @@ func (p *parser) parseField() (*tField, error) {
 		}
 	}
 
-	f := &tField{
+	f := &Field{
 		index:      index,
 		name:       name,
 		typ:        typ,
@@ -550,7 +550,7 @@ func (p *parser) parseType() (Type, error) {
 			return nil, err
 		}
 
-		return &tSliceType{elementType}, nil
+		return &SliceType{elementType}, nil
 
 	default:
 		panic(fmt.Sprintf("unknown choice %s", choice))

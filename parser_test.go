@@ -271,7 +271,7 @@ func (s *Zuite) TestParser_parseType() {
 		`text`:      &tTextType{},
 		`bool`:      &tBoolType{},
 		`number[5]`: &tNumberType{5},
-		`[]bool`:    &tSliceType{&tBoolType{}},
+		`[]bool`:    &SliceType{&tBoolType{}},
 		`foobar`:    &Definition{name: "foobar"},
 	}
 	for input, expected := range cases {
