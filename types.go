@@ -35,6 +35,14 @@ var _ []Type = []Type{
 	&Definition{},
 }
 
+type SliceType struct {
+	elementType Type
+}
+
+func (s *SliceType) ElementType() Type {
+	return s.elementType
+}
+
 func (typ *tUndefinedType) AssignableTo(_ Type) bool {
 	return true
 }
