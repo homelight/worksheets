@@ -39,16 +39,19 @@ And retrieve the worksheet
 
 If you want to contribute, you can get tests running locally as follows:
 
-1. `$ cd path/to/worksheets`
-2. `$ createuser --createdb ws_user`
-3. `$ createdb --username=ws_user ws_test`
-4. `$ psql -U ws_user ws_test -f schema.sql`
-5. `$ go get -t ./...`
-6. `$ go test -v ./...` (for all tests), or `$ go test -v ./... -testify.m <TestName>` (for individual tests)
+
+	cd path/to/worksheets
+	createuser --createdb ws_user
+	createdb --username=ws_user ws_test
+	psql -U ws_user ws_test -f schema.sql
+	go get -t ./...
+	go test -v ./...
+
+or `$ go test -v ./... -testify.m <TestName>` for individual tests.
 
 To update your schema, you can simply re-run
 
-1. `$ psql -U ws_user ws_test -f schema.sql`
+	psql -U ws_user ws_test -f schema.sql
 
 # Worksheet Definition
 
@@ -69,20 +72,21 @@ The general syntax for a field is
 
 The simplest fields we have are there to store values. In the example above, both `age` and `first_name` are input fields. These can be edited and read freely.
 
-## Constrained Fields
+### Constrained Fields
 
-We can also constrain fields
+Input fields can also be constrained
 
 	3:social_security_number number[0] constrained_by {
-		100_00_0000 <= social_security_number
-		social_security_number <= 999_99_9999
+		ok := 100_00_0000 <= social_security_number
+		ok = ok && social_security_number <= 999_99_9999
+		return ok
 	}
 
 When fields are constrained, edits which do not satisfy the constraint are rejected.
 
 ## Computed Fields
 
-Instead of being input fields, we can have output fields, or computed fields
+We can also derive values from the various inputs. We call these 'output fields' or computed fields
 
 	1:date_of_birth date
 	2:age number[0] computed_by {
@@ -97,7 +101,7 @@ Computed fields are determined when their inputs changes, and then materialized.
 
 All worksheets have a unique identifier
 
-	identity text
+	id text
 
 Which is set upon creation, and cannot be ever edited.
 
@@ -105,7 +109,7 @@ Which is set upon creation, and cannot be ever edited.
 
 All worksheets are versionned, with their version number starting at `1`. The version is stored in a field present on all worksheets
 
-	version numeric(0)
+	version number[0]
 
 This `version` field is set to `1` upon creation, and incremented on every edit. Versions are used to detect concurrent edits, and abort an edit that was done on an older version of the worksheet than the one it would now be applied to. Edits are discussed in greater detail later.
 
@@ -128,6 +132,8 @@ All base types represent optional values, i.e. `bool` covers three values `true`
 As described later, all operations over base types have an interpretation with respect to `undefined`. It is often simply treated as an absorbing element such that `v OP undefined = undefined OP v = undefined`.
 
 ### Enums
+
+_TODO(pascal): We likely want to support enums in the language to allow introspection into the possible values the enum could take. Something to ponder._
 
 While the language does not have a specific support for enums, these can be described easily with the use of single field worksheets
 
@@ -232,6 +238,8 @@ For instance, consider the following example. We need to create a `map[repayment
 	}
 
 ### Time and Date
+
+_TODO(pascal) Write this out._
 
 * time as instant in time, timezone less concept, only display (because it can be lossy) needs timezone in some cases
 
