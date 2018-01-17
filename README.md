@@ -432,7 +432,7 @@ One idea would be to be able to verify 'is any of these six fields being modifie
 		}
 	}
 
-Though we'd not even need to verify whether these fields are part of the edit, it's implicit, and more 'underlying structure proof' not too. By 'nuderlying structure proof' we mean that the code assumes less about the internal structure of the fields, they could be inputs or computed fields, and we wouldn't really care.
+Though we'd not even need to verify whether these fields are part of the edit, it's implicit, and more 'underlying structure proof' not too. By 'underlying structure proof' we mean that the code assumes less about the internal structure of the fields, they could be inputs or computed fields, and we wouldn't really care.
 
 ## Preventing Unstable Edits
 
