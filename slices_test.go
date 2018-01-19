@@ -549,10 +549,20 @@ func (s *DbZuite) TestSliceUpdate_appendUndefinedAndEnsureItLoadsCorrectly() {
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		ws := defs.MustNewWorksheet("with_slice")
 		wsId = ws.Id()
-		ws.MustAppend("names", NewUndefined())
 
 		session := s.store.Open(tx)
 		return session.Save(ws)
+	})
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		ws, err := session.Load(wsId)
+		if err != nil {
+			return err
+		}
+		ws.MustAppend("names", NewUndefined())
+
+		return session.Update(ws)
 	})
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
