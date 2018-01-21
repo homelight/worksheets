@@ -413,18 +413,24 @@ func (p *persister) update(ws *Worksheet) error {
 	)
 	for index, change := range diff {
 		valuesToUpdate = append(valuesToUpdate, index)
-		if sliceBefore, ok := change.before.(*slice); ok {
-			if sliceAfter, ok := change.after.(*slice); ok {
-				if sliceBefore.id == sliceAfter.id {
-					ranksOfDels, elementsAdded := diffSlices(sliceBefore, sliceAfter)
+		if sliceAfter, ok := change.after.(*slice); ok {
+			var sliceBefore *slice
+			if actualSliceBefore, ok := change.before.(*slice); ok {
+				sliceBefore = actualSliceBefore
+			} else if _, ok := change.before.(*Undefined); ok {
+				sliceBefore = &slice{id: sliceAfter.id}
+			} else {
+				continue
+			}
+			if sliceBefore.id == sliceAfter.id {
+				ranksOfDels, elementsAdded := diffSlices(sliceBefore, sliceAfter)
 
-					sliceId := sliceBefore.id
-					if len(ranksOfDels) != 0 {
-						slicesRanksOfDels[sliceId] = ranksOfDels
-					}
-					if len(elementsAdded) != 0 {
-						slicesElementsAdded[sliceId] = elementsAdded
-					}
+				sliceId := sliceBefore.id
+				if len(ranksOfDels) != 0 {
+					slicesRanksOfDels[sliceId] = ranksOfDels
+				}
+				if len(elementsAdded) != 0 {
+					slicesElementsAdded[sliceId] = elementsAdded
 				}
 			}
 		}
