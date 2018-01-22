@@ -585,3 +585,41 @@ func (s *DbZuite) TestSliceUpdate_appendUndefinedAndEnsureItLoadsCorrectly() {
 		&Undefined{},
 	}, fresh.MustGetSlice("names"))
 }
+
+func (s *DbZuite) TestSliceUpdate_appendOntoUndefinedSlice() {
+	var wsId string
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		ws := defs.MustNewWorksheet("with_slice")
+		wsId = ws.Id()
+
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		ws, err := session.Load(wsId)
+		if err != nil {
+			return err
+		}
+		ws.MustAppend("names", NewUndefined())
+
+		return session.Update(ws)
+	})
+
+	var fresh *Worksheet
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		ws, err := session.Load(wsId)
+		if err != nil {
+			return err
+		}
+
+		fresh = ws
+		return nil
+	})
+
+	require.Equal(s.T(), []Value{
+		&Undefined{},
+	}, fresh.MustGetSlice("names"))
+}
