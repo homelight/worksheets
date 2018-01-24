@@ -107,7 +107,7 @@ func (s *Zuite) TestSliceErrors_delOnNonSliceFailsEvenIfUndefined() {
 }
 
 func (s *Zuite) TestSliceOps() {
-	slice1 := newSliceWithIdAndLastRank(&SliceType{&tTextType{}}, "a-cool-id", 0)
+	slice1 := newSliceWithIdAndLastRank(&SliceType{&TextType{}}, "a-cool-id", 0)
 
 	require.Len(s.T(), slice1.elements, 0)
 
@@ -261,7 +261,7 @@ func (s *DbZuite) TestSliceLoad() {
 	slice := fresh.data[42].(*slice)
 	require.Equal(s.T(), theSliceId, slice.id)
 	require.Equal(s.T(), 4, slice.lastRank)
-	require.Equal(s.T(), &SliceType{&tTextType{}}, slice.typ)
+	require.Equal(s.T(), &SliceType{&TextType{}}, slice.typ)
 }
 
 func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {

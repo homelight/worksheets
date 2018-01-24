@@ -52,16 +52,6 @@ func (f *Field) Name() string {
 	return f.name
 }
 
-type tUndefinedType struct{}
-
-type tTextType struct{}
-
-type tBoolType struct{}
-
-type tNumberType struct {
-	scale int
-}
-
 type tOp string
 
 const (

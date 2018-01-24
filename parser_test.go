@@ -36,7 +36,7 @@ func (s *Zuite) TestParser_parseWorksheet() {
 			field := ws.fieldsByName["full_name"]
 			require.Equal(s.T(), 42, field.index)
 			require.Equal(s.T(), "full_name", field.name)
-			require.Equal(s.T(), &tTextType{}, field.typ)
+			require.Equal(s.T(), &TextType{}, field.typ)
 			require.Equal(s.T(), ws.fieldsByName["full_name"], field)
 			require.Equal(s.T(), ws.fieldsByIndex[42], field)
 		},
@@ -47,14 +47,14 @@ func (s *Zuite) TestParser_parseWorksheet() {
 			field1 := ws.fieldsByName["full_name"]
 			require.Equal(s.T(), 42, field1.index)
 			require.Equal(s.T(), "full_name", field1.name)
-			require.Equal(s.T(), &tTextType{}, field1.typ)
+			require.Equal(s.T(), &TextType{}, field1.typ)
 			require.Equal(s.T(), ws.fieldsByName["full_name"], field1)
 			require.Equal(s.T(), ws.fieldsByIndex[42], field1)
 
 			field2 := ws.fieldsByName["happy"]
 			require.Equal(s.T(), 45, field2.index)
 			require.Equal(s.T(), "happy", field2.name)
-			require.Equal(s.T(), &tBoolType{}, field2.typ)
+			require.Equal(s.T(), &BoolType{}, field2.typ)
 			require.Equal(s.T(), ws.fieldsByName["happy"], field2)
 			require.Equal(s.T(), ws.fieldsByIndex[45], field2)
 		},
@@ -84,8 +84,8 @@ func (s *Zuite) TestParser_parseStatement() {
 func (s *Zuite) TestParser_parseExpression() {
 	cases := map[string]expression{
 		// literals
-		`3`:         &Number{3, &tNumberType{0}},
-		`-5.12`:     &Number{-512, &tNumberType{2}},
+		`3`:         &Number{3, &NumberType{0}},
+		`-5.12`:     &Number{-512, &NumberType{2}},
 		`undefined`: &Undefined{},
 		`"Alice"`:   &Text{"Alice"},
 		`true`:      &Bool{true},
@@ -94,46 +94,46 @@ func (s *Zuite) TestParser_parseExpression() {
 		`foo`: &tVar{"foo"},
 
 		// unop and binop
-		`3 + 4`: &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}, nil},
+		`3 + 4`: &tBinop{opPlus, &Number{3, &NumberType{0}}, &Number{4, &NumberType{0}}, nil},
 		`!foo`:  &tUnop{opNot, &tVar{"foo"}},
 
 		// parentheses
 		`(true)`:          &Bool{true},
-		`(3 + 4)`:         &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}, nil},
-		`(3) + (4)`:       &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}, nil},
-		`((((3)) + (4)))`: &tBinop{opPlus, &Number{3, &tNumberType{0}}, &Number{4, &tNumberType{0}}, nil},
+		`(3 + 4)`:         &tBinop{opPlus, &Number{3, &NumberType{0}}, &Number{4, &NumberType{0}}, nil},
+		`(3) + (4)`:       &tBinop{opPlus, &Number{3, &NumberType{0}}, &Number{4, &NumberType{0}}, nil},
+		`((((3)) + (4)))`: &tBinop{opPlus, &Number{3, &NumberType{0}}, &Number{4, &NumberType{0}}, nil},
 
 		// single expressions being rounded
-		`3.00 round down 1`:     &tBinop{opPlus, &Number{300, &tNumberType{2}}, &Number{0, &tNumberType{0}}, &tRound{"down", 1}},
-		`3.00 * 4 round down 5`: &tBinop{opMult, &Number{300, &tNumberType{2}}, &Number{4, &tNumberType{0}}, &tRound{"down", 5}},
+		`3.00 round down 1`:     &tBinop{opPlus, &Number{300, &NumberType{2}}, &Number{0, &NumberType{0}}, &tRound{"down", 1}},
+		`3.00 * 4 round down 5`: &tBinop{opMult, &Number{300, &NumberType{2}}, &Number{4, &NumberType{0}}, &tRound{"down", 5}},
 		`3.00 round down 5 * 4`: &tBinop{
 			opMult,
-			&tBinop{opPlus, &Number{300, &tNumberType{2}}, &Number{0, &tNumberType{0}}, &tRound{"down", 5}},
-			&Number{4, &tNumberType{0}},
+			&tBinop{opPlus, &Number{300, &NumberType{2}}, &Number{0, &NumberType{0}}, &tRound{"down", 5}},
+			&Number{4, &NumberType{0}},
 			nil,
 		},
 
 		// rounding closest to the operator it applies
 		`1 * 2 round up 4 * 3 round half 5`: &tBinop{
 			opMult,
-			&tBinop{opMult, &Number{1, &tNumberType{0}}, &Number{2, &tNumberType{0}}, &tRound{"up", 4}},
-			&Number{3, &tNumberType{0}},
+			&tBinop{opMult, &Number{1, &NumberType{0}}, &Number{2, &NumberType{0}}, &tRound{"up", 4}},
+			&Number{3, &NumberType{0}},
 			&tRound{"half", 5},
 		},
 		// same way to write the above, because 1 * 2 is the first operator to
 		// be folded, it associates with the first rounding mode
 		`1 * 2 * 3 round up 4 round half 5`: &tBinop{
 			opMult,
-			&tBinop{opMult, &Number{1, &tNumberType{0}}, &Number{2, &tNumberType{0}}, &tRound{"up", 4}},
-			&Number{3, &tNumberType{0}},
+			&tBinop{opMult, &Number{1, &NumberType{0}}, &Number{2, &NumberType{0}}, &tRound{"up", 4}},
+			&Number{3, &NumberType{0}},
 			&tRound{"half", 5},
 		},
 		// here, because 2 / 3 is the first operator to be folded, the rounding
 		// mode applies to this first
 		`1 * 2 / 3 round up 4 round half 5`: &tBinop{
 			opMult,
-			&Number{1, &tNumberType{0}},
-			&tBinop{opDiv, &Number{2, &tNumberType{0}}, &Number{3, &tNumberType{0}}, &tRound{"up", 4}},
+			&Number{1, &NumberType{0}},
+			&tBinop{opDiv, &Number{2, &NumberType{0}}, &Number{3, &NumberType{0}}, &tRound{"up", 4}},
 			&tRound{"half", 5},
 		},
 		// we move round up 4 closer to the 1 * 2 group, but since the division
@@ -141,11 +141,11 @@ func (s *Zuite) TestParser_parseExpression() {
 		// has no bearings on the * binop)
 		`1 * 2 round up 4 / 3 round half 5`: &tBinop{
 			opMult,
-			&Number{1, &tNumberType{0}},
+			&Number{1, &NumberType{0}},
 			&tBinop{
 				opDiv,
-				&tBinop{opPlus, &Number{2, &tNumberType{0}}, vZero, &tRound{"up", 4}},
-				&Number{3, &tNumberType{0}},
+				&tBinop{opPlus, &Number{2, &NumberType{0}}, vZero, &tRound{"up", 4}},
+				&Number{3, &NumberType{0}},
 				&tRound{"half", 5},
 			},
 			nil,
@@ -246,11 +246,11 @@ func (s *Zuite) TestParser_parseLiteral() {
 	cases := map[string]Value{
 		`undefined`: &Undefined{},
 
-		`1`:                  &Number{1, &tNumberType{0}},
-		`-123.67`:            &Number{-12367, &tNumberType{2}},
-		`1.000`:              &Number{1000, &tNumberType{3}},
-		`1_234.000_000_008`:  &Number{1234000000008, &tNumberType{9}},
-		`-1_234.000_000_008`: &Number{-1234000000008, &tNumberType{9}},
+		`1`:                  &Number{1, &NumberType{0}},
+		`-123.67`:            &Number{-12367, &NumberType{2}},
+		`1.000`:              &Number{1000, &NumberType{3}},
+		`1_234.000_000_008`:  &Number{1234000000008, &NumberType{9}},
+		`-1_234.000_000_008`: &Number{-1234000000008, &NumberType{9}},
 
 		`"foo"`: &Text{"foo"},
 		`"456"`: &Text{"456"},
@@ -267,11 +267,11 @@ func (s *Zuite) TestParser_parseLiteral() {
 
 func (s *Zuite) TestParser_parseType() {
 	cases := map[string]Type{
-		`undefined`: &tUndefinedType{},
-		`text`:      &tTextType{},
-		`bool`:      &tBoolType{},
-		`number[5]`: &tNumberType{5},
-		`[]bool`:    &SliceType{&tBoolType{}},
+		`undefined`: &UndefinedType{},
+		`text`:      &TextType{},
+		`bool`:      &BoolType{},
+		`number[5]`: &NumberType{5},
+		`[]bool`:    &SliceType{&BoolType{}},
 		`foobar`:    &Definition{name: "foobar"},
 	}
 	for input, expected := range cases {

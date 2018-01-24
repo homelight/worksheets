@@ -23,17 +23,17 @@ func (s *Zuite) TestTypeAssignableTo() {
 	cases := []struct {
 		left, right Type
 	}{
-		{&tUndefinedType{}, &tTextType{}},
-		{&tUndefinedType{}, &tBoolType{}},
-		{&tUndefinedType{}, &tNumberType{0}},
-		{&tUndefinedType{}, &tNumberType{1}},
+		{&UndefinedType{}, &TextType{}},
+		{&UndefinedType{}, &BoolType{}},
+		{&UndefinedType{}, &NumberType{0}},
+		{&UndefinedType{}, &NumberType{1}},
 
-		{&tTextType{}, &tTextType{}},
+		{&TextType{}, &TextType{}},
 
-		{&tBoolType{}, &tBoolType{}},
+		{&BoolType{}, &BoolType{}},
 
-		{&tNumberType{0}, &tNumberType{0}},
-		{&tNumberType{1}, &tNumberType{1}},
+		{&NumberType{0}, &NumberType{0}},
+		{&NumberType{1}, &NumberType{1}},
 	}
 	for _, ex := range cases {
 		require.True(s.T(), ex.left.AssignableTo(ex.right), "%s should be assignable to %s", ex.left, ex.right)
@@ -44,19 +44,19 @@ func (s *Zuite) TestTypeNotAssignableTo() {
 	cases := []struct {
 		left, right Type
 	}{
-		{&tTextType{}, &tUndefinedType{}},
-		{&tBoolType{}, &tUndefinedType{}},
-		{&tNumberType{0}, &tUndefinedType{}},
-		{&tNumberType{1}, &tUndefinedType{}},
+		{&TextType{}, &UndefinedType{}},
+		{&BoolType{}, &UndefinedType{}},
+		{&NumberType{0}, &UndefinedType{}},
+		{&NumberType{1}, &UndefinedType{}},
 
-		{&tBoolType{}, &tTextType{}},
-		{&tNumberType{9}, &tTextType{}},
+		{&BoolType{}, &TextType{}},
+		{&NumberType{9}, &TextType{}},
 
-		{&tTextType{}, &tBoolType{}},
-		{&tNumberType{9}, &tBoolType{}},
+		{&TextType{}, &BoolType{}},
+		{&NumberType{9}, &BoolType{}},
 
-		{&tTextType{}, &tNumberType{1}},
-		{&tNumberType{2}, &tNumberType{1}},
+		{&TextType{}, &NumberType{1}},
+		{&NumberType{2}, &NumberType{1}},
 	}
 	for _, ex := range cases {
 		assert.False(s.T(), ex.left.AssignableTo(ex.right), "%s should not be assignable to %s", ex.left, ex.right)
@@ -65,11 +65,11 @@ func (s *Zuite) TestTypeNotAssignableTo() {
 
 func (s *Zuite) TestTypeString() {
 	cases := map[Type]string{
-		&tUndefinedType{}:           "undefined",
-		&tTextType{}:                "text",
-		&tBoolType{}:                "bool",
-		&tNumberType{1}:             "number[1]",
-		&SliceType{&tBoolType{}}:    "[]bool",
+		&UndefinedType{}:            "undefined",
+		&TextType{}:                 "text",
+		&BoolType{}:                 "bool",
+		&NumberType{1}:              "number[1]",
+		&SliceType{&BoolType{}}:     "[]bool",
 		&Definition{name: "simple"}: "simple",
 	}
 	for typ, expected := range cases {
@@ -90,17 +90,17 @@ func (s *Zuite) TestWorksheetDefinition_Fields() {
 		{
 			index: 1,
 			name:  "name",
-			typ:   &tTextType{},
+			typ:   &TextType{},
 		},
 		{
 			index: -2,
 			name:  "id",
-			typ:   &tTextType{},
+			typ:   &TextType{},
 		},
 		{
 			index: -1,
 			name:  "version",
-			typ:   &tNumberType{},
+			typ:   &NumberType{},
 		},
 	}
 	for _, field := range expectedFields {
