@@ -101,12 +101,12 @@ func (p *parser) parseWorksheet() (*Definition, error) {
 	ws.addField(&Field{
 		index: IndexId,
 		name:  "id",
-		typ:   &tTextType{},
+		typ:   &TextType{},
 	})
 	ws.addField(&Field{
 		index: IndexVersion,
 		name:  "version",
-		typ:   &tNumberType{},
+		typ:   &NumberType{},
 	})
 
 	_, err := p.nextAndCheck(pWorksheet)
@@ -510,11 +510,11 @@ func (p *parser) parseType() (Type, error) {
 
 		switch name {
 		case "text":
-			return &tTextType{}, nil
+			return &TextType{}, nil
 		case "bool":
-			return &tBoolType{}, nil
+			return &BoolType{}, nil
 		case "undefined":
-			return &tUndefinedType{}, nil
+			return &UndefinedType{}, nil
 		case "number":
 			_, err := p.nextAndCheck(pLbracket)
 			if err != nil {
@@ -533,7 +533,7 @@ func (p *parser) parseType() (Type, error) {
 			if err != nil {
 				return nil, err
 			}
-			return &tNumberType{scale}, nil
+			return &NumberType{scale}, nil
 		default:
 			return &Definition{name: name}, nil
 		}
@@ -603,7 +603,7 @@ func (p *parser) parseLiteral() (Value, error) {
 		if negNumber {
 			value = -value
 		}
-		return &Number{value, &tNumberType{scale}}, nil
+		return &Number{value, &NumberType{scale}}, nil
 	}
 	if pText.re.MatchString(token) {
 		value, err := strconv.Unquote(token)

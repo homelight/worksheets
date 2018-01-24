@@ -343,7 +343,7 @@ func (ws *Worksheet) set(field *Field, value Value) error {
 	}
 
 	// store
-	if value.Type().AssignableTo(&tUndefinedType{}) {
+	if value.Type().AssignableTo(&UndefinedType{}) {
 		delete(ws.data, index)
 	} else {
 		ws.data[index] = value

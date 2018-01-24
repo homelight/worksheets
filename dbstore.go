@@ -232,7 +232,7 @@ func (l *loader) readValue(typ Type, optValue dat.NullString) (Value, error) {
 
 	value := optValue.String
 	switch t := typ.(type) {
-	case *tTextType:
+	case *TextType:
 		return NewText(value), nil
 	case *SliceType:
 		if !strings.HasPrefix(value, "[:") {

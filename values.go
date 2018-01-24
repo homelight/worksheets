@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	vZero = &Number{0, &tNumberType{0}}
+	vZero = &Number{0, &NumberType{0}}
 )
 
 // RoundingMode describes the rounding mode to be used in an operation.
@@ -65,7 +65,7 @@ type Undefined struct{}
 // Number represents a fixed decimal number.
 type Number struct {
 	value int64
-	typ   *tNumberType
+	typ   *NumberType
 }
 
 // Text represents a string.
@@ -108,7 +108,7 @@ func NewUndefined() Value {
 }
 
 func (value *Undefined) Type() Type {
-	return &tUndefinedType{}
+	return &UndefinedType{}
 }
 
 func (value *Undefined) Equal(that Value) bool {
@@ -184,19 +184,19 @@ func (left *Number) Plus(right *Number) *Number {
 	scale := left.typ.scale + right.typ.scale
 	lv, rv := left.scaleUp(scale), right.scaleUp(scale)
 
-	return &Number{lv + rv, &tNumberType{scale}}
+	return &Number{lv + rv, &NumberType{scale}}
 }
 
 func (left *Number) Minus(right *Number) *Number {
 	scale := left.typ.scale + right.typ.scale
 	lv, rv := left.scaleUp(scale), right.scaleUp(scale)
 
-	return &Number{lv - rv, &tNumberType{scale}}
+	return &Number{lv - rv, &NumberType{scale}}
 }
 
 func (left *Number) Mult(right *Number) *Number {
 	scale := left.typ.scale + right.typ.scale
-	return &Number{left.value * right.value, &tNumberType{scale}}
+	return &Number{left.value * right.value, &NumberType{scale}}
 }
 
 func (value *Number) Round(mode RoundingMode, scale int) *Number {
@@ -204,7 +204,7 @@ func (value *Number) Round(mode RoundingMode, scale int) *Number {
 		return value
 	} else if value.typ.scale < scale {
 		v := value.scaleUp(scale)
-		return &Number{v, &tNumberType{scale}}
+		return &Number{v, &NumberType{scale}}
 	}
 
 	factor := int64(1)
@@ -221,14 +221,14 @@ func (value *Number) Round(mode RoundingMode, scale int) *Number {
 
 	switch mode {
 	case ModeDown:
-		return &Number{v, &tNumberType{scale}}
+		return &Number{v, &NumberType{scale}}
 
 	case ModeUp:
 		var up int64
 		if remainder != 0 {
 			up = 1
 		}
-		return &Number{v + up, &tNumberType{scale}}
+		return &Number{v + up, &NumberType{scale}}
 
 	case ModeHalf:
 		var up int64
@@ -238,7 +238,7 @@ func (value *Number) Round(mode RoundingMode, scale int) *Number {
 		} else if remainder < 0 && remainder <= -threshold {
 			up = -1
 		}
-		return &Number{v + up, &tNumberType{scale}}
+		return &Number{v + up, &NumberType{scale}}
 	}
 
 	return value
@@ -254,7 +254,7 @@ func (left *Number) Div(right *Number, mode RoundingMode, scale int) *Number {
 
 	// scale up left, integer division, and round correctly to finalize
 	lv := left.scaleUp(tempScale)
-	temp := &Number{lv / right.value, &tNumberType{tempScale - right.typ.scale}}
+	temp := &Number{lv / right.value, &NumberType{tempScale - right.typ.scale}}
 	return temp.Round(mode, scale)
 }
 
@@ -263,7 +263,7 @@ func NewText(value string) Value {
 }
 
 func (value *Text) Type() Type {
-	return &tTextType{}
+	return &TextType{}
 }
 
 func (value *Text) Value() string {
@@ -287,7 +287,7 @@ func NewBool(value bool) Value {
 }
 
 func (value *Bool) Type() Type {
-	return &tBoolType{}
+	return &BoolType{}
 }
 
 func (value *Bool) Equal(that Value) bool {

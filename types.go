@@ -27,12 +27,61 @@ type Type interface {
 
 // Assert that all type literals are Type.
 var _ []Type = []Type{
-	&tUndefinedType{},
-	&tTextType{},
-	&tBoolType{},
-	&tNumberType{},
+	&UndefinedType{},
+	&TextType{},
+	&BoolType{},
+	&NumberType{},
 	&SliceType{},
 	&Definition{},
+}
+
+type UndefinedType struct{}
+
+func (typ *UndefinedType) AssignableTo(_ Type) bool {
+	return true
+}
+
+func (typ *UndefinedType) String() string {
+	return "undefined"
+}
+
+type TextType struct{}
+
+func (typ *TextType) AssignableTo(u Type) bool {
+	_, ok := u.(*TextType)
+	return ok
+}
+
+func (typ *TextType) String() string {
+	return "text"
+}
+
+type BoolType struct{}
+
+func (typ *BoolType) AssignableTo(u Type) bool {
+	_, ok := u.(*BoolType)
+	return ok
+}
+
+func (typ *BoolType) String() string {
+	return "bool"
+}
+
+type NumberType struct {
+	scale int
+}
+
+func (typ *NumberType) AssignableTo(u Type) bool {
+	uNum, ok := u.(*NumberType)
+	return ok && typ.scale <= uNum.scale
+}
+
+func (typ *NumberType) String() string {
+	return fmt.Sprintf("number[%d]", typ.scale)
+}
+
+func (t *NumberType) Scale() int {
+	return t.scale
 }
 
 type SliceType struct {
@@ -41,41 +90,6 @@ type SliceType struct {
 
 func (s *SliceType) ElementType() Type {
 	return s.elementType
-}
-
-func (typ *tUndefinedType) AssignableTo(_ Type) bool {
-	return true
-}
-
-func (typ *tUndefinedType) String() string {
-	return "undefined"
-}
-
-func (typ *tTextType) AssignableTo(u Type) bool {
-	_, ok := u.(*tTextType)
-	return ok
-}
-
-func (typ *tTextType) String() string {
-	return "text"
-}
-
-func (typ *tBoolType) AssignableTo(u Type) bool {
-	_, ok := u.(*tBoolType)
-	return ok
-}
-
-func (typ *tBoolType) String() string {
-	return "bool"
-}
-
-func (typ *tNumberType) AssignableTo(u Type) bool {
-	uNum, ok := u.(*tNumberType)
-	return ok && typ.scale <= uNum.scale
-}
-
-func (typ *tNumberType) String() string {
-	return fmt.Sprintf("number[%d]", typ.scale)
 }
 
 func (typ *SliceType) AssignableTo(u Type) bool {
