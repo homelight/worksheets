@@ -56,6 +56,22 @@ func (s *Zuite) TestMarshaling_sliceOfText() {
 	s.requireSameJson(expected, actual)
 }
 
+func (s *Zuite) TestMarshaling_sliceWithUndefined() {
+	ws := defs.MustNewWorksheet("all_types")
+	forciblySetId(ws, "the-id")
+	ws.MustAppend("slice_t", &Undefined{})
+	ws.MustAppend("slice_t", bob)
+
+	expected := `{"the-id":{
+		"slice_t": [null, "Bob"],
+		"id": "the-id",
+		"version":"1"
+	}}`
+	actual, err := json.Marshal(ws)
+	require.NoError(s.T(), err)
+	s.requireSameJson(expected, actual)
+}
+
 func (s *Zuite) TestMarshaling_wsRef() {
 	parent := defs.MustNewWorksheet("all_types")
 	forciblySetId(parent, "the-parent")

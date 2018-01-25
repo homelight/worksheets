@@ -81,7 +81,7 @@ func (m *marshaler) marshal(ws *Worksheet) {
 func (m *marshaler) marshalValue(b *bytes.Buffer, value Value) {
 	switch v := value.(type) {
 	case *Undefined:
-		b.WriteString(`"undefined"`)
+		b.WriteString("null")
 
 	case *Text:
 		b.WriteString(strconv.Quote(v.value))
