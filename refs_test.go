@@ -47,8 +47,8 @@ func (s *DbZuite) TestRefsSave_noDataInRefWorksheet() {
 
 	// We forcibly set both worksheets' identifiers to have a known ordering
 	// when comparing the db state.
-	ws.data[IndexId] = NewText(wsId)
-	simple.data[IndexId] = NewText(simpleId)
+	forciblySetId(ws, wsId)
+	forciblySetId(simple, simpleId)
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
@@ -126,8 +126,8 @@ func (s *DbZuite) TestRefsSave_withDataInRefWorksheet() {
 
 	// We forcibly set both worksheets' identifiers to have a known ordering
 	// when comparing the db state.
-	ws.data[IndexId] = NewText(wsId)
-	simple.data[IndexId] = NewText(simpleId)
+	forciblySetId(ws, wsId)
+	forciblySetId(simple, simpleId)
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
@@ -217,8 +217,8 @@ func (s *DbZuite) TestRefsSave_refWorksheetAlreadySaved() {
 
 	// We forcibly set both worksheets' identifiers to have a known ordering
 	// when comparing the db state.
-	ws.data[IndexId] = NewText(wsId)
-	simple.data[IndexId] = NewText(simpleId)
+	forciblySetId(ws, wsId)
+	forciblySetId(simple, simpleId)
 
 	// We first save simple.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -302,8 +302,8 @@ func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 
 	// We forcibly set both worksheets' identifiers to have a known ordering
 	// when comparing the db state.
-	ws.data[IndexId] = NewText(wsId)
-	simple.data[IndexId] = NewText(simpleId)
+	forciblySetId(ws, wsId)
+	forciblySetId(simple, simpleId)
 
 	// We first save simple.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -459,8 +459,8 @@ func (s *DbZuite) TestRefsLoad_noCycles() {
 
 		// We forcibly set both worksheets' identifiers to have a known ordering
 		// when comparing the db state.
-		ws.data[IndexId] = NewText(wsId)
-		simple.data[IndexId] = NewText(simpleId)
+		forciblySetId(ws, wsId)
+		forciblySetId(simple, simpleId)
 
 		session := s.store.Open(tx)
 		return session.Save(ws)
@@ -520,8 +520,8 @@ func (s *DbZuite) TestRefsUpdate_updateParentNoChangeInChild() {
 
 	// We forcibly set both worksheets' identifiers to have a known ordering
 	// when comparing the db state.
-	ws.data[IndexId] = NewText(wsId)
-	simple.data[IndexId] = NewText(simpleId)
+	forciblySetId(ws, wsId)
+	forciblySetId(simple, simpleId)
 
 	// Initial state.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -636,8 +636,8 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChangesInChild() {
 
 	// We forcibly set both worksheets' identifiers to have a known ordering
 	// when comparing the db state.
-	ws.data[IndexId] = NewText(wsId)
-	simple.data[IndexId] = NewText(simpleId)
+	forciblySetId(ws, wsId)
+	forciblySetId(simple, simpleId)
 
 	// Initial state.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -767,8 +767,8 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChildRequiringToBeSaved() {
 
 	// We forcibly set both worksheets' identifiers to have a known ordering
 	// when comparing the db state.
-	ws.data[IndexId] = NewText(wsId)
-	simple.data[IndexId] = NewText(simpleId)
+	forciblySetId(ws, wsId)
+	forciblySetId(simple, simpleId)
 
 	// Initial state: simple is not attached to ws, and will therefore not be
 	// persisted.

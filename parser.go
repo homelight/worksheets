@@ -67,7 +67,7 @@ var (
 	pHalf       = newTokenPattern(string(ModeHalf), string(ModeHalf))
 
 	// token patterns
-	pName  = newTokenPattern("name", "[a-z]+([a-z_]*[a-z])?")
+	pName  = newTokenPattern("name", "[a-z]+([a-z_0-9]*[a-z0-9])?")
 	pIndex = newTokenPattern("index", "[0-9]+")
 	pText  = newTokenPattern("text", "\".*\"")
 

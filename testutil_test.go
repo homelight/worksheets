@@ -50,6 +50,10 @@ worksheet with_refs_and_cycles {
 	404:point_to_me with_refs_and_cycles
 }`))
 
+func forciblySetId(ws *Worksheet, id string) {
+	ws.data[IndexId] = NewText(id)
+}
+
 type Zuite struct {
 	suite.Suite
 }
