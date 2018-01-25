@@ -14,6 +14,7 @@ package worksheets
 
 import (
 	"strings"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -279,6 +280,30 @@ func (s *Zuite) TestParser_parseType() {
 		actual, err := p.parseType()
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), expected, actual)
+	}
+}
+
+func (s *Zuite) TestTokenPatterns() {
+	cases := []struct {
+		pattern *tokenPattern
+		yes     []string
+		no      []string
+	}{
+		{
+			pName,
+			[]string{"a", "a_a", "a_0"},
+			[]string{"0", "_a", "a_"},
+		},
+	}
+	for _, ex := range cases {
+		s.T().Run(ex.pattern.name, func(t *testing.T) {
+			for _, y := range ex.yes {
+				assert.True(t, ex.pattern.re.MatchString(y))
+			}
+			for _, n := range ex.no {
+				assert.False(t, ex.pattern.re.MatchString(n))
+			}
+		})
 	}
 }
 

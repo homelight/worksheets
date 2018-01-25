@@ -410,9 +410,9 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 
 		// We forcibly set worksheets' identifiers to have a known ordering when
 		// comparing the db state.
-		ws.data[IndexId] = NewText(wsId)
-		simple1.data[IndexId] = NewText(simple1Id)
-		simple2.data[IndexId] = NewText(simple2Id)
+		forciblySetId(ws, wsId)
+		forciblySetId(simple1, simple1Id)
+		forciblySetId(simple2, simple2Id)
 
 		// We keep the slice' identifier handy for assertions.
 		wsSliceId = (ws.data[42].(*slice)).id
