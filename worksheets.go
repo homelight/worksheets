@@ -316,6 +316,16 @@ func (ws *Worksheet) Set(name string, value Value) error {
 		return fmt.Errorf("cannot assign to computed field %s", name)
 	}
 
+	if field.constrainedBy != nil {
+		prevValue := ws.MustGet(name)
+		ws.set(field, value)
+		valid, _ := field.constrainedBy.Compute(ws)
+		if !valid.(*Bool).Value() {
+			ws.set(field, prevValue)
+			return fmt.Errorf("%s not a valid value for constrained field %s", value.String(), name)
+		}
+	}
+
 	if _, ok := field.typ.(*SliceType); ok {
 		return fmt.Errorf("Set on slice field %s, use Append, or Del", name)
 	}
