@@ -33,6 +33,17 @@ worksheet simple {
 	91:age  number[0]
 }
 
+worksheet all_types {
+	1:text      text
+	2:bool      bool
+	3:num_0     number[0]
+	4:num_2     number[2]
+	5:undefined undefined
+	6:ws        all_types
+	7:slice_t   []text
+	8:slice_ws  []all_types
+}
+
 worksheet with_slice {
 	42:names []text
 }
