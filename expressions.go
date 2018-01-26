@@ -168,22 +168,22 @@ func (e *tBinop) Compute(ws *Worksheet) (Value, error) {
 	}
 
 	// numerical operations
-	nLeft, ok := left.(*Number)
-	if !ok {
-		return nil, fmt.Errorf("op on non-number")
-	}
-
 	if _, ok := left.(*Undefined); ok {
 		return left, nil
 	}
 
-	nRight, ok := right.(*Number)
+	nLeft, ok := left.(*Number)
 	if !ok {
 		return nil, fmt.Errorf("op on non-number")
 	}
 
 	if _, ok := right.(*Undefined); ok {
 		return right, nil
+	}
+
+	nRight, ok := right.(*Number)
+	if !ok {
+		return nil, fmt.Errorf("op on non-number")
 	}
 
 	var result *Number

@@ -389,15 +389,17 @@ func (p *persister) update(ws *Worksheet) error {
 
 	oldVersion := ws.Version()
 	newVersion := oldVersion + 1
-	newVersionValue := MustNewValue(strconv.Itoa(newVersion))
 
 	// diff
-	diff := func() map[int]change {
-		oldVersionValue := ws.data[IndexVersion]
-		ws.data[IndexVersion] = MustNewValue(strconv.Itoa(newVersion))
-		d := ws.diff()
-		ws.data[IndexVersion] = oldVersionValue
-		return d
+	ws.set(ws.def.fieldsByIndex[IndexVersion], &Number{int64(newVersion), &NumberType{0}})
+	diff := ws.diff()
+
+	// plan rollback
+	hasFailed := true
+	defer func() {
+		if hasFailed {
+			ws.set(ws.def.fieldsByIndex[IndexVersion], &Number{int64(oldVersion), &NumberType{0}})
+		}
 	}()
 
 	// no change, i.e. only the version would change
@@ -505,11 +507,11 @@ func (p *persister) update(ws *Worksheet) error {
 	}
 
 	// now we can update ws itself to reflect the store
-	ws.data[IndexVersion] = newVersionValue
 	for index, value := range ws.data {
 		ws.orig[index] = value
 	}
 
+	hasFailed = false
 	return nil
 }
 

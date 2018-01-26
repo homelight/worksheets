@@ -13,7 +13,9 @@
 package worksheets
 
 import (
+	"fmt"
 	"math"
+	"strings"
 
 	"github.com/stretchr/testify/require"
 	"gopkg.in/mgutz/dat.v2/sqlx-runner"
@@ -296,6 +298,91 @@ func (s *DbZuite) TestUpdateOnUpdateDoesNothing() {
 	})
 
 	require.Equal(s.T(), 2, ws.Version())
+}
+
+func (s *DbZuite) TestUpdateDetectsConcurrentModifications() {
+	ws := s.store.defs.MustNewWorksheet("simple")
+	ws.MustSet("name", alice)
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	// simulate modification performed by other
+	_, err := s.db.Exec("update worksheets set version = version + 1 where id = $1", ws.Id())
+	require.NoError(s.T(), err)
+
+	// update should fail
+	ws.MustSet("name", bob)
+	var errFromUpdate error
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		errFromUpdate = session.Update(ws)
+		return nil
+	})
+
+	require.EqualError(s.T(), errFromUpdate, "concurrent update detected")
+}
+
+func (s *DbZuite) TestSignoffPattern() {
+	defs := MustNewDefinitions(strings.NewReader(`worksheet needs_sign_off {
+		1:signoff_at number[0]
+		2:is_signedoff bool computed_by {
+			return signoff_at + 1 == version
+		}
+		3:data text
+	}`))
+
+	ws := defs.MustNewWorksheet("needs_sign_off")
+
+	// even with a fresh worksheet, is_signedoff should be set
+	require.Equal(s.T(), "1", ws.MustGet("version").String())
+	require.Equal(s.T(), "false", ws.MustGet("is_signedoff").String())
+
+	// data is inputed into the worksheet
+	ws.MustSet("data", NewText("important data 1"))
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		return session.SaveOrUpdate(ws)
+	})
+	require.Equal(s.T(), "1", ws.MustGet("version").String())
+	require.Equal(s.T(), "false", ws.MustGet("is_signedoff").String())
+
+	// worksheet is signed off
+	ws.MustSet("signoff_at", MustNewValue(fmt.Sprintf("%d", ws.Version())))
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		return session.SaveOrUpdate(ws)
+	})
+	require.Equal(s.T(), "2", ws.MustGet("version").String())
+	require.Equal(s.T(), "true", ws.MustGet("is_signedoff").String())
+
+	// data is modified
+	ws.MustSet("data", NewText("important data 2"))
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		return session.SaveOrUpdate(ws)
+	})
+	require.Equal(s.T(), "3", ws.MustGet("version").String())
+	require.Equal(s.T(), "false", ws.MustGet("is_signedoff").String())
+
+	// worksheet is signed off again, except this time, the update will fail
+	// (due to a concurrent modification)
+	ws.MustSet("signoff_at", MustNewValue(fmt.Sprintf("%d", ws.Version())))
+	_, err := s.db.Exec("update worksheets set version = version + 1 where id = $1", ws.Id())
+	require.NoError(s.T(), err)
+
+	var errFromUpdate error
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		errFromUpdate = session.SaveOrUpdate(ws)
+		return nil
+	})
+	require.EqualError(s.T(), errFromUpdate, "concurrent update detected")
+
+	// which means that is_signedoff should not have been modified
+	require.Equal(s.T(), "3", ws.MustGet("version").String())
+	require.Equal(s.T(), "false", ws.MustGet("is_signedoff").String())
 }
 
 func (s *DbZuite) MustRunTransaction(fn func(tx *runner.Tx) error) {
