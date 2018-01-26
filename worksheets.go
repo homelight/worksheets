@@ -137,6 +137,19 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 					def.dependents[dependent.index] = append(def.dependents[dependent.index], field.index)
 				}
 			}
+			if field.constrainedBy != nil {
+				fieldName := field.name
+				args := field.constrainedBy.Args()
+				if len(args) == 0 {
+					return nil, fmt.Errorf("%s.%s has no dependencies", def.name, fieldName)
+				}
+				for _, argName := range args {
+					_, ok := def.fieldsByName[argName]
+					if !ok {
+						return nil, fmt.Errorf("%s.%s references unknown arg %s", def.name, fieldName, argName)
+					}
+				}
+			}
 		}
 	}
 
@@ -316,18 +329,35 @@ func (ws *Worksheet) Set(name string, value Value) error {
 		return fmt.Errorf("cannot assign to computed field %s", name)
 	}
 
-	if field.constrainedBy != nil {
-		prevValue := ws.MustGet(name)
-		ws.set(field, value)
-		valid, _ := field.constrainedBy.Compute(ws)
-		if !valid.(*Bool).Value() {
-			ws.set(field, prevValue)
-			return fmt.Errorf("%s not a valid value for constrained field %s", value.String(), name)
-		}
-	}
-
 	if _, ok := field.typ.(*SliceType); ok {
 		return fmt.Errorf("Set on slice field %s, use Append, or Del", name)
+	}
+
+	if field.constrainedBy != nil {
+		prevValue := ws.MustGet(name)
+
+		// plan rollback
+		hasFailed := true
+		defer func() {
+			if hasFailed {
+				ws.set(field, prevValue)
+			}
+		}()
+
+		err := ws.set(field, value)
+		if err != nil {
+			return err
+		}
+		constrainedByResult, err := field.constrainedBy.Compute(ws)
+		if err != nil {
+			return err
+		}
+		if val, ok := constrainedByResult.(*Bool); ok && val.Value() == true {
+			hasFailed = false
+			return nil
+		} else {
+			return fmt.Errorf("%s not a valid value for constrained field %s", value.String(), name)
+		}
 	}
 
 	err := ws.set(field, value)

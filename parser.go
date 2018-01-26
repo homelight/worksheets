@@ -214,6 +214,9 @@ func (p *parser) parseField() (*Field, error) {
 		}
 
 	}
+	if constrainedBy != nil && computedBy != nil {
+		return nil, fmt.Errorf("cannot specify both computed_by and constrained_by for field %s", name)
+	}
 
 	f := &Field{
 		index:         index,
