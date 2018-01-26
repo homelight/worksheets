@@ -1,3 +1,4 @@
+/* comments are cool */
 worksheet some_expressions {
 	1:num number[2]
 	2:num_plus_two number[2] computed_by {

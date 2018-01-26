@@ -348,6 +348,14 @@ func (s *Zuite) TestTokenizer() {
 			"2", "|", "|",
 			"done",
 		},
+		"1// ignore my comment\n4": []string{
+			"1",
+			"4",
+		},
+		`1/* this one too */4`: []string{
+			"1",
+			"4",
+		},
 	}
 	for input, toks := range cases {
 		p := newParser(strings.NewReader(input))
