@@ -118,6 +118,19 @@ func (m *marshaler) marshalValue(b *bytes.Buffer, value Value) {
 	}
 }
 
+// WorksheetConverter is an interface used by StructScan.
+type WorksheetConverter interface {
+	// WorksheetConvert assigns a value from a worksheet field.
+	//
+	// The src value can be any defined worksheet value, e.g. text, bool,
+	// number[n], or even a worksheet value.
+	//
+	// An error should be returned if the conversion cannot be done.
+	WorksheetConvert(src Value) error
+}
+
+var worksheetConverterType = reflect.TypeOf((*WorksheetConverter)(nil)).Elem()
+
 func (ws *Worksheet) StructScan(dest interface{}) error {
 	v := reflect.ValueOf(dest)
 	if v.Type().Kind() != reflect.Ptr || v.Type().Elem().Kind() != reflect.Struct {
@@ -144,6 +157,7 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 			return fmt.Errorf("unknown field %s", tag)
 		}
 
+		// for now, no support for slices or worksheets
 		if _, ok := field.typ.(*SliceType); ok {
 			return fmt.Errorf("struct field %s: cannot StructScan slices (yet)", ft.Name)
 		}
@@ -152,7 +166,36 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 			return fmt.Errorf("struct field %s: cannot StructScan worksheets (yet)", ft.Name)
 		}
 
-		value, err := convert(ft.Name, tag, ft.Type, field.typ, ws.MustGet(tag))
+		_, wsValue, _ := ws.get(tag)
+
+		// undefined
+		if _, ok := wsValue.(*Undefined); ok {
+			if ft.Type.Kind() != reflect.Ptr {
+				return fmt.Errorf("field %s to struct field %s: undefined into not nullable", tag, ft.Name)
+			}
+			f.Set(reflect.Zero(ft.Type))
+			continue
+		}
+
+		// WorksheetConverter
+		if ft.Type.AssignableTo(worksheetConverterType) {
+			exporter := reflect.New(ft.Type.Elem()).Interface().(WorksheetConverter)
+			if err := exporter.WorksheetConvert(wsValue); err != nil {
+				return err
+			}
+			f.Set(reflect.ValueOf(exporter))
+			continue
+		} else if reflect.PtrTo(ft.Type).AssignableTo(worksheetConverterType) {
+			exporter := reflect.New(ft.Type).Interface().(WorksheetConverter)
+			if err := exporter.WorksheetConvert(wsValue); err != nil {
+				return err
+			}
+			f.Set(reflect.ValueOf(exporter).Elem())
+			continue
+		}
+
+		// default conversion
+		value, err := convert(ft.Name, tag, ft.Type, field.typ, wsValue)
 		if err != nil {
 			return err
 		}
@@ -165,9 +208,6 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 
 func convert(destFieldName, sourceFieldName string, destType reflect.Type, sourceType Type, value Value) (reflect.Value, error) {
 	if destType.Kind() == reflect.Ptr {
-		if _, ok := value.(*Undefined); ok {
-			return reflect.Zero(destType), nil
-		}
 		v, err := convert(destFieldName, sourceFieldName, destType.Elem(), sourceType, value)
 		if err != nil {
 			return v, err
@@ -178,8 +218,6 @@ func convert(destFieldName, sourceFieldName string, destType reflect.Type, sourc
 	}
 
 	switch v := value.(type) {
-	case *Undefined:
-		return reflect.Value{}, fmt.Errorf("field %s to struct field %s: undefined into not nullable", sourceFieldName, destFieldName)
 	case *Text:
 		if destType.Kind() == reflect.String {
 			return reflect.ValueOf(v.value), nil

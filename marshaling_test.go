@@ -14,6 +14,7 @@ package worksheets
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 
 	"github.com/stretchr/testify/assert"
@@ -276,6 +277,47 @@ func (s *Zuite) TestStructScan_refsNotSupported() {
 	var parent allTypesStruct
 	err := ws.StructScan(&parent)
 	require.EqualError(s.T(), err, "struct field Ws: cannot StructScan worksheets (yet)")
+}
+
+type special struct {
+	helloText string
+}
+
+var _ WorksheetConverter = &special{}
+
+func (sp *special) WorksheetConvert(value Value) error {
+	if text, ok := value.(*Text); ok {
+		sp.helloText = "hello, " + text.value
+		return nil
+	}
+
+	return fmt.Errorf("can only convert text, was %s", value)
+}
+
+func (s *Zuite) TestStructScan_worksheetConverter() {
+	ws := defs.MustNewWorksheet("all_types")
+	ws.MustSet("text", NewText("world!"))
+
+	var data struct {
+		Special    special  `ws:"text"`
+		SpecialPtr *special `ws:"text"`
+	}
+	err := ws.StructScan(&data)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), "hello, world!", data.Special.helloText)
+	require.NotNil(s.T(), data.SpecialPtr)
+	require.Equal(s.T(), "hello, world!", data.SpecialPtr.helloText)
+}
+
+func (s *Zuite) TestStructScan_worksheetConverterWithUndefined() {
+	ws := defs.MustNewWorksheet("all_types")
+
+	var data struct {
+		SpecialPtr *special `ws:"text"`
+	}
+	err := ws.StructScan(&data)
+	require.NoError(s.T(), err)
+	require.Nil(s.T(), data.SpecialPtr)
 }
 
 var (
