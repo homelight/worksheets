@@ -16,6 +16,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 )
 
@@ -115,4 +116,175 @@ func (m *marshaler) marshalValue(b *bytes.Buffer, value Value) {
 	default:
 		panic(fmt.Sprintf("unexpected %v of %T", value, value))
 	}
+}
+
+func (ws *Worksheet) StructScan(dest interface{}) error {
+	v := reflect.ValueOf(dest)
+	if v.Type().Kind() != reflect.Ptr || v.Type().Elem().Kind() != reflect.Struct {
+		return fmt.Errorf("dest must be a *struct")
+	}
+
+	v = v.Elem()
+	t := v.Type()
+	for i := 0; i < t.NumField(); i++ {
+		f := v.Field(i)
+		ft := t.Field(i)
+		tag, ok := ft.Tag.Lookup("ws")
+
+		if !ok {
+			continue
+		}
+
+		if tag == "" {
+			return fmt.Errorf("struct field %s: cannot have empty tag name", ft.Name)
+		}
+
+		field, ok := ws.def.fieldsByName[tag]
+		if !ok {
+			return fmt.Errorf("unknown field %s", tag)
+		}
+
+		if _, ok := field.typ.(*SliceType); ok {
+			return fmt.Errorf("struct field %s: cannot StructScan slices (yet)", ft.Name)
+		}
+
+		if _, ok := field.typ.(*Definition); ok {
+			return fmt.Errorf("struct field %s: cannot StructScan worksheets (yet)", ft.Name)
+		}
+
+		value, err := convert(ft.Name, tag, ft.Type, field.typ, ws.MustGet(tag))
+		if err != nil {
+			return err
+		}
+
+		f.Set(value)
+	}
+
+	return nil
+}
+
+func convert(destFieldName, sourceFieldName string, destType reflect.Type, sourceType Type, value Value) (reflect.Value, error) {
+	if destType.Kind() == reflect.Ptr {
+		if _, ok := value.(*Undefined); ok {
+			return reflect.Zero(destType), nil
+		}
+		v, err := convert(destFieldName, sourceFieldName, destType.Elem(), sourceType, value)
+		if err != nil {
+			return v, err
+		}
+		locus := reflect.New(destType.Elem())
+		locus.Elem().Set(v)
+		return locus, nil
+	}
+
+	switch v := value.(type) {
+	case *Undefined:
+		return reflect.Value{}, fmt.Errorf("field %s to struct field %s: undefined into not nullable", sourceFieldName, destFieldName)
+	case *Text:
+		if destType.Kind() == reflect.String {
+			return reflect.ValueOf(v.value), nil
+		}
+	case *Bool:
+		if destType.Kind() == reflect.Bool {
+			return reflect.ValueOf(v.value), nil
+		} else if destType.Kind() == reflect.String {
+			return reflect.ValueOf(v.String()), nil
+		}
+	case *Number:
+		// to string
+		if destType.Kind() == reflect.String {
+			return reflect.ValueOf(v.String()), nil
+		}
+
+		// to floats
+		if destType.Kind() == reflect.Float32 {
+			if f, err := strconv.ParseFloat(v.String(), 32); err == nil {
+				return reflect.ValueOf(float32(f)), nil
+			}
+			return valueOutOfRange(destFieldName, sourceFieldName, destType, value)
+		} else if destType.Kind() == reflect.Float64 {
+			if f, err := strconv.ParseFloat(v.String(), 64); err == nil {
+				return reflect.ValueOf(f), nil
+			}
+			return valueOutOfRange(destFieldName, sourceFieldName, destType, value)
+		}
+
+		// to ints
+		if t, ok := sourceType.(*NumberType); ok && t.scale == 0 {
+			var (
+				i   int64
+				err error
+			)
+			switch destType.Kind() {
+			case reflect.Int:
+				if i, err = strconv.ParseInt(v.String(), 0, 0); err == nil {
+					return reflect.ValueOf(int(i)), nil
+				}
+			case reflect.Int8:
+				if i, err = strconv.ParseInt(v.String(), 0, 8); err == nil {
+					return reflect.ValueOf(int8(i)), nil
+				}
+			case reflect.Int16:
+				if i, err = strconv.ParseInt(v.String(), 0, 16); err == nil {
+					return reflect.ValueOf(int16(i)), nil
+				}
+			case reflect.Int32:
+				if i, err = strconv.ParseInt(v.String(), 0, 32); err == nil {
+					return reflect.ValueOf(int32(i)), nil
+				}
+			case reflect.Int64:
+				if i, err := strconv.ParseInt(v.String(), 0, 64); err == nil {
+					return reflect.ValueOf(int64(i)), nil
+				}
+			}
+			if err != nil {
+				return valueOutOfRange(destFieldName, sourceFieldName, destType, value)
+			}
+		}
+
+		// to uints
+		if t, ok := sourceType.(*NumberType); ok && t.scale == 0 {
+			if v.value < 0 {
+				return valueOutOfRange(destFieldName, sourceFieldName, destType, value)
+			}
+
+			var (
+				i   uint64
+				err error
+			)
+			switch destType.Kind() {
+			case reflect.Uint:
+				if i, err = strconv.ParseUint(v.String(), 0, 0); err == nil {
+					return reflect.ValueOf(uint(i)), nil
+				}
+			case reflect.Uint8:
+				if i, err = strconv.ParseUint(v.String(), 0, 8); err == nil {
+					return reflect.ValueOf(uint8(i)), nil
+				}
+			case reflect.Uint16:
+				if i, err = strconv.ParseUint(v.String(), 0, 16); err == nil {
+					return reflect.ValueOf(uint16(i)), nil
+				}
+			case reflect.Uint32:
+				if i, err = strconv.ParseUint(v.String(), 0, 32); err == nil {
+					return reflect.ValueOf(uint32(i)), nil
+				}
+			case reflect.Uint64:
+				if i, err := strconv.ParseUint(v.String(), 0, 64); err == nil {
+					return reflect.ValueOf(uint64(i)), nil
+				}
+			}
+			if err != nil {
+				return valueOutOfRange(destFieldName, sourceFieldName, destType, value)
+			}
+		}
+	default:
+		panic(fmt.Sprintf("unexpected destType=%v, value=%v", destType, value))
+	}
+
+	return reflect.Value{}, fmt.Errorf("field %s to struct field %s: cannot convert %s to %s", sourceFieldName, destFieldName, value.Type(), destType)
+}
+
+func valueOutOfRange(destFieldName, sourceFieldName string, destType reflect.Type, value Value) (reflect.Value, error) {
+	return reflect.Value{}, fmt.Errorf("field %s to struct field %s: cannot convert %s to %s, value out of range", sourceFieldName, destFieldName, value.Type(), destType)
 }
