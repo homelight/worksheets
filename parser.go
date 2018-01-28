@@ -590,7 +590,7 @@ func (p *parser) parseLiteral() (Value, error) {
 			token = token + strings.Replace(addToken, "_", "", -1)
 		}
 		dot := strings.Index(token, ".")
-		value, err := strconv.ParseInt(strings.Replace(token, ".", "", 1), 10, 64)
+		value, err := strconv.ParseInt("-"+strings.Replace(token, ".", "", 1), 10, 64)
 		if err != nil {
 			return nil, err
 		}
@@ -600,7 +600,7 @@ func (p *parser) parseLiteral() (Value, error) {
 		} else {
 			scale = len(token) - dot - 1
 		}
-		if negNumber {
+		if !negNumber {
 			value = -value
 		}
 		return &Number{value, &NumberType{scale}}, nil
