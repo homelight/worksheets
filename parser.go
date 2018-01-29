@@ -38,33 +38,34 @@ func newParser(src io.Reader) *parser {
 
 var (
 	// tokens
-	pLacco      = newTokenPattern("{", "\\{")
-	pRacco      = newTokenPattern("}", "\\}")
-	pLparen     = newTokenPattern("(", "\\(")
-	pRparen     = newTokenPattern(")", "\\)")
-	pLbracket   = newTokenPattern("[", "\\[")
-	pRbracket   = newTokenPattern("]", "\\]")
-	pColon      = newTokenPattern(":", "\\:")
-	pPlus       = newTokenPattern("+", "\\+")
-	pMinus      = newTokenPattern("-", "\\-")
-	pMult       = newTokenPattern("*", "\\*")
-	pDiv        = newTokenPattern("/", "\\/")
-	pNot        = newTokenPattern("!", "\\!")
-	pEqual      = newTokenPattern("==", "\\=\\=")
-	pNotEqual   = newTokenPattern("!=", "\\!\\=")
-	pAnd        = newTokenPattern("&&", "\\&\\&")
-	pOr         = newTokenPattern("||", "\\|\\|")
-	pWorksheet  = newTokenPattern("worksheet", "worksheet")
-	pComputedBy = newTokenPattern("computed_by", "computed_by")
-	pExternal   = newTokenPattern("external", "external")
-	pUndefined  = newTokenPattern("undefined", "undefined")
-	pTrue       = newTokenPattern("true", "true")
-	pFalse      = newTokenPattern("false", "false")
-	pRound      = newTokenPattern("round", "round")
-	pReturn     = newTokenPattern("return", "return")
-	pUp         = newTokenPattern(string(ModeUp), string(ModeUp))
-	pDown       = newTokenPattern(string(ModeDown), string(ModeDown))
-	pHalf       = newTokenPattern(string(ModeHalf), string(ModeHalf))
+	pLacco         = newTokenPattern("{", "\\{")
+	pRacco         = newTokenPattern("}", "\\}")
+	pLparen        = newTokenPattern("(", "\\(")
+	pRparen        = newTokenPattern(")", "\\)")
+	pLbracket      = newTokenPattern("[", "\\[")
+	pRbracket      = newTokenPattern("]", "\\]")
+	pColon         = newTokenPattern(":", "\\:")
+	pPlus          = newTokenPattern("+", "\\+")
+	pMinus         = newTokenPattern("-", "\\-")
+	pMult          = newTokenPattern("*", "\\*")
+	pDiv           = newTokenPattern("/", "\\/")
+	pNot           = newTokenPattern("!", "\\!")
+	pEqual         = newTokenPattern("==", "\\=\\=")
+	pNotEqual      = newTokenPattern("!=", "\\!\\=")
+	pAnd           = newTokenPattern("&&", "\\&\\&")
+	pOr            = newTokenPattern("||", "\\|\\|")
+	pWorksheet     = newTokenPattern("worksheet", "worksheet")
+	pConstrainedBy = newTokenPattern("constrained_by", "constrained_by")
+	pComputedBy    = newTokenPattern("computed_by", "computed_by")
+	pExternal      = newTokenPattern("external", "external")
+	pUndefined     = newTokenPattern("undefined", "undefined")
+	pTrue          = newTokenPattern("true", "true")
+	pFalse         = newTokenPattern("false", "false")
+	pRound         = newTokenPattern("round", "round")
+	pReturn        = newTokenPattern("return", "return")
+	pUp            = newTokenPattern(string(ModeUp), string(ModeUp))
+	pDown          = newTokenPattern(string(ModeDown), string(ModeDown))
+	pHalf          = newTokenPattern(string(ModeHalf), string(ModeHalf))
 
 	// token patterns
 	pName  = newTokenPattern("name", "[a-z]+([a-z_0-9]*[a-z0-9])?")
@@ -166,20 +167,30 @@ func (p *parser) parseField() (*Field, error) {
 	if err != nil {
 		return nil, err
 	}
+	f := &Field{
+		index: index,
+		name:  name,
+		typ:   typ,
+	}
 
-	var computedBy expression
-	if p.peek(pComputedBy) {
-		_, err = p.nextAndCheck(pComputedBy)
-		if err != nil {
-			return nil, err
-		}
+	choice, ok := p.peekWithChoice([]*tokenPattern{
+		pComputedBy,
+		pConstrainedBy,
+	}, []string{
+		"computed",
+		"constrained",
+	})
+
+	if ok {
+		p.next()
 
 		_, err = p.nextAndCheck(pLacco)
 		if err != nil {
 			return nil, err
 		}
 
-		computedBy, err = p.parseStatement()
+		var expr expression
+		expr, err = p.parseStatement()
 		if err != nil {
 			return nil, err
 		}
@@ -188,16 +199,17 @@ func (p *parser) parseField() (*Field, error) {
 		if err != nil {
 			return nil, err
 		}
-	}
 
-	f := &Field{
-		index:      index,
-		name:       name,
-		typ:        typ,
-		computedBy: computedBy,
+		switch choice {
+		case "computed":
+			f.computedBy = expr
+		case "constrained":
+			f.constrainedBy = expr
+		}
 	}
 
 	return f, nil
+
 }
 
 // parseStatement

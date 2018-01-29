@@ -37,11 +37,11 @@ func (def *Definition) addField(field *Field) {
 }
 
 type Field struct {
-	index      int
-	name       string
-	typ        Type
-	computedBy expression
-	// also need constrainedBy *tExpression
+	index         int
+	name          string
+	typ           Type
+	computedBy    expression
+	constrainedBy expression
 }
 
 func (f *Field) Type() Type {

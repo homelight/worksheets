@@ -84,6 +84,24 @@ func (s *Zuite) TestNewDefinitionsErrors() {
 		`worksheet refs_to_worksheet {
 			89:refs_here [][]some_other_worksheet
 		}`: `refs_to_worksheet.refs_here: unknown worksheet some_other_worksheet referenced`,
+
+		`worksheet constrained_and_computed {
+			1:age number[0]
+			69:some_field text constrained_by { return true } computed_by { return age + 2 }
+		}`: `expected index, found computed_by`,
+
+		`worksheet computed_and_constrained {
+			1:age number[0]
+			69:some_field text computed_by { return age + 2 } constrained_by { return true }
+		}`: `expected index, found constrained_by`,
+
+		`worksheet constrained_invalid_arg {
+			69:some_field text constrained_by { return not_a_field == "Alex" }
+		}`: `constrained_invalid_arg.some_field references unknown arg not_a_field`,
+
+		`worksheet constrained_no_arg {
+			69:some_field text constrained_by { return true }
+		}`: `constrained_no_arg.some_field has no dependencies`,
 	}
 	for input, msg := range cases {
 		_, err := NewDefinitions(strings.NewReader(input))

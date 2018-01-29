@@ -119,13 +119,19 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 		}
 	}
 
-	// Resolve computed_by dependencies
+	// Resolve computed_by & constrained_by dependencies
 	for _, def := range defs {
 		def.dependents = make(map[int][]int)
 		for _, field := range def.fields {
-			if field.computedBy != nil {
+
+			fieldTrigger := field.computedBy
+			if fieldTrigger == nil {
+				fieldTrigger = field.constrainedBy
+			}
+
+			if fieldTrigger != nil {
 				fieldName := field.name
-				args := field.computedBy.Args()
+				args := fieldTrigger.Args()
 				if len(args) == 0 {
 					return nil, fmt.Errorf("%s.%s has no dependencies", def.name, fieldName)
 				}
@@ -134,7 +140,10 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 					if !ok {
 						return nil, fmt.Errorf("%s.%s references unknown arg %s", def.name, fieldName, argName)
 					}
-					def.dependents[dependent.index] = append(def.dependents[dependent.index], field.index)
+					if field.computedBy != nil {
+						// only update the graph for computed fields; constrained fields don't need to be recalculated when args are set, only upon setting a new value
+						def.dependents[dependent.index] = append(def.dependents[dependent.index], field.index)
+					}
 				}
 			}
 		}
@@ -203,9 +212,14 @@ func attachPluginsToFields(def *Definition, plugins map[string]ComputedBy) error
 			return fmt.Errorf("plugins: unknown field %s.%s", def.name, fieldName)
 		}
 		if _, ok := field.computedBy.(*tExternal); !ok {
-			return fmt.Errorf("plugins: field %s.%s not externally defined", def.name, fieldName)
+			if _, ok := field.constrainedBy.(*tExternal); !ok {
+				return fmt.Errorf("plugins: field %s.%s not externally defined", def.name, fieldName)
+			} else {
+				field.constrainedBy = &ePlugin{plugin}
+			}
+		} else {
+			field.computedBy = &ePlugin{plugin}
 		}
-		field.computedBy = &ePlugin{plugin}
 	}
 	return nil
 }
@@ -318,6 +332,33 @@ func (ws *Worksheet) Set(name string, value Value) error {
 
 	if _, ok := field.typ.(*SliceType); ok {
 		return fmt.Errorf("Set on slice field %s, use Append, or Del", name)
+	}
+
+	if field.constrainedBy != nil {
+		prevValue := ws.MustGet(name)
+
+		// plan rollback
+		hasFailed := true
+		defer func() {
+			if hasFailed {
+				ws.set(field, prevValue)
+			}
+		}()
+
+		err := ws.set(field, value)
+		if err != nil {
+			return err
+		}
+		constrainedByResult, err := field.constrainedBy.Compute(ws)
+		if err != nil {
+			return err
+		}
+		if val, ok := constrainedByResult.(*Bool); ok && val.value {
+			hasFailed = false
+			return nil
+		} else {
+			return fmt.Errorf("%s not a valid value for constrained field %s", value.String(), name)
+		}
 	}
 
 	err := ws.set(field, value)
