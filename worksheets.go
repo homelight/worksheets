@@ -212,9 +212,14 @@ func attachPluginsToFields(def *Definition, plugins map[string]ComputedBy) error
 			return fmt.Errorf("plugins: unknown field %s.%s", def.name, fieldName)
 		}
 		if _, ok := field.computedBy.(*tExternal); !ok {
-			return fmt.Errorf("plugins: field %s.%s not externally defined", def.name, fieldName)
+			if _, ok := field.constrainedBy.(*tExternal); !ok {
+				return fmt.Errorf("plugins: field %s.%s not externally defined", def.name, fieldName)
+			} else {
+				field.constrainedBy = &ePlugin{plugin}
+			}
+		} else {
+			field.computedBy = &ePlugin{plugin}
 		}
-		field.computedBy = &ePlugin{plugin}
 	}
 	return nil
 }
