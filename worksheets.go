@@ -119,13 +119,19 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 		}
 	}
 
-	// Resolve computed_by dependencies
+	// Resolve computed_by & constrained_by dependencies
 	for _, def := range defs {
 		def.dependents = make(map[int][]int)
 		for _, field := range def.fields {
-			if field.computedBy != nil {
+
+			fieldTrigger := field.computedBy
+			if fieldTrigger == nil {
+				fieldTrigger = field.constrainedBy
+			}
+
+			if fieldTrigger != nil {
 				fieldName := field.name
-				args := field.computedBy.Args()
+				args := fieldTrigger.Args()
 				if len(args) == 0 {
 					return nil, fmt.Errorf("%s.%s has no dependencies", def.name, fieldName)
 				}
@@ -134,19 +140,9 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 					if !ok {
 						return nil, fmt.Errorf("%s.%s references unknown arg %s", def.name, fieldName, argName)
 					}
-					def.dependents[dependent.index] = append(def.dependents[dependent.index], field.index)
-				}
-			}
-			if field.constrainedBy != nil {
-				fieldName := field.name
-				args := field.constrainedBy.Args()
-				if len(args) == 0 {
-					return nil, fmt.Errorf("%s.%s has no dependencies", def.name, fieldName)
-				}
-				for _, argName := range args {
-					_, ok := def.fieldsByName[argName]
-					if !ok {
-						return nil, fmt.Errorf("%s.%s references unknown arg %s", def.name, fieldName, argName)
+					if field.computedBy != nil {
+						// only update the graph for computed fields; constrained fields don't need to be recalculated when args are set, only upon setting a new value
+						def.dependents[dependent.index] = append(def.dependents[dependent.index], field.index)
 					}
 				}
 			}
