@@ -16,7 +16,7 @@ func (s *Zuite) TestWorksheet_constrainedBy() {
 
 	require.False(s.T(), ws.MustIsSet("name"))
 	err = ws.Set("name", NewText("Alice"))
-	require.Equal(s.T(), "\"Alice\" not a valid value for constrained field name", err.Error())
+	require.Equal(s.T(), `"Alice" not a valid value for constrained field name`, err.Error())
 	require.False(s.T(), ws.MustIsSet("name"))
 
 	err = ws.Set("name", NewText("Alex"))
