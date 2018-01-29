@@ -93,7 +93,7 @@ func (s *Zuite) TestNewDefinitionsErrors() {
 		`worksheet computed_and_constrained {
 			1:age number[0]
 			69:some_field text computed_by { return age + 2 } constrained_by { return true }
-		}`: `cannot specify both computed_by and constrained_by for field some_field`,
+		}`: `expected index, found constrained_by`,
 
 		`worksheet constrained_invalid_arg {
 			69:some_field text constrained_by { return not_a_field == "Alex" }

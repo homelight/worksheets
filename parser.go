@@ -167,66 +167,49 @@ func (p *parser) parseField() (*Field, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	var computedBy expression
-	if p.peek(pComputedBy) {
-		_, err = p.nextAndCheck(pComputedBy)
-		if err != nil {
-			return nil, err
-		}
-
-		_, err = p.nextAndCheck(pLacco)
-		if err != nil {
-			return nil, err
-		}
-
-		computedBy, err = p.parseStatement()
-		if err != nil {
-			return nil, err
-		}
-
-		_, err = p.nextAndCheck(pRacco)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	var constrainedBy expression
-	if p.peek(pConstrainedBy) {
-		_, err = p.nextAndCheck(pConstrainedBy)
-		if err != nil {
-			return nil, err
-		}
-
-		_, err = p.nextAndCheck(pLacco)
-		if err != nil {
-			return nil, err
-		}
-
-		constrainedBy, err = p.parseStatement()
-		if err != nil {
-			return nil, err
-		}
-
-		_, err = p.nextAndCheck(pRacco)
-		if err != nil {
-			return nil, err
-		}
-
-	}
-	if constrainedBy != nil && computedBy != nil {
-		return nil, fmt.Errorf("cannot specify both computed_by and constrained_by for field %s", name)
-	}
-
 	f := &Field{
-		index:         index,
-		name:          name,
-		typ:           typ,
-		computedBy:    computedBy,
-		constrainedBy: constrainedBy,
+		index: index,
+		name:  name,
+		typ:   typ,
+	}
+
+	choice, ok := p.peekWithChoice([]*tokenPattern{
+		pComputedBy,
+		pConstrainedBy,
+	}, []string{
+		"computed",
+		"constrained",
+	})
+
+	if ok {
+		p.next()
+
+		_, err = p.nextAndCheck(pLacco)
+		if err != nil {
+			return nil, err
+		}
+
+		var expr expression
+		expr, err = p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = p.nextAndCheck(pRacco)
+		if err != nil {
+			return nil, err
+		}
+
+		switch choice {
+		case "computed":
+			f.computedBy = expr
+		case "constrained":
+			f.constrainedBy = expr
+		}
 	}
 
 	return f, nil
+
 }
 
 // parseStatement
