@@ -352,7 +352,7 @@ func (ws *Worksheet) Set(name string, value Value) error {
 		if err != nil {
 			return err
 		}
-		if val, ok := constrainedByResult.(*Bool); ok && val.Value() == true {
+		if val, ok := constrainedByResult.(*Bool); ok && val.value {
 			hasFailed = false
 			return nil
 		} else {
