@@ -32,7 +32,7 @@ func (s *Zuite) TestRefsExample() {
 func (s *Zuite) TestRefsErrors_setWithWrongWorksheet() {
 	ws := defs.MustNewWorksheet("with_refs")
 	err := ws.Set("simple", ws)
-	require.EqualError(s.T(), err, "cannot assign value of type with_refs to field of type simple")
+	require.EqualError(s.T(), err, "cannot assign value of type with_refs to field simple of type simple")
 }
 
 func (s *DbZuite) TestRefsSave_noDataInRefWorksheet() {

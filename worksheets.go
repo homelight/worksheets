@@ -380,7 +380,7 @@ func (ws *Worksheet) set(field *Field, value Value) error {
 	// type check
 	litType := value.Type()
 	if ok := litType.AssignableTo(field.typ); !ok {
-		return fmt.Errorf("cannot assign value of type %s to field of type %s", litType, field.typ)
+		return fmt.Errorf("cannot assign value of type %s to field %s of type %s", litType, field.name, field.typ)
 	}
 
 	// store
