@@ -133,10 +133,21 @@ func (value *Number) Equal(that Value) bool {
 }
 
 func (value *Number) String() string {
-	s := strconv.FormatInt(value.value, 10)
 	scale := value.typ.scale
 	if scale == 0 {
-		return s
+		return strconv.FormatInt(value.value, 10)
+	}
+
+	var (
+		s        string
+		negative bool
+	)
+
+	if value.value < 0 {
+		s = strconv.FormatInt(-value.value, 10)
+		negative = true
+	} else {
+		s = strconv.FormatInt(value.value, 10)
 	}
 
 	// We count down from most significant digit in the number we are generating.
@@ -150,6 +161,9 @@ func (value *Number) String() string {
 		l      = len(s)
 		buffer bytes.Buffer
 	)
+	if negative {
+		buffer.WriteRune('-')
+	}
 	if l > i {
 		i = l
 	}
