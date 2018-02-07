@@ -34,6 +34,8 @@ func (s *Zuite) TestValueString() {
 		&Number{123, &NumberType{2}}:   "1.23",
 		&Number{123, &NumberType{3}}:   "0.123",
 		&Number{123, &NumberType{4}}:   "0.0123",
+		&Number{-4, &NumberType{0}}:    "-4",
+		&Number{-4, &NumberType{2}}:    "-0.04",
 
 		&slice{elements: []sliceElement{
 			{value: &Number{123, &NumberType{1}}},
