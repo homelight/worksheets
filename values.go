@@ -133,10 +133,21 @@ func (value *Number) Equal(that Value) bool {
 }
 
 func (value *Number) String() string {
-	s := strconv.FormatInt(value.value, 10)
 	scale := value.typ.scale
 	if scale == 0 {
-		return s
+		return strconv.FormatInt(value.value, 10)
+	}
+
+	var (
+		s      string
+		buffer bytes.Buffer
+	)
+
+	if value.value < 0 {
+		s = strconv.FormatInt(-value.value, 10)
+		buffer.WriteRune('-')
+	} else {
+		s = strconv.FormatInt(value.value, 10)
 	}
 
 	// We count down from most significant digit in the number we are generating.
@@ -146,9 +157,8 @@ func (value *Number) String() string {
 	// or introducing 0s as necessery. We also add the period at the appropriate
 	// place while iterating.
 	var (
-		i      = scale + 1
-		l      = len(s)
-		buffer bytes.Buffer
+		i = scale + 1
+		l = len(s)
 	)
 	if l > i {
 		i = l
@@ -164,6 +174,7 @@ func (value *Number) String() string {
 		}
 		i--
 	}
+
 	return buffer.String()
 }
 
