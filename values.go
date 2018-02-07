@@ -181,14 +181,20 @@ func (value *Number) scaleUp(scale int) int64 {
 }
 
 func (left *Number) Plus(right *Number) *Number {
-	scale := left.typ.scale + right.typ.scale
+	scale := left.typ.scale
+	if scale < right.typ.scale {
+		scale = right.typ.scale
+	}
 	lv, rv := left.scaleUp(scale), right.scaleUp(scale)
 
 	return &Number{lv + rv, &NumberType{scale}}
 }
 
 func (left *Number) Minus(right *Number) *Number {
-	scale := left.typ.scale + right.typ.scale
+	scale := left.typ.scale
+	if scale < right.typ.scale {
+		scale = right.typ.scale
+	}
 	lv, rv := left.scaleUp(scale), right.scaleUp(scale)
 
 	return &Number{lv - rv, &NumberType{scale}}

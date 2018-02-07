@@ -125,6 +125,11 @@ func (s *Zuite) TestNumber_Plus() {
 			right:    MustNewValue("3").(*Number),
 			expected: MustNewValue("5.0").(*Number),
 		},
+		{
+			left:     MustNewValue("2.0").(*Number),
+			right:    MustNewValue("3.0").(*Number),
+			expected: MustNewValue("5.0").(*Number),
+		},
 	}
 	for _, ex := range cases {
 		actual := ex.left.Plus(ex.right)
@@ -147,6 +152,11 @@ func (s *Zuite) TestNumber_Minus() {
 		{
 			left:     MustNewValue("2.0").(*Number),
 			right:    MustNewValue("3").(*Number),
+			expected: MustNewValue("-1.0").(*Number),
+		},
+		{
+			left:     MustNewValue("2.0").(*Number),
+			right:    MustNewValue("3.0").(*Number),
 			expected: MustNewValue("-1.0").(*Number),
 		},
 	}
