@@ -97,6 +97,23 @@ func (s *Zuite) TestWorksheet_externalComputedBy() {
 			},
 			"simple.name references unknown arg agee",
 		},
+		{
+			`worksheet parent {
+				1:child child
+				2:name text computed_by { external }
+			}
+			worksheet child {
+				3:field text
+			}`,
+			&Options{
+				Plugins: map[string]map[string]ComputedBy{
+					"parent": map[string]ComputedBy{
+						"name": sayAlice([]string{"child.not_field"}),
+					},
+				},
+			},
+			"parent.name references unknown arg child.not_field",
+		},
 	}
 	for _, ex := range cases {
 		var opts []Options
@@ -303,4 +320,31 @@ func (s *Zuite) TestCyclicEditsIfNoIdentCheck() {
 	require.Equal(s.T(), "true", ws.MustGet("right").String(), "right")
 	require.Equal(s.T(), "undefined", ws.MustGet("a").String(), "a")
 	require.Equal(s.T(), "undefined", ws.MustGet("b").String(), "b")
+}
+
+var defsCrossWs = MustNewDefinitions(strings.NewReader(`
+worksheet parent {
+	1:child_amount number[2] computed_by {
+		return child.amount
+	}
+	2:child child
+}
+
+worksheet child {
+	5:amount number[2]
+}`))
+
+func (s *Zuite) TestComputedBy_simpleCrossWs() {
+	parent := defsCrossWs.MustNewWorksheet("parent")
+
+	child := defsCrossWs.MustNewWorksheet("child")
+	child.MustSet("amount", MustNewValue("1.11"))
+	parent.MustSet("child", child)
+	require.Equal(s.T(), "1.11", parent.MustGet("child_amount").String())
+
+	child.MustSet("amount", MustNewValue("2.22"))
+	require.Equal(s.T(), "2.22", parent.MustGet("child_amount").String())
+
+	parent.MustUnset("child")
+	require.Equal(s.T(), "undefined", parent.MustGet("child_amount").String())
 }
