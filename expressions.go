@@ -186,6 +186,20 @@ func (e *tBinop) Compute(ws *Worksheet) (Value, error) {
 		return nil, fmt.Errorf("op on non-number")
 	}
 
+	// gt/gte/lt/lte
+	if e.op == opGT {
+		return &Bool{nLeft.GreaterThan(nRight)}, nil
+	}
+	// if e.op == opGTE {
+	// 	return &Bool{nLeft.GreaterThanOrEqual(nRight)}, nil
+	// }
+	if e.op == opLT {
+		return &Bool{nLeft.LessThan(nRight)}, nil
+	}
+	// if e.op == opLTE {
+	// 	return &Bool{nLeft.LessThanOrEqual(nRight)}, nil
+	// }
+
 	var result *Number
 	switch e.op {
 	case opPlus:

@@ -116,6 +116,8 @@ func (value *Undefined) Equal(that Value) bool {
 	return ok
 }
 
+// TODO: jjw: implement gte/lte for undefined for consistency with eq?
+
 func (value *Undefined) String() string {
 	return "undefined"
 }
@@ -131,6 +133,44 @@ func (value *Number) Equal(that Value) bool {
 	}
 	return value.value == typed.value && value.typ.scale == typed.typ.scale
 }
+
+func (value *Number) GreaterThan(that Value) bool {
+	typed, ok := that.(*Number)
+	if !ok {
+		return false
+	}
+	if value.typ.scale > typed.typ.scale {
+		return value.value > typed.scaleUp(value.typ.scale)
+	}
+	if value.typ.scale < typed.typ.scale {
+		return value.scaleUp(typed.typ.scale) > typed.value
+	}
+	return value.value > typed.value
+}
+
+// func (value *Number) GreaterThanOrEqual(that Value) bool {
+// 	typed, ok := that.(*Number)
+// 	if !ok {
+// 		return false
+// 	}
+// 	return value.Equal(typed) || value.GreaterThan(typed)
+// }
+
+func (value *Number) LessThan(that Value) bool {
+	typed, ok := that.(*Number)
+	if !ok {
+		return false
+	}
+	return !value.Equal(typed) && !value.GreaterThan(typed)
+}
+
+// func (value *Number) LessThanOrEqual(that Value) bool {
+// 	typed, ok := that.(*Number)
+// 	if !ok {
+// 		return false
+// 	}
+// 	return value.Equal(typed) || !value.GreaterThan(typed)
+// }
 
 func (value *Number) String() string {
 	scale := value.typ.scale
