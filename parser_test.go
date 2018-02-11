@@ -238,6 +238,12 @@ func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
 		`0 > 5.003`:       `false`,
 		`0 > 0`:           `false`,
 		`0.000 > 0.000`:   `false`,
+		`0 > 0.000000`:    `false`,
+		`0.000000 > 0`:    `false`,
+		`0.5 > 0.5000`:    `false`,
+		`0.5000 > 0.5`:    `false`,
+		`-0.120 > -0.12`:  `false`,
+		`-0.23 > -0.2300`: `false`,
 
 		// gte
 		`6 >= 4`:          `true`,
@@ -263,7 +269,13 @@ func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
 		`-5 >= -2.9458`:   `false`,
 		`0 >= 84.2`:       `false`,
 		`0 >= 0`:          `true`,
+		`0 >= 0.0000000`:  `true`,
+		`0.0000 >= 0`:     `true`,
 		`0.000 >= 0.000`:  `true`,
+		`0.100 >= 0.1`:    `true`,
+		`0.1 >= 0.1000`:   `true`,
+		`-0.34 >= -0.340`: `true`,
+		`-2.2 >= -2.200`:  `true`,
 
 		// lt
 		`7 < 99`:          `true`,
@@ -290,6 +302,12 @@ func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
 		`0.00000001 < 0`:  `false`,
 		`0 < 0`:           `false`,
 		`0.000 < 0.000`:   `false`,
+		`0.00 < 0`:        `false`,
+		`0 < 0.0000000`:   `false`,
+		`0.4300 < 0.43`:   `false`,
+		`0.3 < 0.30000`:   `false`,
+		`-5.61 < -5.6100`: `false`,
+		`-4.5 < -4.5000`:  `false`,
 
 		// lte
 		`32 <= 71`:        `true`,
@@ -316,12 +334,18 @@ func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
 		`-10.0 <= -10.43`: `false`,
 		`0 <= 0`:          `true`,
 		`0.000 <= 0.000`:  `true`,
+		`0 <= 0.000000`:   `true`,
+		`0.00000 <= 0.0`:  `true`,
+		`1.56 <= 1.5600`:  `true`,
+		`4.5000 <= 4.5`:   `true`,
+		`-98.2 <= -98.20`: `true`,
+		`-1.5000 <= -1.5`: `true`,
 
 		// more complicated gt/gte/lt/lte expressions
-		`15.899 > 15 + 0.899 round up 0`: `false`,
-		// `17.8 / 2.22 round up 0 >= 8.0`:    `true`,
-		`900 - 900.111 < -0.111`: `false`,
-		// `17.5 * 13 round down 2 <= 227.00`: `true`,
+		`15.899 > 15 + 0.899 round up 0`:        `false`,
+		`5999 / 12 round half 2 >= 499.9199999`: `true`,
+		`900 - 900.111 < -0.111`:                `false`,
+		`17.5 * 13 round down 0 <= 227.0`:       `true`,
 
 		// TODO(pascal): work on convoluted examples below
 		// `5 - 1 == 2 * 2 round down 2 round down 0`: `true`,

@@ -126,6 +126,7 @@ func (value *Number) Type() Type {
 	return value.typ
 }
 
+// usual number equality requires that both value and scale are equal
 func (value *Number) Equal(that Value) bool {
 	typed, ok := that.(*Number)
 	if !ok {
@@ -148,12 +149,29 @@ func (value *Number) GreaterThan(that Value) bool {
 	return value.value > typed.value
 }
 
+// for usual number equality, we require that value and scale are equal;
+// for gt/gte/lt/lte comparisons, however, we recognize that scale doesn't need
+// to be equal because we'll often be bounds checking (e.g., 5.999999 <= 6.0)
+func (value *Number) ScaledEqual(that Value) bool {
+	typed, ok := that.(*Number)
+	if !ok {
+		return false
+	}
+	if value.typ.scale > typed.typ.scale {
+		return value.value == typed.scaleUp(value.typ.scale)
+	}
+	if value.typ.scale < typed.typ.scale {
+		return value.scaleUp(typed.typ.scale) == typed.value
+	}
+	return value.value == typed.value
+}
+
 func (value *Number) GreaterThanOrEqual(that Value) bool {
 	typed, ok := that.(*Number)
 	if !ok {
 		return false
 	}
-	return value.Equal(typed) || value.GreaterThan(typed)
+	return value.ScaledEqual(typed) || value.GreaterThan(typed)
 }
 
 func (value *Number) LessThan(that Value) bool {
@@ -161,7 +179,7 @@ func (value *Number) LessThan(that Value) bool {
 	if !ok {
 		return false
 	}
-	return !value.Equal(typed) && !value.GreaterThan(typed)
+	return !value.ScaledEqual(typed) && !value.GreaterThan(typed)
 }
 
 func (value *Number) LessThanOrEqual(that Value) bool {
@@ -169,7 +187,7 @@ func (value *Number) LessThanOrEqual(that Value) bool {
 	if !ok {
 		return false
 	}
-	return value.Equal(typed) || !value.GreaterThan(typed)
+	return value.ScaledEqual(typed) || !value.GreaterThan(typed)
 }
 
 func (value *Number) String() string {
