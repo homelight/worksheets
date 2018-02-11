@@ -63,11 +63,11 @@ const (
 	opEqual        = "equal"
 	opNotEqual     = "not-equal"
 	opGT           = "gt"
-	// opGTE          = "gte"
-	opLT = "lt"
-	// opLTE          = "lte"
-	opOr  = "or"
-	opAnd = "and"
+	opGTE          = "gte"
+	opLT           = "lt"
+	opLTE          = "lte"
+	opOr           = "or"
+	opAnd          = "and"
 )
 
 type tRound struct {

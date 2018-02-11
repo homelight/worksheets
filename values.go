@@ -148,13 +148,13 @@ func (value *Number) GreaterThan(that Value) bool {
 	return value.value > typed.value
 }
 
-// func (value *Number) GreaterThanOrEqual(that Value) bool {
-// 	typed, ok := that.(*Number)
-// 	if !ok {
-// 		return false
-// 	}
-// 	return value.Equal(typed) || value.GreaterThan(typed)
-// }
+func (value *Number) GreaterThanOrEqual(that Value) bool {
+	typed, ok := that.(*Number)
+	if !ok {
+		return false
+	}
+	return value.Equal(typed) || value.GreaterThan(typed)
+}
 
 func (value *Number) LessThan(that Value) bool {
 	typed, ok := that.(*Number)
@@ -164,13 +164,13 @@ func (value *Number) LessThan(that Value) bool {
 	return !value.Equal(typed) && !value.GreaterThan(typed)
 }
 
-// func (value *Number) LessThanOrEqual(that Value) bool {
-// 	typed, ok := that.(*Number)
-// 	if !ok {
-// 		return false
-// 	}
-// 	return value.Equal(typed) || !value.GreaterThan(typed)
-// }
+func (value *Number) LessThanOrEqual(that Value) bool {
+	typed, ok := that.(*Number)
+	if !ok {
+		return false
+	}
+	return value.Equal(typed) || !value.GreaterThan(typed)
+}
 
 func (value *Number) String() string {
 	scale := value.typ.scale

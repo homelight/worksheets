@@ -38,24 +38,24 @@ func newParser(src io.Reader) *parser {
 
 var (
 	// tokens
-	pLacco    = newTokenPattern("{", "\\{")
-	pRacco    = newTokenPattern("}", "\\}")
-	pLparen   = newTokenPattern("(", "\\(")
-	pRparen   = newTokenPattern(")", "\\)")
-	pLbracket = newTokenPattern("[", "\\[")
-	pRbracket = newTokenPattern("]", "\\]")
-	pColon    = newTokenPattern(":", "\\:")
-	pPlus     = newTokenPattern("+", "\\+")
-	pMinus    = newTokenPattern("-", "\\-")
-	pMult     = newTokenPattern("*", "\\*")
-	pDiv      = newTokenPattern("/", "\\/")
-	pNot      = newTokenPattern("!", "\\!")
-	pEqual    = newTokenPattern("==", "\\=\\=")
-	pNotEqual = newTokenPattern("!=", "\\!\\=")
-	pGT       = newTokenPattern(">", "\\>")
-	// pGTE           = newTokenPattern(">=", "\\>\\=")
-	pLT = newTokenPattern("<", "\\<")
-	// pLTE           = newTokenPattern("<=", "\\<\\=")
+	pLacco         = newTokenPattern("{", "\\{")
+	pRacco         = newTokenPattern("}", "\\}")
+	pLparen        = newTokenPattern("(", "\\(")
+	pRparen        = newTokenPattern(")", "\\)")
+	pLbracket      = newTokenPattern("[", "\\[")
+	pRbracket      = newTokenPattern("]", "\\]")
+	pColon         = newTokenPattern(":", "\\:")
+	pPlus          = newTokenPattern("+", "\\+")
+	pMinus         = newTokenPattern("-", "\\-")
+	pMult          = newTokenPattern("*", "\\*")
+	pDiv           = newTokenPattern("/", "\\/")
+	pNot           = newTokenPattern("!", "\\!")
+	pEqual         = newTokenPattern("==", "\\=\\=")
+	pNotEqual      = newTokenPattern("!=", "\\!\\=")
+	pGT            = newTokenPattern(">", "\\>")
+	pGTE           = newTokenPattern(">=", "\\>\\=")
+	pLT            = newTokenPattern("<", "\\<")
+	pLTE           = newTokenPattern("<=", "\\<\\=")
 	pAnd           = newTokenPattern("&&", "\\&\\&")
 	pOr            = newTokenPattern("||", "\\|\\|")
 	pWorksheet     = newTokenPattern("worksheet", "worksheet")
@@ -253,7 +253,7 @@ func (p *parser) parseStatement() (expression, error) {
 //
 //  := parseLiteral
 //   | var
-//   | exp (+ -  * /) exp
+//   | exp (+ - * /) exp
 func (p *parser) parseExpression(withOp bool) (expression, error) {
 	choice, ok := p.peekWithChoice([]*tokenPattern{
 		pUndefined,
@@ -359,9 +359,9 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 			pEqual,
 			pNotEqual,
 			pGT,
-			// pGTE,
+			pGTE,
 			pLT,
-			// pLTE,
+			pLTE,
 			pAnd,
 			pOr,
 		}, []string{
@@ -372,9 +372,9 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 			string(opEqual),
 			string(opNotEqual),
 			string(opGT),
-			// string(opGTE),
+			string(opGTE),
 			string(opLT),
-			// string(opLTE),
+			string(opLTE),
 			string(opAnd),
 			string(opOr),
 		})
@@ -418,13 +418,13 @@ var opPrecedence = map[tOp]int{
 	opEqual:    2,
 	opNotEqual: 2,
 	opGT:       2,
-	// opGTE:      2,
-	opLT: 2,
-	// opLTE:      2,
-	opPlus:  3,
-	opMinus: 3,
-	opMult:  4,
-	opDiv:   5,
+	opGTE:      2,
+	opLT:       2,
+	opLTE:      2,
+	opPlus:     3,
+	opMinus:    3,
+	opMult:     4,
+	opDiv:      5,
 }
 
 // foldExprs folds expressions separated by operators by respecting the
@@ -672,6 +672,8 @@ func (p *parser) nextAndCheck(expected *tokenPattern) (string, error) {
 var tokensToCombine = map[string]string{
 	"=": "=",
 	"!": "=",
+	"<": "=",
+	">": "=",
 	"&": "&",
 	"|": "|",
 }
