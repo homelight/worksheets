@@ -21,10 +21,10 @@ func RunTransaction(db *runner.DB, fn func(tx *runner.Tx) error) error {
 	if err != nil {
 		return err
 	}
+	defer tx.AutoRollback()
 
 	err = fn(tx)
 	if err != nil {
-		defer tx.Rollback()
 		return err
 	}
 
