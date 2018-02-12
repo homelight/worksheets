@@ -12,19 +12,17 @@
 
 package worksheets
 
-import (
-	"gopkg.in/mgutz/dat.v2/sqlx-runner"
-)
+import runner "github.com/helloeave/dat/sqlx-runner"
 
 func RunTransaction(db *runner.DB, fn func(tx *runner.Tx) error) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
 	}
+	defer tx.AutoRollback()
 
 	err = fn(tx)
 	if err != nil {
-		defer tx.Rollback()
 		return err
 	}
 
