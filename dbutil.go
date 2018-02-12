@@ -12,7 +12,9 @@
 
 package worksheets
 
-import runner "github.com/helloeave/dat/sqlx-runner"
+import (
+	"gopkg.in/mgutz/dat.v2/sqlx-runner"
+)
 
 func RunTransaction(db *runner.DB, fn func(tx *runner.Tx) error) error {
 	tx, err := db.Begin()
