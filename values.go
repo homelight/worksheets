@@ -135,61 +135,6 @@ func (value *Number) Equal(that Value) bool {
 	return value.value == typed.value && value.typ.scale == typed.typ.scale
 }
 
-func (value *Number) GreaterThan(that Value) bool {
-	typed, ok := that.(*Number)
-	if !ok {
-		return false
-	}
-	if value.typ.scale > typed.typ.scale {
-		return value.value > typed.scaleUp(value.typ.scale)
-	}
-	if value.typ.scale < typed.typ.scale {
-		return value.scaleUp(typed.typ.scale) > typed.value
-	}
-	return value.value > typed.value
-}
-
-// for usual number equality, we require that value and scale are equal;
-// for gt/gte/lt/lte comparisons, however, we recognize that scale doesn't need
-// to be equal because we'll often be bounds checking (e.g., 5.999999 <= 6.0)
-func (value *Number) ScaledEqual(that Value) bool {
-	typed, ok := that.(*Number)
-	if !ok {
-		return false
-	}
-	if value.typ.scale > typed.typ.scale {
-		return value.value == typed.scaleUp(value.typ.scale)
-	}
-	if value.typ.scale < typed.typ.scale {
-		return value.scaleUp(typed.typ.scale) == typed.value
-	}
-	return value.value == typed.value
-}
-
-func (value *Number) GreaterThanOrEqual(that Value) bool {
-	typed, ok := that.(*Number)
-	if !ok {
-		return false
-	}
-	return value.ScaledEqual(typed) || value.GreaterThan(typed)
-}
-
-func (value *Number) LessThan(that Value) bool {
-	typed, ok := that.(*Number)
-	if !ok {
-		return false
-	}
-	return !value.ScaledEqual(typed) && !value.GreaterThan(typed)
-}
-
-func (value *Number) LessThanOrEqual(that Value) bool {
-	typed, ok := that.(*Number)
-	if !ok {
-		return false
-	}
-	return value.ScaledEqual(typed) || !value.GreaterThan(typed)
-}
-
 func (value *Number) String() string {
 	scale := value.typ.scale
 	if scale == 0 {
@@ -247,6 +192,41 @@ func (value *Number) scaleUp(scale int) int64 {
 	}
 
 	return v
+}
+
+// for usual number equality, we require that value and scale are equal;
+// for gt/gte/lt/lte comparisons, however, we recognize that scale doesn't need
+// to be equal because we'll often be bounds checking (e.g., 5.999999 <= 6.0)
+func (left *Number) ScaledEqual(right *Number) bool {
+	if left.typ.scale > right.typ.scale {
+		return left.value == right.scaleUp(left.typ.scale)
+	}
+	if left.typ.scale < right.typ.scale {
+		return left.scaleUp(right.typ.scale) == right.value
+	}
+	return left.value == right.value
+}
+
+func (left *Number) GreaterThan(right *Number) bool {
+	if left.typ.scale > right.typ.scale {
+		return left.value > right.scaleUp(left.typ.scale)
+	}
+	if left.typ.scale < right.typ.scale {
+		return left.scaleUp(right.typ.scale) > right.value
+	}
+	return left.value > right.value
+}
+
+func (left *Number) GreaterThanOrEqual(right *Number) bool {
+	return left.ScaledEqual(right) || left.GreaterThan(right)
+}
+
+func (left *Number) LessThan(right *Number) bool {
+	return !left.ScaledEqual(right) && !left.GreaterThan(right)
+}
+
+func (left *Number) LessThanOrEqual(right *Number) bool {
+	return left.ScaledEqual(right) || !left.GreaterThan(right)
 }
 
 func (left *Number) Plus(right *Number) *Number {
