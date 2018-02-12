@@ -126,7 +126,6 @@ func (value *Number) Type() Type {
 	return value.typ
 }
 
-// usual number equality requires that both value and scale are equal
 func (value *Number) Equal(that Value) bool {
 	typed, ok := that.(*Number)
 	if !ok {
@@ -194,10 +193,7 @@ func (value *Number) scaleUp(scale int) int64 {
 	return v
 }
 
-// for usual number equality, we require that value and scale are equal;
-// for gt/gte/lt/lte comparisons, however, we recognize that scale doesn't need
-// to be equal because we'll often be bounds checking (e.g., 5.999999 <= 6.0)
-func (left *Number) ScaledEqual(right *Number) bool {
+func (left *Number) NumericEqual(right *Number) bool {
 	if left.typ.scale > right.typ.scale {
 		return left.value == right.scaleUp(left.typ.scale)
 	}
@@ -218,15 +214,15 @@ func (left *Number) GreaterThan(right *Number) bool {
 }
 
 func (left *Number) GreaterThanOrEqual(right *Number) bool {
-	return left.ScaledEqual(right) || left.GreaterThan(right)
+	return left.NumericEqual(right) || left.GreaterThan(right)
 }
 
 func (left *Number) LessThan(right *Number) bool {
-	return !left.ScaledEqual(right) && !left.GreaterThan(right)
+	return !left.NumericEqual(right) && !left.GreaterThan(right)
 }
 
 func (left *Number) LessThanOrEqual(right *Number) bool {
-	return left.ScaledEqual(right) || !left.GreaterThan(right)
+	return left.NumericEqual(right) || !left.GreaterThan(right)
 }
 
 func (left *Number) Plus(right *Number) *Number {
