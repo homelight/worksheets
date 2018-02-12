@@ -213,7 +213,7 @@ func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
 		`false && undefined`:               `false`,
 		`false && 6 / 0 round down 7 == 6`: `false`,
 
-		// gt
+		// greater than
 		`3 > 2`:           `true`,
 		`7 > 7`:           `false`,
 		`62 > 100`:        `false`,
@@ -233,7 +233,7 @@ func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
 		`-500 > 500`:      `false`,
 		`-500 > -500`:     `false`,
 
-		// gte
+		// greater than or equal
 		`3 >= 2`:           `true`,
 		`7 >= 7`:           `true`,
 		`62 >= 100`:        `false`,
@@ -253,7 +253,7 @@ func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
 		`-500 >= 500`:      `false`,
 		`-500 >= -500`:     `true`,
 
-		// lt
+		// less than
 		`7 < 99`:         `true`,
 		`13 < 13`:        `false`,
 		`11 < 8`:         `false`,
@@ -273,7 +273,7 @@ func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
 		`100 < -100`:     `false`,
 		`-100 < -100`:    `false`,
 
-		// lte
+		// less than or equal
 		`7 <= 99`:         `true`,
 		`13 <= 13`:        `true`,
 		`11 <= 8`:         `false`,
@@ -292,6 +292,20 @@ func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
 		`-100 <= 100`:     `true`,
 		`100 <= -100`:     `false`,
 		`-100 <= -100`:    `true`,
+
+		// undefined gt/gte/lt/lte expressions
+		`54 < undefined`:         `undefined`,
+		`undefined < 83`:         `undefined`,
+		`undefined < undefined`:  `undefined`,
+		`5 <= undefined`:         `undefined`,
+		`undefined <= 7`:         `undefined`,
+		`undefined <= undefined`: `undefined`,
+		`31 > undefined`:         `undefined`,
+		`undefined > 26`:         `undefined`,
+		`undefined > undefined`:  `undefined`,
+		`45 >= undefined`:        `undefined`,
+		`undefined >= 86`:        `undefined`,
+		`undefined >= undefined`: `undefined`,
 
 		// more complicated gt/gte/lt/lte expressions
 		`15.899 > 15 + 0.8999 round down 3`:     `false`,

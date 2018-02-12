@@ -187,13 +187,13 @@ func (e *tBinop) Compute(ws *Worksheet) (Value, error) {
 	}
 
 	switch e.op {
-	case opGT:
+	case opGreaterThan:
 		return &Bool{nLeft.GreaterThan(nRight)}, nil
-	case opGTE:
+	case opGreaterThanOrEqual:
 		return &Bool{nLeft.GreaterThanOrEqual(nRight)}, nil
-	case opLT:
+	case opLessThan:
 		return &Bool{nLeft.LessThan(nRight)}, nil
-	case opLTE:
+	case opLessThanOrEqual:
 		return &Bool{nLeft.LessThanOrEqual(nRight)}, nil
 	}
 

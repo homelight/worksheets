@@ -55,19 +55,19 @@ func (f *Field) Name() string {
 type tOp string
 
 const (
-	opPlus     tOp = "plus"
-	opMinus        = "minus"
-	opMult         = "mult"
-	opDiv          = "div"
-	opNot          = "not"
-	opEqual        = "equal"
-	opNotEqual     = "not-equal"
-	opGT           = "gt"
-	opGTE          = "gte"
-	opLT           = "lt"
-	opLTE          = "lte"
-	opOr           = "or"
-	opAnd          = "and"
+	opPlus               tOp = "plus"
+	opMinus                  = "minus"
+	opMult                   = "mult"
+	opDiv                    = "div"
+	opNot                    = "not"
+	opEqual                  = "equal"
+	opNotEqual               = "not-equal"
+	opGreaterThan            = "greater-than"
+	opGreaterThanOrEqual     = "greater-than-or-equal"
+	opLessThan               = "less-than"
+	opLessThanOrEqual        = "less-than-or-equal"
+	opOr                     = "or"
+	opAnd                    = "and"
 )
 
 type tRound struct {

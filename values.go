@@ -116,8 +116,6 @@ func (value *Undefined) Equal(that Value) bool {
 	return ok
 }
 
-// TODO: jjw: implement gte/lte for undefined for consistency with eq?
-
 func (value *Undefined) String() string {
 	return "undefined"
 }
