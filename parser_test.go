@@ -213,6 +213,34 @@ func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
 		`false && undefined`:               `false`,
 		`false && 6 / 0 round down 7 == 6`: `false`,
 
+		// numerical equality
+		`4 == 4`:           `true`,
+		`2 == 9`:           `false`,
+		`2.4 == 2.400`:     `true`,
+		`3.0 == 3.001`:     `false`,
+		`-10 == -10`:       `true`,
+		`-12 == -80`:       `false`,
+		`-1.9 == -1.900`:   `true`,
+		`-7.600 == -7.601`: `false`,
+		`0 == 0`:           `true`,
+		`1 == 0`:           `false`,
+		`0.00000 == 0.0`:   `true`,
+		`0.000000001 == 0`: `false`,
+
+		// numerical inequality
+		`7 != 2`:           `true`,
+		`8 != 8`:           `false`,
+		`9.01 != 9.1`:      `true`,
+		`3.30 != 3.3`:      `false`,
+		`-98 != -14`:       `true`,
+		`-3 != -3`:         `false`,
+		`-8.69 != -8.7`:    `true`,
+		`-2.00000 != -2.0`: `false`,
+		`1 != 0`:           `true`,
+		`0 != 0`:           `false`,
+		`0 != 0.000000001`: `true`,
+		`0.0 != 0.00000`:   `false`,
+
 		// greater than
 		`3 > 2`:           `true`,
 		`7 > 7`:           `false`,
