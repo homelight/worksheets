@@ -160,7 +160,7 @@ func (s *Zuite) TestParser_parseExpression() {
 	}
 }
 
-func (s *Zuite) TestParser_parseExpressionsToCheckOperatorPrecedence() {
+func (s *Zuite) TestParser_parseAndEvalExprToCheckOperatorPrecedence() {
 	// Parsing and evaluating expressions is an easier way to write tests for
 	// operator precedence rules. It's great when things are green... And when
 	// they are not, it's key to look at the AST to debug.
