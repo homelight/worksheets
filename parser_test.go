@@ -198,7 +198,6 @@ func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
 
 		`!undefined`:                       `undefined`,
 		`!true`:                            `false`,
-		`3 == 4`:                           `false`,
 		`3 + 1 == 4`:                       `true`,
 		`4 / 1 round down 0 == 2 * 2`:      `true`,
 		`5 - 1 == 2 * 2 round down 0`:      `true`,
@@ -228,7 +227,7 @@ func (s *Zuite) TestParser_parseExpressionsAndCheckCompute() {
 		`0.000000001 == 0`: `false`,
 
 		// numerical inequality
-		`7 != 2`:           `true`,
+		`7 != 3`:           `true`,
 		`8 != 8`:           `false`,
 		`9.01 != 9.1`:      `true`,
 		`3.30 != 3.3`:      `false`,
