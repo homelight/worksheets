@@ -257,6 +257,15 @@ func (s *Zuite) TestParser_parseLiteral() {
 		`1_234.000_000_008`:  &Number{1234000000008, &NumberType{9}},
 		`-1_234.000_000_008`: &Number{-1234000000008, &NumberType{9}},
 
+		`6%`:         &Number{6, &NumberType{2}},
+		`3.25%`:      &Number{325, &NumberType{4}},
+		`-4%`:        &Number{-4, &NumberType{2}},
+		`-5.666667%`: &Number{-5666667, &NumberType{8}},
+		`1_50%`:      &Number{150, &NumberType{2}},
+		`2_0.2%`:     &Number{202, &NumberType{3}},
+		`-8_0%`:      &Number{-80, &NumberType{2}},
+		`-25.3_7_5%`: &Number{-25375, &NumberType{5}},
+
 		`"foo"`: &Text{"foo"},
 		`"456"`: &Text{"456"},
 
