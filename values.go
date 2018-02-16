@@ -124,14 +124,6 @@ func (value *Number) Type() Type {
 	return value.typ
 }
 
-func (value *Number) Equal(that Value) bool {
-	typed, ok := that.(*Number)
-	if !ok {
-		return false
-	}
-	return value.value == typed.value && value.typ.scale == typed.typ.scale
-}
-
 func (value *Number) String() string {
 	scale := value.typ.scale
 	if scale == 0 {
@@ -191,7 +183,7 @@ func (value *Number) scaleUp(scale int) int64 {
 	return v
 }
 
-func (left *Number) NumericEqual(right *Number) bool {
+func (left *Number) numericEqual(right *Number) bool {
 	if left.typ.scale > right.typ.scale {
 		return left.value == right.scaleUp(left.typ.scale)
 	}
@@ -199,6 +191,14 @@ func (left *Number) NumericEqual(right *Number) bool {
 		return left.scaleUp(right.typ.scale) == right.value
 	}
 	return left.value == right.value
+}
+
+func (value *Number) Equal(that Value) bool {
+	typed, ok := that.(*Number)
+	if !ok {
+		return false
+	}
+	return value.numericEqual(typed)
 }
 
 func (left *Number) GreaterThan(right *Number) bool {
@@ -212,15 +212,15 @@ func (left *Number) GreaterThan(right *Number) bool {
 }
 
 func (left *Number) GreaterThanOrEqual(right *Number) bool {
-	return left.NumericEqual(right) || left.GreaterThan(right)
+	return left.numericEqual(right) || left.GreaterThan(right)
 }
 
 func (left *Number) LessThan(right *Number) bool {
-	return !left.NumericEqual(right) && !left.GreaterThan(right)
+	return !left.numericEqual(right) && !left.GreaterThan(right)
 }
 
 func (left *Number) LessThanOrEqual(right *Number) bool {
-	return left.NumericEqual(right) || !left.GreaterThan(right)
+	return left.numericEqual(right) || !left.GreaterThan(right)
 }
 
 func (left *Number) Plus(right *Number) *Number {
