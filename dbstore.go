@@ -26,7 +26,7 @@ import (
 // Store ... TODO(pascal): write about abstraction.
 type Store interface {
 	// Load loads the worksheet with identifier `id` from the store.
-	Load(id string) (*Worksheet, error)
+	Load(id string, version ...int) (*Worksheet, error)
 
 	// Save saves a new worksheet to the store.
 	Save(ws *Worksheet) error
@@ -94,11 +94,14 @@ var tableToEntities = map[string]interface{}{
 	"worksheet_slice_elements": &rSliceElement{},
 }
 
-func (s *Session) Load(id string) (*Worksheet, error) {
+func (s *Session) Load(id string, version ...int) (*Worksheet, error) {
 	loader := &loader{
 		s:               s,
 		graph:           make(map[string]*Worksheet),
 		slicesToHydrate: make(map[string]*Slice),
+	}
+	if len(version) > 0 {
+		return loader.loadWorksheet(id, version[0])
 	}
 	return loader.loadWorksheet(id)
 }
@@ -133,7 +136,7 @@ type loader struct {
 	slicesToHydrate map[string]*Slice
 }
 
-func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
+func (l *loader) loadWorksheet(id string, version ...int) (*Worksheet, error) {
 	if ws, ok := l.graph[id]; ok {
 		return ws, nil
 	}
@@ -157,13 +160,19 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 	}
 
 	l.graph[id] = ws
+	wsVersion := wsRec.Version
+	loadingHead := true
+	if len(version) > 0 {
+		wsVersion = version[0]
+		loadingHead = false
+	}
 
 	var valuesRecs []rValue
 	if err := l.s.tx.
 		Select("*").
 		From("worksheet_values").
 		Where("worksheet_id = $1", id).
-		Where("from_version <= $1 and $1 <= to_version", wsRec.Version).
+		Where("from_version <= $1 and $1 <= to_version", wsVersion).
 		QueryStructs(&valuesRecs); err != nil {
 		return nil, err
 	}
@@ -178,7 +187,7 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 
 		// load, and potentially defer hydration of value
 		if valueRec.Value.Valid {
-			value, err := l.readValue(field.typ, valueRec.Value)
+			value, err := l.readValue(field.typ, valueRec.Value, loadingHead)
 			if err != nil {
 				return nil, err
 			}
@@ -203,7 +212,7 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 			Select("*").
 			From("worksheet_slice_elements").
 			Where(inClause("slice_id", len(slicesIds)), slicesIds...).
-			Where("from_version <= $1 and $1 <= to_version", wsRec.Version).
+			Where("from_version <= $1 and $1 <= to_version", wsVersion).
 			OrderBy("slice_id, rank").
 			QueryStructs(&sliceElementsRecs)
 		if err != nil {
@@ -211,7 +220,7 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 		}
 		for _, sliceElementsRec := range sliceElementsRecs {
 			slice := slicesToHydrate[sliceElementsRec.SliceId]
-			value, err := l.readValue(slice.typ.elementType, sliceElementsRec.Value)
+			value, err := l.readValue(slice.typ.elementType, sliceElementsRec.Value, loadingHead)
 			if err != nil {
 				return nil, err
 			}
@@ -225,7 +234,7 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 	return ws, nil
 }
 
-func (l *loader) readValue(typ Type, optValue dat.NullString) (Value, error) {
+func (l *loader) readValue(typ Type, optValue dat.NullString, loadingHead bool) (Value, error) {
 	if !optValue.Valid {
 		return &Undefined{}, nil
 	}
@@ -257,7 +266,17 @@ func (l *loader) readValue(typ Type, optValue dat.NullString) (Value, error) {
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("unreadable value for ref %s", value)
 		}
-		value, err := l.loadWorksheet(parts[1])
+		var value Value
+		var err error
+		partsTwo := strings.Split(parts[1], "@")
+		if !loadingHead && len(partsTwo) > 1 {
+			version, err := strconv.Atoi(partsTwo[1])
+			if err != nil {
+				return nil, fmt.Errorf("unreadable version for ref %s", value)
+			}
+			value, err = l.loadWorksheet(partsTwo[0], version)
+		}
+		value, err = l.loadWorksheet(partsTwo[0])
 		if err != nil {
 			return nil, fmt.Errorf("unable to load referenced worksheet %s: %s", parts[1], err)
 		}
@@ -392,6 +411,15 @@ func (p *persister) update(ws *Worksheet) error {
 
 	// diff
 	ws.set(ws.def.fieldsByIndex[IndexVersion], &Number{int64(newVersion), &NumberType{0}})
+
+	// hack? Since loading the current version of ws always loads the current versions of all of its sub-worksheets,
+	// in order to know if one of those sub-worksheets has changed versions, we need to also see what the ws should
+	// look like at this version as loaded from the db (i.e. what it would look like once we've made some more changes).
+	// Once we swap out `orig` with the version loaded from the db, the diff will properly update the sub-worksheet versions
+	// The problem with the approach as implemented right here is that becasue of pointers, values are being written even when the sub worksheet hasn't changed
+	loadedWs, _ := p.s.Load(ws.Id(), ws.Version())
+	ws.orig = loadedWs.orig
+
 	diff := ws.diff()
 
 	// plan rollback
@@ -527,7 +555,7 @@ func (p *persister) writeValue(value Value) dat.NullString {
 	case *Slice:
 		result = fmt.Sprintf("[:%d:%s", v.lastRank, v.id)
 	case *Worksheet:
-		result = fmt.Sprintf("*:%s", v.Id())
+		result = fmt.Sprintf("*:%s@%d", v.Id(), v.Version())
 	default:
 		result = value.String()
 	}

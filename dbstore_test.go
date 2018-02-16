@@ -41,6 +41,37 @@ func (s *DbZuite) TestExample() {
 	require.Equal(s.T(), `"Alice"`, wsFromStore.MustGet("name").String())
 }
 
+func (s *DbZuite) TestLoadOldVersion() {
+	ws, err := s.store.defs.NewWorksheet("simple")
+	require.NoError(s.T(), err)
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		return session.Save(ws)
+	})
+
+	err = ws.Set("name", NewText("Alice"))
+	require.NoError(s.T(), err)
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		return session.Update(ws)
+	})
+
+	var oldWsFromStore *Worksheet
+	var currentWsFromStore *Worksheet
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		var err error
+		oldWsFromStore, err = session.Load(ws.Id(), 1)
+		currentWsFromStore, err = session.Load(ws.Id())
+		return err
+	})
+
+	require.Equal(s.T(), "undefined", oldWsFromStore.MustGet("name").String())
+	require.Equal(s.T(), "\"Alice\"", currentWsFromStore.MustGet("name").String())
+}
+
 func (s *DbZuite) TestSave() {
 	ws, err := s.store.defs.NewWorksheet("simple")
 	require.NoError(s.T(), err)
