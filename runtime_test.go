@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func (s *Zuite) TestRuntime_evalNumericalExpressions() {
+func (s *Zuite) TestRuntime_parseAndEvalNumericalExpr() {
 	cases := map[string]string{
 		// equal
 		`4 == 4`:           `true`,
@@ -30,10 +30,6 @@ func (s *Zuite) TestRuntime_evalNumericalExpressions() {
 		`-12 == -80`:       `false`,
 		`-1.9 == -1.900`:   `true`,
 		`-7.600 == -7.601`: `false`,
-		`0 == 0`:           `true`,
-		`1 == 0`:           `false`,
-		`0.00000 == 0.0`:   `true`,
-		`0.000000001 == 0`: `false`,
 
 		// not equal
 		`7 != 3`:           `true`,
@@ -44,10 +40,6 @@ func (s *Zuite) TestRuntime_evalNumericalExpressions() {
 		`-3 != -3`:         `false`,
 		`-8.69 != -8.7`:    `true`,
 		`-2.00000 != -2.0`: `false`,
-		`1 != 0`:           `true`,
-		`0 != 0`:           `false`,
-		`0 != 0.000000001`: `true`,
-		`0.0 != 0.00000`:   `false`,
 
 		// greater than
 		`3 > 2`:           `true`,
@@ -147,9 +139,11 @@ func (s *Zuite) TestRuntime_evalNumericalExpressions() {
 	for input, output := range cases {
 		expected := MustNewValue(output)
 		p := newParser(strings.NewReader(input))
+
 		expr, err := p.parseExpression(true)
 		require.NoError(s.T(), err, input)
 		require.Equal(s.T(), "", p.next(), "%s should have reached eof", input)
+
 		actual, err := expr.Compute(nil)
 		require.NoError(s.T(), err, input)
 		assert.Equal(s.T(), expected, actual, "%s should equal %s was %s", input, output, actual)
