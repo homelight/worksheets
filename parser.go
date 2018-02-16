@@ -77,8 +77,8 @@ var (
 	pText  = newTokenPattern("text", "\".*\"")
 
 	pNumber               = newTokenPattern("number", "[0-9]+(\\.[0-9]+)?")
-	pNumberWithUnderscore = newTokenPattern("number", "[_0-9]+")
 	pNumberWithDot        = newTokenPattern("number", "\\.[0-9]*")
+	pNumberWithUnderscore = newTokenPattern("number", "[_0-9]+")
 )
 
 func (p *parser) parseWorksheets() (map[string]*Definition, error) {
@@ -604,16 +604,16 @@ func (p *parser) parseLiteral() (Value, error) {
 		}
 	}
 	if pNumber.re.MatchString(token) {
-		for p.peek(pNumberWithUnderscore) || p.peek(pNumberWithDot) {
+		for p.peek(pNumberWithDot) || p.peek(pNumberWithUnderscore) {
 			addToken := p.next()
-			if strings.HasSuffix(addToken, "_") {
-				return nil, fmt.Errorf("number cannot terminate with underscore")
-			}
 			if strings.HasSuffix(addToken, ".") {
 				if p.peek(pNumberWithUnderscore) {
 					return nil, fmt.Errorf("number fraction cannot start with underscore")
 				}
 				return nil, fmt.Errorf("number cannot terminate with dot")
+			}
+			if strings.HasSuffix(addToken, "_") {
+				return nil, fmt.Errorf("number cannot terminate with underscore")
 			}
 			token = token + strings.Replace(addToken, "_", "", -1)
 		}
