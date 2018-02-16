@@ -78,6 +78,7 @@ var (
 
 	pNumber               = newTokenPattern("number", "[0-9]+(\\.[0-9]+)?")
 	pNumberWithDot        = newTokenPattern("number", "\\.[0-9]*")
+	pNumberWithPercent    = newTokenPattern("number", "\\%")
 	pNumberWithUnderscore = newTokenPattern("number", "[_0-9]+")
 )
 
@@ -261,6 +262,7 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 		pFalse,
 		pNumber,
 		pNumberWithDot,
+		pNumberWithPercent,
 		pNumberWithUnderscore,
 		pMinus,
 		pText,
@@ -268,6 +270,7 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 		pLparen,
 		pNot,
 	}, []string{
+		"literal",
 		"literal",
 		"literal",
 		"literal",
@@ -604,7 +607,7 @@ func (p *parser) parseLiteral() (Value, error) {
 		}
 	}
 	if pNumber.re.MatchString(token) {
-		for p.peek(pNumberWithDot) || p.peek(pNumberWithUnderscore) {
+		for p.peek(pNumberWithDot) || p.peek(pNumberWithUnderscore) || p.peek(pNumberWithPercent) {
 			addToken := p.next()
 			if strings.HasSuffix(addToken, ".") {
 				if p.peek(pNumberWithUnderscore) {
@@ -615,8 +618,16 @@ func (p *parser) parseLiteral() (Value, error) {
 			if strings.HasSuffix(addToken, "_") {
 				return nil, fmt.Errorf("number cannot terminate with underscore")
 			}
+			if strings.Contains(token, "%") {
+				return nil, fmt.Errorf("number must terminate with percent if present")
+			}
 			token = token + strings.Replace(addToken, "_", "", -1)
 		}
+
+		// note whether percent, then remove to keep dot-index calcs correct
+		isPct := strings.HasSuffix(token, "%")
+		token = strings.TrimRight(token, "%")
+
 		dot := strings.Index(token, ".")
 		value, err := strconv.ParseInt("-"+strings.Replace(token, ".", "", 1), 10, 64)
 		if err != nil {
@@ -627,6 +638,10 @@ func (p *parser) parseLiteral() (Value, error) {
 			scale = 0
 		} else {
 			scale = len(token) - dot - 1
+		}
+
+		if isPct {
+			scale += 2
 		}
 		if !negNumber {
 			value = -value
