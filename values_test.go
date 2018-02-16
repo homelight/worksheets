@@ -62,10 +62,14 @@ func (s *Zuite) TestValueEqual() {
 		{
 			MustNewValue("1"),
 			MustNewValue("1"),
+			MustNewValue("1.0"),
+			MustNewValue("1.000"),
 		},
 		{
-			MustNewValue("1.0"),
-			MustNewValue("1.0"),
+			MustNewValue("0"),
+			MustNewValue("0"),
+			MustNewValue("-0"),
+			MustNewValue("0.000"),
 		},
 		{
 			NewText("Alice"),
