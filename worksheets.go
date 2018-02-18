@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 
 	"github.com/satori/go.uuid"
 )
@@ -136,10 +137,12 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 					return nil, fmt.Errorf("%s.%s has no dependencies", def.name, fieldName)
 				}
 				for _, argName := range args {
-					dependent, ok := def.fieldsByName[argName]
+					selector := argToSelector(argName)
+					path, ok := selector.Select(def)
 					if !ok {
 						return nil, fmt.Errorf("%s.%s references unknown arg %s", def.name, fieldName, argName)
 					}
+					dependent := path[0]
 					if field.computedBy != nil {
 						// only update the graph for computed fields; constrained fields don't need to be recalculated when args are set, only upon setting a new value
 						def.dependents[dependent.index] = append(def.dependents[dependent.index], field.index)
@@ -152,6 +155,34 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 	return &Definitions{
 		defs: defs,
 	}, nil
+}
+
+func argToSelector(arg string) tSelector {
+	return tSelector(strings.Split(arg, "."))
+}
+
+func (s tSelector) Select(elemType Type) ([]*Field, bool) {
+	switch typ := elemType.(type) {
+	case *Definition:
+		field, ok := typ.fieldsByName[s[0]]
+		if !ok {
+			return nil, false
+		}
+		var subPath []*Field
+		if len(s) > 1 {
+			var ok bool
+			subPath, ok = tSelector(s[1:]).Select(field.typ)
+			if !ok {
+				return nil, false
+			}
+		}
+		subPath = append(subPath, field)
+		return subPath, true
+	case *SliceType:
+		return s.Select(typ.elementType)
+	}
+
+	return nil, false
 }
 
 func resolveRefTypes(niceFieldName string, defs map[string]*Definition, locus interface{}) error {
