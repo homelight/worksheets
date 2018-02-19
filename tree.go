@@ -21,10 +21,6 @@ type Definition struct {
 	fields        []*Field
 	fieldsByName  map[string]*Field
 	fieldsByIndex map[int]*Field
-
-	// derived values handling
-	externals  map[int]ComputedBy
-	dependents map[int][]int
 }
 
 func (def *Definition) addField(field *Field) {
@@ -40,6 +36,7 @@ type Field struct {
 	index         int
 	name          string
 	typ           Type
+	dependents    []int
 	computedBy    expression
 	constrainedBy expression
 }
@@ -50,6 +47,10 @@ func (f *Field) Type() Type {
 
 func (f *Field) Name() string {
 	return f.name
+}
+
+func (f *Field) String() string {
+	return fmt.Sprintf("field(%d:%s, %s)", f.index, f.name, f.typ)
 }
 
 type tOp string

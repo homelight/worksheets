@@ -122,30 +122,31 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 
 	// Resolve computed_by & constrained_by dependencies
 	for _, def := range defs {
-		def.dependents = make(map[int][]int)
 		for _, field := range def.fields {
-
 			fieldTrigger := field.computedBy
 			if fieldTrigger == nil {
 				fieldTrigger = field.constrainedBy
 			}
 
 			if fieldTrigger != nil {
-				fieldName := field.name
 				args := fieldTrigger.Args()
 				if len(args) == 0 {
-					return nil, fmt.Errorf("%s.%s has no dependencies", def.name, fieldName)
+					return nil, fmt.Errorf("%s.%s has no dependencies", def.name, field.name)
 				}
 				for _, argName := range args {
 					selector := argToSelector(argName)
 					path, ok := selector.Select(def)
 					if !ok {
-						return nil, fmt.Errorf("%s.%s references unknown arg %s", def.name, fieldName, argName)
+						return nil, fmt.Errorf("%s.%s references unknown arg %s", def.name, field.name, argName)
 					}
-					dependent := path[0]
+
+					// Only update the graph for computed fields; constrained
+					// fields don't need to be recalculated when args are
+					// set, only upon setting a new value.
 					if field.computedBy != nil {
-						// only update the graph for computed fields; constrained fields don't need to be recalculated when args are set, only upon setting a new value
-						def.dependents[dependent.index] = append(def.dependents[dependent.index], field.index)
+						for _, dependent := range path {
+							dependent.dependents = append(dependent.dependents, field.index)
+						}
 					}
 				}
 			}
@@ -422,7 +423,7 @@ func (ws *Worksheet) set(field *Field, value Value) error {
 	}
 
 	// if this field is an ascendant to any other, recompute them
-	for _, dependentIndex := range ws.def.dependents[index] {
+	for _, dependentIndex := range field.dependents {
 		dependent := ws.def.fieldsByIndex[dependentIndex]
 		updatedValue, err := dependent.computedBy.Compute(ws)
 		if err != nil {
