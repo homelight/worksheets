@@ -14,6 +14,7 @@ package worksheets
 
 import (
 	"fmt"
+	"strings"
 )
 
 type expression interface {
@@ -30,7 +31,7 @@ var _ = []expression{
 
 	&tExternal{},
 	&ePlugin{},
-	&tVar{},
+	tSelector(nil),
 	&tUnop{},
 	&tBinop{},
 	&tReturn{},
@@ -76,12 +77,13 @@ func (e *Bool) Compute(ws *Worksheet) (Value, error) {
 	return e, nil
 }
 
-func (e *tVar) Args() []string {
-	return []string{e.name}
+func (e tSelector) Args() []string {
+	return []string{strings.Join([]string(e), ".")}
 }
 
-func (e *tVar) Compute(ws *Worksheet) (Value, error) {
-	return ws.Get(e.name)
+func (e tSelector) Compute(ws *Worksheet) (Value, error) {
+	// TODO(pascal): fix this!
+	return ws.Get(e[0])
 }
 
 func (e *tUnop) Args() []string {

@@ -91,12 +91,14 @@ func (s *Zuite) TestParser_parseExpression() {
 		`"Alice"`:   &Text{"Alice"},
 		`true`:      &Bool{true},
 
-		// var
-		`foo`: &tVar{"foo"},
+		// selectors
+		`foo`:         tSelector([]string{"foo"}),
+		`foo.bar`:     tSelector([]string{"foo", "bar"}),
+		`foo.bar.baz`: tSelector([]string{"foo", "bar", "baz"}),
 
 		// unop and binop
 		`3 + 4`: &tBinop{opPlus, &Number{3, &NumberType{0}}, &Number{4, &NumberType{0}}, nil},
-		`!foo`:  &tUnop{opNot, &tVar{"foo"}},
+		`!foo`:  &tUnop{opNot, tSelector([]string{"foo"})},
 
 		// parentheses
 		`(true)`:          &Bool{true},

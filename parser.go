@@ -50,6 +50,7 @@ var (
 	pMult               = newTokenPattern("*", "\\*")
 	pDiv                = newTokenPattern("/", "\\/")
 	pNot                = newTokenPattern("!", "\\!")
+	pDot                = newTokenPattern(".", "\\.")
 	pEqual              = newTokenPattern("==", "\\=\\=")
 	pNotEqual           = newTokenPattern("!=", "\\!\\=")
 	pGreaterThan        = newTokenPattern(">", "\\>")
@@ -276,7 +277,7 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 		"literal",
 		"literal",
 		"literal",
-		"var",
+		"ident",
 		"paren",
 		"unop",
 	})
@@ -294,9 +295,17 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 		}
 		first = val.(expression)
 
-	case "var":
-		token := p.next()
-		first = &tVar{token}
+	case "ident":
+		path := []string{p.next()}
+		for p.peek(pDot) {
+			p.next()
+			name, err := p.nextAndCheck(pName)
+			if err != nil {
+				return nil, err
+			}
+			path = append(path, name)
+		}
+		first = tSelector(path)
 
 	case "paren":
 		p.next()

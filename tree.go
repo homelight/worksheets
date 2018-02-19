@@ -97,12 +97,8 @@ func (t *tBinop) String() string {
 	return fmt.Sprintf("binop(%s, %s, %s, %s)", t.op, t.left, t.right, t.round)
 }
 
-// TODO(pascal): remove, replace by selector with only one name!
-type tVar struct {
-	name string
-}
-
-// tSelector represents a selector such as `foo.bar`
+// tSelector represents a selector such as referencing a field `foo`, or
+// referencing a field through a path such `foo.bar`.
 type tSelector []string
 
 type tReturn struct {
