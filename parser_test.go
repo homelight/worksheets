@@ -260,7 +260,7 @@ func (s *Zuite) TestParser_parseNumberLiteralWithPercentAndSpace() {
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))
-		actual, err := p.parseExpression(true)
+		actual, err := p.parseLiteral()
 		require.NoError(s.T(), err, input)
 		require.Equal(s.T(), "%", p.next(), "%s should not have reached eof", input)
 		assert.Equal(s.T(), expected, actual, input)
