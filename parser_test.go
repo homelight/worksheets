@@ -253,6 +253,20 @@ func (s *Zuite) TestParser_parseExpressionErrors() {
 	}
 }
 
+func (s *Zuite) TestParser_parseNumberLiteralWithPercentAndSpace() {
+	cases := map[string]Value{
+		`100 %`:   &Number{100, &NumberType{0}},
+		`1.625 %`: &Number{1625, &NumberType{3}},
+	}
+	for input, expected := range cases {
+		p := newParser(strings.NewReader(input))
+		actual, err := p.parseExpression(true)
+		require.NoError(s.T(), err, input)
+		require.Equal(s.T(), "%", p.next(), "%s should not have reached eof", input)
+		assert.Equal(s.T(), expected, actual, input)
+	}
+}
+
 func (s *Zuite) TestParser_parseLiteral() {
 	cases := map[string]Value{
 		`undefined`: &Undefined{},
