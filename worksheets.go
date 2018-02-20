@@ -132,7 +132,7 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 					// set, only upon setting a new value.
 					if field.computedBy != nil {
 						for _, ascendant := range path {
-							ascendant.dependants = append(ascendant.dependants, field)
+							ascendant.dependents = append(ascendant.dependents, field)
 						}
 					}
 				}
@@ -414,7 +414,7 @@ func (ws *Worksheet) set(field *Field, value Value) error {
 		ws.data[index] = value
 	}
 
-	// dependants
+	// dependents
 	if err := ws.handleDependantUpdates(field, oldValue, value); err != nil {
 		return err
 	}
@@ -569,7 +569,7 @@ func (ws *Worksheet) Append(name string, element Value) error {
 	}
 	ws.data[index] = slice
 
-	// dependants
+	// dependents
 	if err := ws.handleDependantUpdates(field, nil, element); err != nil {
 		return err
 	}
@@ -601,7 +601,7 @@ func (ws *Worksheet) Del(name string, index int) error {
 	deletedValue := slice.elements[index].value
 	ws.data[field.index] = newSlice
 
-	// dependants
+	// dependents
 	if err := ws.handleDependantUpdates(field, deletedValue, nil); err != nil {
 		return err
 	}
@@ -610,27 +610,27 @@ func (ws *Worksheet) Del(name string, index int) error {
 }
 
 func (ws *Worksheet) handleDependantUpdates(field *Field, oldValue, newValue Value) error {
-	for _, dependantField := range field.dependants {
+	for _, dependentField := range field.dependents {
 		// 1. Gather all depedant worksheets which point to this worksheet,
 		// and need to be triggered.
-		var allDependants []*Worksheet
-		if dependantField.def == ws.def {
-			allDependants = []*Worksheet{ws}
+		var allDependents []*Worksheet
+		if dependentField.def == ws.def {
+			allDependents = []*Worksheet{ws}
 		} else {
-			for _, parentsByFieldIndex := range ws.parents[dependantField.def.name] {
+			for _, parentsByFieldIndex := range ws.parents[dependentField.def.name] {
 				for _, parent := range parentsByFieldIndex {
-					allDependants = append(allDependants, parent)
+					allDependents = append(allDependents, parent)
 				}
 			}
 		}
 
-		// 2. Trigger the compute by of all dependant worksheets.
-		for _, dependant := range allDependants {
-			updatedValue, err := dependantField.computedBy.Compute(dependant)
+		// 2. Trigger the compute by of all dependent worksheets.
+		for _, dependent := range allDependents {
+			updatedValue, err := dependentField.computedBy.Compute(dependent)
 			if err != nil {
 				return err
 			}
-			if err := dependant.set(dependantField, updatedValue); err != nil {
+			if err := dependent.set(dependentField, updatedValue); err != nil {
 				return err
 			}
 		}

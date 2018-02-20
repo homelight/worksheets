@@ -48,7 +48,7 @@ type Field struct {
 	name          string
 	typ           Type
 	def           *Definition
-	dependants    []*Field
+	dependents    []*Field
 	computedBy    expression
 	constrainedBy expression
 }
