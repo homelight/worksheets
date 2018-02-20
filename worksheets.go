@@ -673,6 +673,12 @@ func (ws *Worksheet) handleDependantUpdates(field *Field, oldValue, newValue Val
 		if _, ok := childWs.parents[ws.def.name]; ok {
 			if _, ok := childWs.parents[ws.def.name][field.index]; ok {
 				delete(childWs.parents[ws.def.name][field.index], ws.Id())
+				if len(childWs.parents[ws.def.name][field.index]) == 0 {
+					delete(childWs.parents[ws.def.name], field.index)
+					if len(childWs.parents[ws.def.name]) == 0 {
+						delete(childWs.parents, ws.def.name)
+					}
+				}
 			}
 		}
 	}

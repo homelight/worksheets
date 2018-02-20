@@ -350,8 +350,8 @@ func (s *Zuite) TestComputedBy_simpleCrossWsParentPointers() {
 	require.True(s.T(), child.parents["parent"][2]["parent-id"] == parent)
 
 	parent.MustUnset("child")
-	require.Len(s.T(), child.parents, 1)
-	require.Len(s.T(), child.parents["parent"], 1)
+	require.Len(s.T(), child.parents, 0)
+	require.Len(s.T(), child.parents["parent"], 0)
 	require.Len(s.T(), child.parents["parent"][2], 0)
 }
 
@@ -443,8 +443,8 @@ func (s *Zuite) TestComputedBy_crossWsThroughSliceParentPointers() {
 	require.True(s.T(), child2.parents["parent"][2]["parent-id"] == parent)
 
 	parent.Del("children", 0)
-	require.Len(s.T(), child1.parents, 1)
-	require.Len(s.T(), child1.parents["parent"], 1)
+	require.Len(s.T(), child1.parents, 0)
+	require.Len(s.T(), child1.parents["parent"], 0)
 	require.Len(s.T(), child1.parents["parent"][2], 0)
 	require.Len(s.T(), child2.parents, 1)
 	require.Len(s.T(), child2.parents["parent"], 1)
@@ -452,11 +452,11 @@ func (s *Zuite) TestComputedBy_crossWsThroughSliceParentPointers() {
 	require.True(s.T(), child2.parents["parent"][2]["parent-id"] == parent)
 
 	parent.Del("children", 0)
-	require.Len(s.T(), child1.parents, 1)
-	require.Len(s.T(), child1.parents["parent"], 1)
+	require.Len(s.T(), child1.parents, 0)
+	require.Len(s.T(), child1.parents["parent"], 0)
 	require.Len(s.T(), child1.parents["parent"][2], 0)
-	require.Len(s.T(), child2.parents, 1)
-	require.Len(s.T(), child2.parents["parent"], 1)
+	require.Len(s.T(), child2.parents, 0)
+	require.Len(s.T(), child2.parents["parent"], 0)
 	require.Len(s.T(), child2.parents["parent"][2], 0)
 }
 
