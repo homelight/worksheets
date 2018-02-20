@@ -94,28 +94,7 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 	}
 
 	for _, def := range defs {
-		var (
-			indexesUsed = make(map[int]bool)
-			namesUsed   = make(map[string]bool)
-		)
 		for _, field := range def.fieldsByIndex {
-			// Any bad index?
-			if field.index == 0 {
-				return nil, fmt.Errorf("%s.%s: index cannot be zero", def.name, field.name)
-			}
-
-			// Any index reused?
-			if _, ok := indexesUsed[field.index]; ok {
-				return nil, fmt.Errorf("%s.%s: index %d cannot be reused", def.name, field.name, field.index)
-			}
-			indexesUsed[field.index] = true
-
-			// Any names reused?
-			if _, ok := namesUsed[field.name]; ok {
-				return nil, fmt.Errorf("%s.%s: multiple fields named %s", def.name, field.name, field.name)
-			}
-			namesUsed[field.name] = true
-
 			// Any unresolved externals?
 			if _, ok := field.computedBy.(*tExternal); ok {
 				return nil, fmt.Errorf("%s.%s: missing plugin for external computed_by", def.name, field.name)

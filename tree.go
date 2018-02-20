@@ -25,6 +25,11 @@ type Definition struct {
 func (def *Definition) addField(field *Field) error {
 	field.def = def
 
+	// Parsing guarantees user-defined fields are non-negative.
+	if field.index == 0 {
+		return fmt.Errorf("%s.%s: index cannot be zero", def.name, field.name)
+	}
+
 	if _, ok := def.fieldsByIndex[field.index]; ok {
 		return fmt.Errorf("%s.%s: index %d cannot be reused", def.name, field.name, field.index)
 	}
