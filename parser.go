@@ -604,16 +604,16 @@ func (p *parser) parseLiteral() (Value, error) {
 		}
 	}
 	if pNumber.re.MatchString(token) {
-		for p.peek(pNumberWithDot) || p.peek(pNumberWithUnderscore) {
+		for p.peek(pNumberWithUnderscore) || p.peek(pNumberWithDot) {
 			addToken := p.next()
+			if strings.HasSuffix(addToken, "_") {
+				return nil, fmt.Errorf("number cannot terminate with underscore")
+			}
 			if strings.HasSuffix(addToken, ".") {
 				if p.peek(pNumberWithUnderscore) {
 					return nil, fmt.Errorf("number fraction cannot start with underscore")
 				}
 				return nil, fmt.Errorf("number cannot terminate with dot")
-			}
-			if strings.HasSuffix(addToken, "_") {
-				return nil, fmt.Errorf("number cannot terminate with underscore")
 			}
 			if strings.HasSuffix(token, "%") {
 				return nil, fmt.Errorf("number must terminate with percent if present")
