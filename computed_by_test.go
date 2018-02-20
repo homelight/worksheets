@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func (s *Zuite) TestWorksheet_externalComputedBy() {
+func (s *Zuite) TestComputedBy_externalComputedBy() {
 	cases := []struct {
 		def         string
 		opt         *Options
@@ -128,7 +128,7 @@ func (s *Zuite) TestWorksheet_externalComputedBy() {
 
 }
 
-func (s *Zuite) TestWorksheet_externalComputedByPlugin() {
+func (s *Zuite) TestComputedBy_externalComputedByPlugin() {
 	opt := Options{
 		Plugins: map[string]map[string]ComputedBy{
 			"simple": map[string]ComputedBy{
@@ -235,7 +235,7 @@ func (fn bio) Compute(values ...Value) Value {
 	return NewText(fmt.Sprintf("%s, age %d, born in %d", fullName, age, birthYear))
 }
 
-func (s *Zuite) TestExternalComputedBy_good() {
+func (s *Zuite) TestComputedBy_externalGood() {
 	opt := Options{
 		Plugins: map[string]map[string]ComputedBy{
 			"simple": map[string]ComputedBy{
@@ -257,7 +257,7 @@ func (s *Zuite) TestExternalComputedBy_good() {
 	require.Equal(s.T(), `"Alice"`, ws.MustGet("name").String())
 }
 
-func (s *Zuite) TestExternalComputedBy_goodComplicated() {
+func (s *Zuite) TestComputedBy_externalGoodComplicated() {
 	opt := Options{
 		Plugins: map[string]map[string]ComputedBy{
 			"complicated": map[string]ComputedBy{
@@ -289,7 +289,7 @@ func (s *Zuite) TestExternalComputedBy_goodComplicated() {
 	require.Equal(s.T(), `"Alice Maters, age 73, born in 1945"`, ws.MustGet("bio").String())
 }
 
-func (s *Zuite) TestSimpleExpressionsInWorksheet() {
+func (s *Zuite) TestComputedBy_simpleExpressionsInWorksheet() {
 	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {
 		1:age number[0]
 		2:age_plus_two number[0] computed_by { return age + 2 }
@@ -302,7 +302,7 @@ func (s *Zuite) TestSimpleExpressionsInWorksheet() {
 	require.Equal(s.T(), "75", ws.MustGet("age_plus_two").String())
 }
 
-func (s *Zuite) TestCyclicEditsIfNoIdentCheck() {
+func (s *Zuite) TestComputedBy_cyclicEditsIfNoIdentCheck() {
 	defs, err := NewDefinitions(strings.NewReader(`worksheet cyclic_edits {
 		1:right bool
 		2:a bool computed_by {
@@ -334,7 +334,29 @@ worksheet child {
 	5:amount number[2]
 }`))
 
-func (s *Zuite) TestComputedBy_simpleCrossWs() {
+func (s *Zuite) TestComputedBy_simpleCrossWsParentPointers() {
+	parent := defsCrossWs.MustNewWorksheet("parent")
+	child := defsCrossWs.MustNewWorksheet("child")
+	forciblySetId(parent, "parent-id")
+	forciblySetId(child, "child-id")
+
+	require.Len(s.T(), child.parents, 0)
+	require.Len(s.T(), child.parents["parent"], 0)
+	require.Len(s.T(), child.parents["parent"][2], 0)
+
+	parent.MustSet("child", child)
+	require.Len(s.T(), child.parents, 1)
+	require.Len(s.T(), child.parents["parent"], 1)
+	require.Len(s.T(), child.parents["parent"][2], 1)
+	require.True(s.T(), child.parents["parent"][2]["parent-id"] == parent)
+
+	parent.MustUnset("child")
+	require.Len(s.T(), child.parents, 1)
+	require.Len(s.T(), child.parents["parent"], 1)
+	require.Len(s.T(), child.parents["parent"][2], 0)
+}
+
+func (s *Zuite) TestComputedBy_simpleCrossWsExample() {
 	parent := defsCrossWs.MustNewWorksheet("parent")
 
 	child := defsCrossWs.MustNewWorksheet("child")

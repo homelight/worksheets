@@ -104,16 +104,20 @@ func (p *parser) parseWorksheet() (*Definition, error) {
 		fieldsByName:  make(map[string]*Field),
 		fieldsByIndex: make(map[int]*Field),
 	}
-	ws.addField(&Field{
+	if err := ws.addField(&Field{
 		index: IndexId,
 		name:  "id",
 		typ:   &TextType{},
-	})
-	ws.addField(&Field{
+	}); err != nil {
+		panic(fmt.Sprintf("unexpected %s", err))
+	}
+	if err := ws.addField(&Field{
 		index: IndexVersion,
 		name:  "version",
 		typ:   &NumberType{},
-	})
+	}); err != nil {
+		panic(fmt.Sprintf("unexpected %s", err))
+	}
 
 	_, err := p.nextAndCheck(pWorksheet)
 	if err != nil {
@@ -136,7 +140,9 @@ func (p *parser) parseWorksheet() (*Definition, error) {
 		if err != nil {
 			return nil, err
 		}
-		ws.addField(field)
+		if err := ws.addField(field); err != nil {
+			return nil, err
+		}
 	}
 
 	_, err = p.nextAndCheck(pRacco)

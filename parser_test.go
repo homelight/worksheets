@@ -24,13 +24,11 @@ func (s *Zuite) TestParser_parseWorksheet() {
 	cases := map[string]func(*Definition){
 		`worksheet simple {}`: func(ws *Definition) {
 			require.Equal(s.T(), "simple", ws.name)
-			require.Equal(s.T(), 2+0, len(ws.fields))
 			require.Equal(s.T(), 2+0, len(ws.fieldsByName))
 			require.Equal(s.T(), 2+0, len(ws.fieldsByIndex))
 		},
 		`worksheet simple {42:full_name text}`: func(ws *Definition) {
 			require.Equal(s.T(), "simple", ws.name)
-			require.Equal(s.T(), 2+1, len(ws.fields))
 			require.Equal(s.T(), 2+1, len(ws.fieldsByName))
 			require.Equal(s.T(), 2+1, len(ws.fieldsByIndex))
 
@@ -43,7 +41,8 @@ func (s *Zuite) TestParser_parseWorksheet() {
 		},
 		`  worksheet simple {42:full_name text 45:happy bool}`: func(ws *Definition) {
 			require.Equal(s.T(), "simple", ws.name)
-			require.Equal(s.T(), 2+2, len(ws.fields))
+			require.Equal(s.T(), 2+2, len(ws.fieldsByName))
+			require.Equal(s.T(), 2+2, len(ws.fieldsByIndex))
 
 			field1 := ws.fieldsByName["full_name"]
 			require.Equal(s.T(), 42, field1.index)

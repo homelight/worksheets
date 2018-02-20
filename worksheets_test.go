@@ -71,7 +71,7 @@ func (s *Zuite) TestNewDefinitionsErrors() {
 		`worksheet simple {
 			42:same_name text
 			43:same_name text
-		}`: `simple.same_name: multiple fields named same_name`,
+		}`: `simple.same_name: name same_name cannot be reused`,
 
 		`worksheet ref_to_worksheet {
 			89:ref_here some_other_worksheet
@@ -105,7 +105,7 @@ func (s *Zuite) TestNewDefinitionsErrors() {
 	}
 	for input, msg := range cases {
 		_, err := NewDefinitions(strings.NewReader(input))
-		assert.EqualError(s.T(), err, msg, input)
+		assert.EqualError(s.T(), err, msg, input+" expecting "+msg)
 	}
 }
 

@@ -82,8 +82,25 @@ func (e tSelector) Args() []string {
 }
 
 func (e tSelector) Compute(ws *Worksheet) (Value, error) {
-	// TODO(pascal): fix this!
-	return ws.Get(e[0])
+	var (
+		currentWs = ws
+		lastIndex = len(e) - 1
+	)
+	for i := 0; i < lastIndex; i++ {
+		if value, err := ws.Get(e[i]); err != nil {
+			return nil, err
+		} else if _, ok := value.(*Undefined); ok {
+			return value, nil
+		} else if nextWs, ok := value.(*Worksheet); ok {
+			currentWs = nextWs
+		} else {
+			// TODO(pascal):
+			// 1. How coudl this occur since we validate paths?
+			// 2. Clearer error message wouldn't hurt.
+			return nil, fmt.Errorf("non-sensical selector %v at index %d, not a worksheet, but was %s", e, i, value)
+		}
+	}
+	return currentWs.Get(e[lastIndex])
 }
 
 func (e *tUnop) Args() []string {

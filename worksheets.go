@@ -40,6 +40,14 @@ type Worksheet struct {
 
 	// data holds all the worksheet data.
 	data map[int]Value
+
+	// parents holds all the reverse pointers of worksheets pointing to this
+	// worksheet.
+	//
+	// The map goes from parent's worksheet name, field index of the parent
+	// pointing to this worksheet, and then the actual references to the parent
+	// worksheet by UUID.
+	parents map[string]map[int]map[string]*Worksheet
 }
 
 const (
@@ -90,7 +98,7 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 			indexesUsed = make(map[int]bool)
 			namesUsed   = make(map[string]bool)
 		)
-		for _, field := range def.fields {
+		for _, field := range def.fieldsByIndex {
 			// Any bad index?
 			if field.index == 0 {
 				return nil, fmt.Errorf("%s.%s: index cannot be zero", def.name, field.name)
@@ -122,7 +130,7 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 
 	// Resolve computed_by & constrained_by dependencies
 	for _, def := range defs {
-		for _, field := range def.fields {
+		for _, field := range def.fieldsByIndex {
 			fieldTrigger := field.computedBy
 			if fieldTrigger == nil {
 				fieldTrigger = field.constrainedBy
@@ -144,8 +152,8 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 					// fields don't need to be recalculated when args are
 					// set, only upon setting a new value.
 					if field.computedBy != nil {
-						for _, dependent := range path {
-							dependent.dependents = append(dependent.dependents, field.index)
+						for _, ascendant := range path {
+							ascendant.dependants = append(ascendant.dependants, field)
 						}
 					}
 				}
@@ -296,9 +304,10 @@ func (defs *Definitions) newUninitializedWorksheet(name string) (*Worksheet, err
 	}
 
 	ws := &Worksheet{
-		def:  def,
-		orig: make(map[int]Value),
-		data: make(map[int]Value),
+		def:     def,
+		orig:    make(map[int]Value),
+		data:    make(map[int]Value),
+		parents: make(map[string]map[int]map[string]*Worksheet),
 	}
 
 	return ws, nil
@@ -398,39 +407,78 @@ func (ws *Worksheet) Set(name string, value Value) error {
 }
 
 func (ws *Worksheet) set(field *Field, value Value) error {
-	index := field.index
+	var (
+		index          = field.index
+		_, isUndefined = value.(*Undefined)
+	)
+
+	// oldValue
+	oldValue, ok := ws.data[index]
+	if !ok {
+		oldValue = &Undefined{}
+	}
 
 	// ident
-	if oldValue, ok := ws.data[index]; !ok {
-		if _, ok := value.(*Undefined); ok {
-			return nil
-		}
-	} else if oldValue.Equal(value) {
+	if oldValue.Equal(value) {
 		return nil
 	}
 
 	// type check
-	litType := value.Type()
-	if ok := litType.AssignableTo(field.typ); !ok {
-		return fmt.Errorf("cannot assign value of type %s to field of type %s", litType, field.typ)
+	if ok := value.Type().AssignableTo(field.typ); !ok {
+		return fmt.Errorf("cannot assign value of type %s to field of type %s", value.Type(), field.typ)
 	}
 
 	// store
-	if value.Type().AssignableTo(&UndefinedType{}) {
+	if isUndefined {
 		delete(ws.data, index)
 	} else {
 		ws.data[index] = value
 	}
 
 	// if this field is an ascendant to any other, recompute them
-	for _, dependentIndex := range field.dependents {
-		dependent := ws.def.fieldsByIndex[dependentIndex]
-		updatedValue, err := dependent.computedBy.Compute(ws)
-		if err != nil {
-			return err
+	for _, dependantField := range field.dependants {
+		// 1. Gather all depedant worksheets which point to this worksheet,
+		// and need to be triggered.
+		var allDependants []*Worksheet
+		if dependantField.def == ws.def {
+			allDependants = []*Worksheet{ws}
+		} else {
+			for _, parentsByFieldIndex := range ws.parents[dependantField.def.name] {
+				for _, parent := range parentsByFieldIndex {
+					allDependants = append(allDependants, parent)
+				}
+			}
 		}
-		if err := ws.set(dependent, updatedValue); err != nil {
-			return err
+
+		// 2. Trigger the compute by of all dependant worksheets.
+		for _, dependant := range allDependants {
+			updatedValue, err := dependantField.computedBy.Compute(dependant)
+			if err != nil {
+				return err
+			}
+			if err := dependant.set(dependantField, updatedValue); err != nil {
+				return err
+			}
+		}
+	}
+
+	// if the value is worksheet, update its parents pointers
+	if childWs, ok := value.(*Worksheet); ok {
+		if _, ok := childWs.parents[ws.def.name]; !ok {
+			childWs.parents[ws.def.name] = make(map[int]map[string]*Worksheet)
+		}
+		if _, ok := childWs.parents[ws.def.name][field.index]; !ok {
+			childWs.parents[ws.def.name][field.index] = make(map[string]*Worksheet)
+		}
+		childWs.parents[ws.def.name][field.index][ws.Id()] = ws
+	}
+
+	// if the old value was a worksheet, update its parent pointers
+	if childWs, ok := oldValue.(*Worksheet); ok {
+		if _, ok := childWs.parents[ws.def.name]; ok {
+			if _, ok := childWs.parents[ws.def.name][field.index]; ok {
+				delete(childWs.parents[ws.def.name][field.index], ws.Id())
+			}
 		}
 	}
 

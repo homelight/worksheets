@@ -91,16 +91,19 @@ func (s *Zuite) TestWorksheetDefinition_Fields() {
 			index: 1,
 			name:  "name",
 			typ:   &TextType{},
+			def:   defs.defs["simple"],
 		},
 		{
 			index: -2,
 			name:  "id",
 			typ:   &TextType{},
+			def:   defs.defs["simple"],
 		},
 		{
 			index: -1,
 			name:  "version",
 			typ:   &NumberType{},
+			def:   defs.defs["simple"],
 		},
 	}
 	for _, field := range expectedFields {

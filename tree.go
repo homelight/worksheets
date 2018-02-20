@@ -18,25 +18,32 @@ import (
 
 type Definition struct {
 	name          string
-	fields        []*Field
 	fieldsByName  map[string]*Field
 	fieldsByIndex map[int]*Field
 }
 
-func (def *Definition) addField(field *Field) {
-	def.fields = append(def.fields, field)
+func (def *Definition) addField(field *Field) error {
+	field.def = def
 
-	// Clobbering due to name reuse, or index reuse, is checked by validating
-	// the tree.
-	def.fieldsByName[field.name] = field
+	if _, ok := def.fieldsByIndex[field.index]; ok {
+		return fmt.Errorf("%s.%s: index %d cannot be reused", def.name, field.name, field.index)
+	}
 	def.fieldsByIndex[field.index] = field
+
+	if _, ok := def.fieldsByName[field.name]; ok {
+		return fmt.Errorf("%s.%s: name %s cannot be reused", def.name, field.name, field.name)
+	}
+	def.fieldsByName[field.name] = field
+
+	return nil
 }
 
 type Field struct {
 	index         int
 	name          string
 	typ           Type
-	dependents    []int
+	def           *Definition
+	dependants    []*Field
 	computedBy    expression
 	constrainedBy expression
 }
@@ -50,7 +57,7 @@ func (f *Field) Name() string {
 }
 
 func (f *Field) String() string {
-	return fmt.Sprintf("field(%d:%s, %s)", f.index, f.name, f.typ)
+	return fmt.Sprintf("field(%s.%s, %s)", f.def.name, f.name, f.typ)
 }
 
 type tOp string
