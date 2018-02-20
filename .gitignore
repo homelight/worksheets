@@ -1,0 +1,11 @@
+.DS_Store
+
+# ignore generated corpus
+fuzz/corpus/*
+!fuzz/corpus/corpus_*
+fuzz/crashers/*
+fuzz/suppressions/*
+
+# ignore generated fuzz bin
+worksheets-fuzz.zip
+

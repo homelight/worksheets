@@ -32,6 +32,8 @@ func (def *Definition) addField(field *Field) error {
 
 	if _, ok := def.fieldsByIndex[field.index]; ok {
 		return fmt.Errorf("%s.%s: index %d cannot be reused", def.name, field.name, field.index)
+	} else if field.index > 65536 {
+		return fmt.Errorf("%s.%s: index cannot be greater than 65536", def.name, field.name)
 	}
 	def.fieldsByIndex[field.index] = field
 

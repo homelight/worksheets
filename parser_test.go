@@ -304,18 +304,32 @@ func (s *Zuite) TestParser_parseLiteral() {
 
 func (s *Zuite) TestParser_parseType() {
 	cases := map[string]Type{
-		`undefined`: &UndefinedType{},
-		`text`:      &TextType{},
-		`bool`:      &BoolType{},
-		`number[5]`: &NumberType{5},
-		`[]bool`:    &SliceType{&BoolType{}},
-		`foobar`:    &Definition{name: "foobar"},
+		`undefined`:  &UndefinedType{},
+		`text`:       &TextType{},
+		`bool`:       &BoolType{},
+		`number[5]`:  &NumberType{5},
+		`number[32]`: &NumberType{32},
+		`[]bool`:     &SliceType{&BoolType{}},
+		`foobar`:     &Definition{name: "foobar"},
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))
 		actual, err := p.parseType()
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), expected, actual)
+	}
+}
+
+func (s *Zuite) TestParser_parseTypeErrors() {
+	cases := map[string]string{
+		`number[-7]`: `expected index, found -`,
+		`number[33]`: `scale cannot be greater than 32`,
+		`number[9999999999999999999999999999999999999999999999999]`: `scale cannot be greater than 32`,
+	}
+	for input, expected := range cases {
+		p := newParser(strings.NewReader(input))
+		_, err := p.parseType()
+		assert.EqualError(s.T(), err, expected, input)
 	}
 }
 

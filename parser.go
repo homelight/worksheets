@@ -158,10 +158,13 @@ func (p *parser) parseField() (*Field, error) {
 	if err != nil {
 		return nil, err
 	}
-	index, err := strconv.Atoi(sIndex)
-	if err != nil {
-		// unexpected since sIndex should conform to pIndex
-		panic(err)
+	index := 65536 + 1
+	if len(sIndex) <= len("65536") {
+		index, err = strconv.Atoi(sIndex)
+		if err != nil {
+			// unexpected since sIndex should conform to pIndex
+			panic(err)
+		}
 	}
 
 	_, err = p.nextAndCheck(pColon)
@@ -567,10 +570,16 @@ func (p *parser) parseType() (Type, error) {
 			if err != nil {
 				return nil, err
 			}
-			scale, err := strconv.Atoi(sScale)
-			if err != nil {
-				// unexpected since sIndex should conform to pIndex
-				panic(err)
+			var scale int = 32 + 1
+			if len(sScale) <= len("32") {
+				scale, err = strconv.Atoi(sScale)
+				if err != nil {
+					// unexpected since sIndex should conform to pIndex
+					panic(err)
+				}
+			}
+			if scale > 32 {
+				return nil, fmt.Errorf("scale cannot be greater than 32")
 			}
 			_, err = p.nextAndCheck(pRbracket)
 			if err != nil {

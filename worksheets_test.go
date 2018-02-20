@@ -60,6 +60,14 @@ func (s *Zuite) TestNewDefinitionsErrors() {
 
 		// worksheet semantics
 		`worksheet simple {
+			65537:index_too_large bool
+		}`: `simple.index_too_large: index cannot be greater than 65536`,
+
+		`worksheet simple {
+			9999999999999999999999999999999999999999999999999:index_too_large bool
+		}`: `simple.index_too_large: index cannot be greater than 65536`,
+
+		`worksheet simple {
 			0:no_can_do_with_zero bool
 		}`: `simple.no_can_do_with_zero: index cannot be zero`,
 
