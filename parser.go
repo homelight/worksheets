@@ -77,8 +77,8 @@ var (
 	pText  = newTokenPattern("text", "\".*\"")
 
 	pNumber               = newTokenPattern("number", "[0-9]+(\\.[0-9]+)?(\\%)?")
-	pNumberWithDot        = newTokenPattern("number", "\\.[0-9]*(\\%)?")
 	pNumberWithUnderscore = newTokenPattern("number", "[_0-9]+(\\%)?")
+	pNumberWithDot        = newTokenPattern("number", "\\.[0-9]*(\\%)?")
 )
 
 func (p *parser) parseWorksheets() (map[string]*Definition, error) {
@@ -695,7 +695,7 @@ func (p *parser) next() string {
 		p.s.Scan()
 		token := p.s.TokenText()
 
-		// will need to revisit this when we implement mod operator
+		// will need to revisit when we implement mod operator
 		if p.s.Peek() == '%' {
 			return token + string(p.s.Next())
 		}
