@@ -98,7 +98,7 @@ func (s *Session) Load(id string) (*Worksheet, error) {
 	loader := &loader{
 		s:               s,
 		graph:           make(map[string]*Worksheet),
-		slicesToHydrate: make(map[string]*slice),
+		slicesToHydrate: make(map[string]*Slice),
 	}
 	return loader.loadWorksheet(id)
 }
@@ -130,7 +130,7 @@ func (s *Session) Update(ws *Worksheet) error {
 type loader struct {
 	s               *Session
 	graph           map[string]*Worksheet
-	slicesToHydrate map[string]*slice
+	slicesToHydrate map[string]*Slice
 }
 
 func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
@@ -267,9 +267,9 @@ func (l *loader) readValue(typ Type, optValue dat.NullString) (Value, error) {
 	}
 }
 
-func (l *loader) nextSlicesToHydrate() map[string]*slice {
+func (l *loader) nextSlicesToHydrate() map[string]*Slice {
 	slicesToHydrate := l.slicesToHydrate
-	l.slicesToHydrate = make(map[string]*slice)
+	l.slicesToHydrate = make(map[string]*Slice)
 	return slicesToHydrate
 }
 
@@ -326,7 +326,7 @@ func (p *persister) save(ws *Worksheet) error {
 	}
 
 	// insert rValues
-	var slicesToInsert []*slice
+	var slicesToInsert []*Slice
 	insertValues := p.s.tx.InsertInto("worksheet_values").Columns("*").Blacklist("id")
 	for index, value := range ws.data {
 		insertValues.Record(rValue{
@@ -337,7 +337,7 @@ func (p *persister) save(ws *Worksheet) error {
 			Value:       p.writeValue(value),
 		})
 
-		if slice, ok := value.(*slice); ok {
+		if slice, ok := value.(*Slice); ok {
 			slicesToInsert = append(slicesToInsert, slice)
 		}
 	}
@@ -415,12 +415,12 @@ func (p *persister) update(ws *Worksheet) error {
 	)
 	for index, change := range diff {
 		valuesToUpdate = append(valuesToUpdate, index)
-		if sliceAfter, ok := change.after.(*slice); ok {
-			var sliceBefore *slice
-			if actualSliceBefore, ok := change.before.(*slice); ok {
+		if sliceAfter, ok := change.after.(*Slice); ok {
+			var sliceBefore *Slice
+			if actualSliceBefore, ok := change.before.(*Slice); ok {
 				sliceBefore = actualSliceBefore
 			} else if _, ok := change.before.(*Undefined); ok {
-				sliceBefore = &slice{id: sliceAfter.id}
+				sliceBefore = &Slice{id: sliceAfter.id}
 			} else {
 				continue
 			}
@@ -524,7 +524,7 @@ func (p *persister) writeValue(value Value) dat.NullString {
 	switch v := value.(type) {
 	case *Text:
 		result = v.value
-	case *slice:
+	case *Slice:
 		result = fmt.Sprintf("[:%d:%s", v.lastRank, v.id)
 	case *Worksheet:
 		result = fmt.Sprintf("*:%s", v.Id())
@@ -554,7 +554,7 @@ func worksheetsToCascade(value Value) []*Worksheet {
 	switch v := value.(type) {
 	case *Worksheet:
 		return []*Worksheet{v}
-	case *slice:
+	case *Slice:
 		var result []*Worksheet
 		for _, element := range v.elements {
 			result = append(result, worksheetsToCascade(element.value)...)

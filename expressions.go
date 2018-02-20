@@ -82,25 +82,44 @@ func (e tSelector) Args() []string {
 }
 
 func (e tSelector) Compute(ws *Worksheet) (Value, error) {
-	var (
-		currentWs = ws
-		lastIndex = len(e) - 1
-	)
-	for i := 0; i < lastIndex; i++ {
-		if value, err := ws.Get(e[i]); err != nil {
-			return nil, err
-		} else if _, ok := value.(*Undefined); ok {
-			return value, nil
-		} else if nextWs, ok := value.(*Worksheet); ok {
-			currentWs = nextWs
-		} else {
-			// TODO(pascal):
-			// 1. How coudl this occur since we validate paths?
-			// 2. Clearer error message wouldn't hurt.
-			return nil, fmt.Errorf("non-sensical selector %v at index %d, not a worksheet, but was %s", e, i, value)
-		}
+	// TODO(pascal): raw get for internal use?
+	value, ok := ws.data[ws.def.fieldsByName[e[0]].index]
+	if !ok {
+		value = &Undefined{}
 	}
-	return currentWs.Get(e[lastIndex])
+
+	// base case
+	if len(e) == 1 {
+		return value, nil
+	}
+
+	// recursive case
+	if _, ok := value.(*Undefined); ok {
+		return value, nil
+	} else if selectedWs, ok := value.(*Worksheet); ok {
+		return tSelector(e[1:]).Compute(selectedWs)
+	} else if selectedSlice, ok := value.(*Slice); ok {
+		// returnedSlice :=newSlice(nil) // TODO(pascal)
+		var elements []sliceElement
+		for _, elem := range selectedSlice.elements {
+			subWs, ok := elem.value.(*Worksheet)
+			if !ok {
+				return nil, fmt.Errorf("sorry! more complex selectors are not supported yet!")
+			}
+			subValue, err := tSelector(e[1:]).Compute(subWs)
+			if err != nil {
+				return nil, err
+			}
+			elements = append(elements, sliceElement{
+				value: subValue,
+			})
+		}
+		return &Slice{
+			elements: elements,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("sorry! more complex selectors are not supported yet!")
 }
 
 func (e *tUnop) Args() []string {
@@ -260,7 +279,12 @@ func (e *ePlugin) Compute(ws *Worksheet) (Value, error) {
 	args := e.computedBy.Args()
 	values := make([]Value, len(args), len(args))
 	for i, arg := range args {
-		value := ws.MustGet(arg)
+		selector := argToSelector(arg)
+		value, err := selector.Compute(ws)
+		if err != nil {
+			// TODO(pascal): panic here, this should have failed earlier when binding Args
+			return nil, err
+		}
 		values[i] = value
 	}
 	return e.computedBy.Compute(values...), nil

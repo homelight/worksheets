@@ -435,51 +435,9 @@ func (ws *Worksheet) set(field *Field, value Value) error {
 		ws.data[index] = value
 	}
 
-	// if this field is an ascendant to any other, recompute them
-	for _, dependantField := range field.dependants {
-		// 1. Gather all depedant worksheets which point to this worksheet,
-		// and need to be triggered.
-		var allDependants []*Worksheet
-		if dependantField.def == ws.def {
-			allDependants = []*Worksheet{ws}
-		} else {
-			for _, parentsByFieldIndex := range ws.parents[dependantField.def.name] {
-				for _, parent := range parentsByFieldIndex {
-					allDependants = append(allDependants, parent)
-				}
-			}
-		}
-
-		// 2. Trigger the compute by of all dependant worksheets.
-		for _, dependant := range allDependants {
-			updatedValue, err := dependantField.computedBy.Compute(dependant)
-			if err != nil {
-				return err
-			}
-			if err := dependant.set(dependantField, updatedValue); err != nil {
-				return err
-			}
-		}
-	}
-
-	// if the value is worksheet, update its parents pointers
-	if childWs, ok := value.(*Worksheet); ok {
-		if _, ok := childWs.parents[ws.def.name]; !ok {
-			childWs.parents[ws.def.name] = make(map[int]map[string]*Worksheet)
-		}
-		if _, ok := childWs.parents[ws.def.name][field.index]; !ok {
-			childWs.parents[ws.def.name][field.index] = make(map[string]*Worksheet)
-		}
-		childWs.parents[ws.def.name][field.index][ws.Id()] = ws
-	}
-
-	// if the old value was a worksheet, update its parent pointers
-	if childWs, ok := oldValue.(*Worksheet); ok {
-		if _, ok := childWs.parents[ws.def.name]; ok {
-			if _, ok := childWs.parents[ws.def.name][field.index]; ok {
-				delete(childWs.parents[ws.def.name][field.index], ws.Id())
-			}
-		}
+	// dependants
+	if err := ws.handleDependantUpdates(field, oldValue, value); err != nil {
+		return err
 	}
 
 	return nil
@@ -546,14 +504,10 @@ func (ws *Worksheet) GetSlice(name string) ([]Value, error) {
 		return nil, nil
 	}
 
-	var values []Value
-	for _, element := range slice.elements {
-		values = append(values, element.value)
-	}
-	return values, nil
+	return slice.Elements(), nil
 }
 
-func (ws *Worksheet) getSlice(name string) (*Field, *slice, error) {
+func (ws *Worksheet) getSlice(name string) (*Field, *Slice, error) {
 	field, value, err := ws.get(name)
 	if err != nil {
 		return nil, nil, err
@@ -567,7 +521,7 @@ func (ws *Worksheet) getSlice(name string) (*Field, *slice, error) {
 		return field, nil, nil
 	}
 
-	return field, value.(*slice), nil
+	return field, value.(*Slice), nil
 }
 
 // Get gets a value for base types, e.g. text, number, or bool.
@@ -629,12 +583,17 @@ func (ws *Worksheet) Append(name string, element Value) error {
 	}
 
 	// append
-	slice := value.(*slice)
+	slice := value.(*Slice)
 	slice, err := slice.doAppend(element)
 	if err != nil {
 		return err
 	}
 	ws.data[index] = slice
+
+	// dependants
+	if err := ws.handleDependantUpdates(field, nil, element); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -656,13 +615,75 @@ func (ws *Worksheet) Del(name string, index int) error {
 		return err
 	}
 
-	slice, err = slice.doDel(index)
+	newSlice, err := slice.doDel(index)
 	if err != nil {
 		return err
 	}
+	deletedValue := slice.elements[index].value
+	ws.data[field.index] = newSlice
 
-	ws.data[field.index] = slice
+	// dependants
+	if err := ws.handleDependantUpdates(field, deletedValue, nil); err != nil {
+		return err
+	}
 
+	return nil
+}
+
+func (ws *Worksheet) handleDependantUpdates(field *Field, oldValue, newValue Value) error {
+	for _, dependantField := range field.dependants {
+		// 1. Gather all depedant worksheets which point to this worksheet,
+		// and need to be triggered.
+		var allDependants []*Worksheet
+		if dependantField.def == ws.def {
+			allDependants = []*Worksheet{ws}
+		} else {
+			for _, parentsByFieldIndex := range ws.parents[dependantField.def.name] {
+				for _, parent := range parentsByFieldIndex {
+					allDependants = append(allDependants, parent)
+				}
+			}
+		}
+
+		// 2. Trigger the compute by of all dependant worksheets.
+		for _, dependant := range allDependants {
+			updatedValue, err := dependantField.computedBy.Compute(dependant)
+			if err != nil {
+				return err
+			}
+			if err := dependant.set(dependantField, updatedValue); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Add ws to parent pointers of newValue.
+	for _, childWs := range extractChildWs(newValue) {
+		if _, ok := childWs.parents[ws.def.name]; !ok {
+			childWs.parents[ws.def.name] = make(map[int]map[string]*Worksheet)
+		}
+		if _, ok := childWs.parents[ws.def.name][field.index]; !ok {
+			childWs.parents[ws.def.name][field.index] = make(map[string]*Worksheet)
+		}
+		childWs.parents[ws.def.name][field.index][ws.Id()] = ws
+	}
+
+	// Remove ws from parent pointers of oldValue.
+	for _, childWs := range extractChildWs(oldValue) {
+		if _, ok := childWs.parents[ws.def.name]; ok {
+			if _, ok := childWs.parents[ws.def.name][field.index]; ok {
+				delete(childWs.parents[ws.def.name][field.index], ws.Id())
+			}
+		}
+	}
+
+	return nil
+}
+
+func extractChildWs(value Value) []*Worksheet {
+	if childWs, ok := value.(*Worksheet); ok {
+		return []*Worksheet{childWs}
+	}
 	return nil
 }
 
@@ -704,7 +725,7 @@ func (ws *Worksheet) diff() map[int]change {
 	return diff
 }
 
-func diffSlices(before, after *slice) ([]int, []sliceElement) {
+func diffSlices(before, after *Slice) ([]int, []sliceElement) {
 	var (
 		b, a          int
 		ranksOfDels   []int

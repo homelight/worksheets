@@ -55,7 +55,7 @@ var _ []Value = []Value{
 	&Bool{},
 
 	// Internals.
-	&slice{},
+	&Slice{},
 	&Worksheet{},
 }
 
@@ -360,29 +360,37 @@ func (el sliceElement) String() string {
 	return fmt.Sprintf("%d:%s", el.rank, el.value)
 }
 
-type slice struct {
+type Slice struct {
 	id       string
 	lastRank int
 	typ      *SliceType
 	elements []sliceElement
 }
 
-func newSlice(typ *SliceType) *slice {
-	return &slice{
+func newSlice(typ *SliceType) *Slice {
+	return &Slice{
 		id:  uuid.NewV4().String(),
 		typ: typ,
 	}
 }
 
-func newSliceWithIdAndLastRank(typ *SliceType, id string, lastRank int) *slice {
-	return &slice{
+func newSliceWithIdAndLastRank(typ *SliceType, id string, lastRank int) *Slice {
+	return &Slice{
 		id:       id,
 		typ:      typ,
 		lastRank: lastRank,
 	}
 }
 
-func (value *slice) doAppend(element Value) (*slice, error) {
+func (slice *Slice) Elements() []Value {
+	var values []Value
+	for _, element := range slice.elements {
+		values = append(values, element.value)
+	}
+	return values
+}
+
+func (value *Slice) doAppend(element Value) (*Slice, error) {
 	if !element.Type().AssignableTo(value.typ.elementType) {
 		return nil, fmt.Errorf("cannot append %s to %s", element.Type(), value.Type())
 	}
@@ -390,7 +398,7 @@ func (value *slice) doAppend(element Value) (*slice, error) {
 	nextRank := value.lastRank + 1
 	value.lastRank++
 
-	slice := &slice{
+	slice := &Slice{
 		id:       value.id,
 		typ:      value.typ,
 		lastRank: value.lastRank,
@@ -402,7 +410,7 @@ func (value *slice) doAppend(element Value) (*slice, error) {
 	return slice, nil
 }
 
-func (value *slice) doDel(index int) (*slice, error) {
+func (value *Slice) doDel(index int) (*Slice, error) {
 	if value == nil || index < 0 || len(value.elements) <= index {
 		return nil, fmt.Errorf("index out of range")
 	}
@@ -413,7 +421,7 @@ func (value *slice) doDel(index int) (*slice, error) {
 			elements = append(elements, value.elements[i])
 		}
 	}
-	return &slice{
+	return &Slice{
 		id:       value.id,
 		typ:      value.typ,
 		lastRank: value.lastRank,
@@ -423,17 +431,17 @@ func (value *slice) doDel(index int) (*slice, error) {
 	}, nil
 }
 
-func (value *slice) Type() Type {
+func (value *Slice) Type() Type {
 	return value.typ
 }
 
-func (value *slice) Equal(that Value) bool {
+func (value *Slice) Equal(that Value) bool {
 	// Since slices structs are meant to be immutable, pointer equality is how
 	// we check equality. See doXxx funcs for more details.
 	return value == that
 }
 
-func (value *slice) String() string {
+func (value *Slice) String() string {
 	var buffer bytes.Buffer
 	buffer.WriteRune('[')
 	for i, element := range value.elements {

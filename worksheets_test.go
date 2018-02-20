@@ -344,14 +344,14 @@ func (s *Zuite) TestWorksheet_diffSlices() {
 	}
 }
 
-func toSlice(data map[int]Value) *slice {
+func toSlice(data map[int]Value) *Slice {
 	ranks := make([]int, 0, len(data))
 	for rank := range data {
 		ranks = append(ranks, rank)
 	}
 	sort.Ints(ranks)
 
-	slice := &slice{}
+	slice := &Slice{}
 	for _, rank := range ranks {
 		slice.elements = append(slice.elements, sliceElement{
 			rank:  rank,

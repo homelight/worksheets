@@ -171,7 +171,7 @@ func (s *DbZuite) TestSliceSave() {
 
 	// We're reaching into the data store to get the slice id in order to write
 	// assertions against it.
-	slice := ws.data[42].(*slice)
+	slice := ws.data[42].(*Slice)
 	theSliceId := slice.id
 	slice.lastRank = 89
 
@@ -240,7 +240,7 @@ func (s *DbZuite) TestSliceLoad() {
 		ws.MustAppend("names", bob)
 		ws.MustAppend("names", carol)
 
-		wsId, theSliceId = ws.Id(), (ws.data[42].(*slice)).id
+		wsId, theSliceId = ws.Id(), (ws.data[42].(*Slice)).id
 
 		session := s.store.Open(tx)
 		return session.Save(ws)
@@ -258,7 +258,7 @@ func (s *DbZuite) TestSliceLoad() {
 	})
 	require.Equal(s.T(), []Value{alice, carol, bob, carol}, fresh.MustGetSlice("names"))
 
-	slice := fresh.data[42].(*slice)
+	slice := fresh.data[42].(*Slice)
 	require.Equal(s.T(), theSliceId, slice.id)
 	require.Equal(s.T(), 4, slice.lastRank)
 	require.Equal(s.T(), &SliceType{&TextType{}}, slice.typ)
@@ -275,7 +275,7 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 		ws.MustAppend("names", alice)
 		ws.MustAppend("names", bob)
 
-		wsId, theSliceId = ws.Id(), (ws.data[42].(*slice)).id
+		wsId, theSliceId = ws.Id(), (ws.data[42].(*Slice)).id
 
 		session := s.store.Open(tx)
 		return session.Save(ws)
@@ -415,7 +415,7 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 		forciblySetId(simple2, simple2Id)
 
 		// We keep the slice' identifier handy for assertions.
-		wsSliceId = (ws.data[42].(*slice)).id
+		wsSliceId = (ws.data[42].(*Slice)).id
 
 		session := s.store.Open(tx)
 		return session.Save(ws)
