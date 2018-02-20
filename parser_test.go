@@ -262,6 +262,8 @@ func (s *Zuite) TestParser_parseNumberLiteralWithPercentAndSpace() {
 		p := newParser(strings.NewReader(input))
 		actual, err := p.parseLiteral()
 		require.NoError(s.T(), err, input)
+
+		// because of space, expect that "%" token will still be in stream
 		require.Equal(s.T(), "%", p.next(), "%s should not have reached eof", input)
 		assert.Equal(s.T(), expected, actual, input)
 	}
