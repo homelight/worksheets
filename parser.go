@@ -76,9 +76,9 @@ var (
 	pIndex = newTokenPattern("index", "[0-9]+")
 	pText  = newTokenPattern("text", "\".*\"")
 
-	pNumber               = newTokenPattern("number", "[0-9]+(\\.[0-9]+)?")
-	pNumberWithUnderscore = newTokenPattern("number", "[_0-9]+")
-	pNumberWithDot        = newTokenPattern("number", "\\.[0-9]*")
+	pNumber               = newTokenPattern("number", "[0-9]+(\\.[0-9]+)?(\\%)?")
+	pNumberWithUnderscore = newTokenPattern("number", "[_0-9]+(\\%)?")
+	pNumberWithDot        = newTokenPattern("number", "\\.[0-9]*(\\%)?")
 )
 
 func (p *parser) parseWorksheets() (map[string]*Definition, error) {
@@ -615,8 +615,16 @@ func (p *parser) parseLiteral() (Value, error) {
 				}
 				return nil, fmt.Errorf("number cannot terminate with dot")
 			}
+			if strings.HasSuffix(token, "%") {
+				return nil, fmt.Errorf("number must terminate with percent if present")
+			}
 			token = token + strings.Replace(addToken, "_", "", -1)
 		}
+
+		// note whether percent, then remove to keep dot-index calcs correct
+		isPct := strings.HasSuffix(token, "%")
+		token = strings.TrimRight(token, "%")
+
 		dot := strings.Index(token, ".")
 		value, err := strconv.ParseInt("-"+strings.Replace(token, ".", "", 1), 10, 64)
 		if err != nil {
@@ -627,6 +635,10 @@ func (p *parser) parseLiteral() (Value, error) {
 			scale = 0
 		} else {
 			scale = len(token) - dot - 1
+		}
+
+		if isPct {
+			scale += 2
 		}
 		if !negNumber {
 			value = -value
@@ -682,6 +694,11 @@ func (p *parser) next() string {
 	if len(p.toks) == 0 {
 		p.s.Scan()
 		token := p.s.TokenText()
+
+		// will need to revisit when we implement mod operator
+		if p.s.Peek() == '%' {
+			return token + string(p.s.Next())
+		}
 
 		second, ok := tokensToCombine[token]
 		if !ok {

@@ -239,11 +239,33 @@ func (s *Zuite) TestParser_parseExpressionErrors() {
 		`1_234.`:    `number cannot terminate with dot`,
 		`1_234._67`: `number fraction cannot start with underscore`,
 		`1_234.+7`:  `number cannot terminate with dot`,
+
+		// will need to revisit when we implement mod operator
+		`4%0`:     `number must terminate with percent if present`,
+		`-1%_000`: `number must terminate with percent if present`,
+		`2.7%5`:   `number must terminate with percent if present`,
+		`-3%.625`: `number must terminate with percent if present`,
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))
 		_, err := p.parseExpression(true)
 		assert.EqualError(s.T(), err, expected, input)
+	}
+}
+
+func (s *Zuite) TestParser_parseNumberLiteralWithPercentAndSpace() {
+	cases := map[string]Value{
+		`100 %`:   &Number{100, &NumberType{0}},
+		`1.625 %`: &Number{1625, &NumberType{3}},
+	}
+	for input, expected := range cases {
+		p := newParser(strings.NewReader(input))
+		actual, err := p.parseLiteral()
+		require.NoError(s.T(), err, input)
+
+		// because of space, expect that "%" token will still be in stream
+		require.Equal(s.T(), "%", p.next(), "%s should not have reached eof", input)
+		assert.Equal(s.T(), expected, actual, input)
 	}
 }
 
@@ -256,6 +278,15 @@ func (s *Zuite) TestParser_parseLiteral() {
 		`1.000`:              &Number{1000, &NumberType{3}},
 		`1_234.000_000_008`:  &Number{1234000000008, &NumberType{9}},
 		`-1_234.000_000_008`: &Number{-1234000000008, &NumberType{9}},
+
+		`6%`:         &Number{6, &NumberType{2}},
+		`3.25%`:      &Number{325, &NumberType{4}},
+		`-4%`:        &Number{-4, &NumberType{2}},
+		`-5.666667%`: &Number{-5666667, &NumberType{8}},
+		`1_50%`:      &Number{150, &NumberType{2}},
+		`2_0.2%`:     &Number{202, &NumberType{3}},
+		`-8_0%`:      &Number{-80, &NumberType{2}},
+		`-25.3_7_5%`: &Number{-25375, &NumberType{5}},
 
 		`"foo"`: &Text{"foo"},
 		`"456"`: &Text{"456"},
@@ -336,6 +367,18 @@ func (s *Zuite) TestTokenizer() {
 			"_2__6",
 			"+",
 			"7",
+		},
+		`1_000*8%`: []string{
+			"1", "_000", "*", "8%",
+		},
+		`5.75%*100`: []string{
+			"5.75%", "*", "100",
+		},
+		`50_000 / 1.375%`: []string{
+			"50", "_000", "/", "1.375%",
+		},
+		`0.000_100%`: []string{
+			"0.000", "_100%",
 		},
 		`1!=2!3! =4==5=6= =7&&8&9& &0||1|2| |done`: []string{
 			"1", "!=",
