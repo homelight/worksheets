@@ -244,6 +244,9 @@ func (s *Zuite) TestParser_parseExpressionErrors() {
 		`-1%_000`: `number must terminate with percent if present`,
 		`2.7%5`:   `number must terminate with percent if present`,
 		`-3%.625`: `number must terminate with percent if present`,
+
+		// will need to change once we implement mod operator
+		`6.875 %`: `unknown literal, found %`,
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))
