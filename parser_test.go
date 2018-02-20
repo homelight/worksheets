@@ -239,6 +239,11 @@ func (s *Zuite) TestParser_parseExpressionErrors() {
 		`1_234.`:    `number cannot terminate with dot`,
 		`1_234._67`: `number fraction cannot start with underscore`,
 		`1_234.+7`:  `number cannot terminate with dot`,
+
+		`4%0`:     `number must terminate with percent if present`,
+		`-1%_000`: `number must terminate with percent if present`,
+		`2.7%5`:   `number must terminate with percent if present`,
+		`-3%.625`: `number must terminate with percent if present`,
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))
