@@ -574,7 +574,7 @@ func (p *parser) parseType() (Type, error) {
 			if len(sScale) <= len("32") {
 				scale, err = strconv.Atoi(sScale)
 				if err != nil {
-					// unexpected since sIndex should conform to pIndex
+					// unexpected since sScale should conform to pIndex
 					panic(err)
 				}
 			}
