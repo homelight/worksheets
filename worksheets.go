@@ -611,7 +611,7 @@ func (ws *Worksheet) Del(name string, index int) error {
 
 func (ws *Worksheet) handleDependentUpdates(field *Field, oldValue, newValue Value) error {
 	for _, dependentField := range field.dependents {
-		// 1. Gather all depedant worksheets which point to this worksheet,
+		// 1. Gather all dependent worksheets which point to this worksheet,
 		// and need to be triggered.
 		var allDependents []*Worksheet
 		if dependentField.def == ws.def {
