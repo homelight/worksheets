@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func (s *Zuite) TestWorksheet_externalComputedBy() {
+func (s *Zuite) TestComputedBy_externalComputedBy() {
 	cases := []struct {
 		def         string
 		opt         *Options
@@ -97,6 +97,23 @@ func (s *Zuite) TestWorksheet_externalComputedBy() {
 			},
 			"simple.name references unknown arg agee",
 		},
+		{
+			`worksheet parent {
+				1:child child
+				2:name text computed_by { external }
+			}
+			worksheet child {
+				3:field text
+			}`,
+			&Options{
+				Plugins: map[string]map[string]ComputedBy{
+					"parent": map[string]ComputedBy{
+						"name": sayAlice([]string{"child.not_field"}),
+					},
+				},
+			},
+			"parent.name references unknown arg child.not_field",
+		},
 	}
 	for _, ex := range cases {
 		var opts []Options
@@ -111,7 +128,7 @@ func (s *Zuite) TestWorksheet_externalComputedBy() {
 
 }
 
-func (s *Zuite) TestWorksheet_externalComputedByPlugin() {
+func (s *Zuite) TestComputedBy_externalComputedByPlugin() {
 	opt := Options{
 		Plugins: map[string]map[string]ComputedBy{
 			"simple": map[string]ComputedBy{
@@ -218,7 +235,7 @@ func (fn bio) Compute(values ...Value) Value {
 	return NewText(fmt.Sprintf("%s, age %d, born in %d", fullName, age, birthYear))
 }
 
-func (s *Zuite) TestExternalComputedBy_good() {
+func (s *Zuite) TestComputedBy_externalGood() {
 	opt := Options{
 		Plugins: map[string]map[string]ComputedBy{
 			"simple": map[string]ComputedBy{
@@ -240,7 +257,7 @@ func (s *Zuite) TestExternalComputedBy_good() {
 	require.Equal(s.T(), `"Alice"`, ws.MustGet("name").String())
 }
 
-func (s *Zuite) TestExternalComputedBy_goodComplicated() {
+func (s *Zuite) TestComputedBy_externalGoodComplicated() {
 	opt := Options{
 		Plugins: map[string]map[string]ComputedBy{
 			"complicated": map[string]ComputedBy{
@@ -272,7 +289,7 @@ func (s *Zuite) TestExternalComputedBy_goodComplicated() {
 	require.Equal(s.T(), `"Alice Maters, age 73, born in 1945"`, ws.MustGet("bio").String())
 }
 
-func (s *Zuite) TestSimpleExpressionsInWorksheet() {
+func (s *Zuite) TestComputedBy_simpleExpressionsInWorksheet() {
 	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {
 		1:age number[0]
 		2:age_plus_two number[0] computed_by { return age + 2 }
@@ -285,7 +302,7 @@ func (s *Zuite) TestSimpleExpressionsInWorksheet() {
 	require.Equal(s.T(), "75", ws.MustGet("age_plus_two").String())
 }
 
-func (s *Zuite) TestCyclicEditsIfNoIdentCheck() {
+func (s *Zuite) TestComputedBy_cyclicEditsIfNoIdentCheck() {
 	defs, err := NewDefinitions(strings.NewReader(`worksheet cyclic_edits {
 		1:right bool
 		2:a bool computed_by {
@@ -303,4 +320,164 @@ func (s *Zuite) TestCyclicEditsIfNoIdentCheck() {
 	require.Equal(s.T(), "true", ws.MustGet("right").String(), "right")
 	require.Equal(s.T(), "undefined", ws.MustGet("a").String(), "a")
 	require.Equal(s.T(), "undefined", ws.MustGet("b").String(), "b")
+}
+
+var defsCrossWs = MustNewDefinitions(strings.NewReader(`
+worksheet parent {
+	1:child_amount number[2] computed_by {
+		return child.amount
+	}
+	2:child child
+}
+
+worksheet child {
+	5:amount number[2]
+}`))
+
+func (s *Zuite) TestComputedBy_simpleCrossWsParentPointers() {
+	parent := defsCrossWs.MustNewWorksheet("parent")
+	child := defsCrossWs.MustNewWorksheet("child")
+	forciblySetId(parent, "parent-id")
+
+	require.Len(s.T(), child.parents, 0)
+	require.Len(s.T(), child.parents["parent"], 0)
+	require.Len(s.T(), child.parents["parent"][2], 0)
+
+	parent.MustSet("child", child)
+	require.Len(s.T(), child.parents, 1)
+	require.Len(s.T(), child.parents["parent"], 1)
+	require.Len(s.T(), child.parents["parent"][2], 1)
+	require.True(s.T(), child.parents["parent"][2]["parent-id"] == parent)
+
+	parent.MustUnset("child")
+	require.Len(s.T(), child.parents, 0)
+	require.Len(s.T(), child.parents["parent"], 0)
+	require.Len(s.T(), child.parents["parent"][2], 0)
+}
+
+func (s *Zuite) TestComputedBy_simpleCrossWsExample() {
+	parent := defsCrossWs.MustNewWorksheet("parent")
+
+	child := defsCrossWs.MustNewWorksheet("child")
+	child.MustSet("amount", MustNewValue("1.11"))
+	parent.MustSet("child", child)
+	require.Equal(s.T(), "1.11", parent.MustGet("child_amount").String())
+
+	child.MustSet("amount", MustNewValue("2.22"))
+	require.Equal(s.T(), "2.22", parent.MustGet("child_amount").String())
+
+	parent.MustUnset("child")
+	require.Equal(s.T(), "undefined", parent.MustGet("child_amount").String())
+}
+
+type sumPlugin string
+
+// Assert that sumPlugin implements the ComputedBy interface.
+var _ ComputedBy = sumPlugin("")
+
+func (p sumPlugin) Args() []string {
+	return []string{string(p)}
+}
+
+func (p sumPlugin) Compute(values ...Value) Value {
+	slice := values[0].(*Slice)
+	sum := MustNewValue("0").(*Number)
+	for _, elem := range slice.Elements() {
+		if num, ok := elem.(*Number); ok {
+			sum = sum.Plus(num)
+		} else {
+			return &Undefined{}
+		}
+	}
+	return sum
+}
+
+var defsCrossWsThroughSlice = MustNewDefinitions(strings.NewReader(`
+worksheet parent {
+	1:sum_child_amount number[2] computed_by {
+		external
+	}
+	2:children []child
+}
+
+worksheet child {
+	5:amount number[2]
+}`), Options{
+	Plugins: map[string]map[string]ComputedBy{
+		"parent": {
+			"sum_child_amount": sumPlugin("children.amount"),
+		},
+	},
+})
+
+func (s *Zuite) TestComputedBy_crossWsThroughSliceParentPointers() {
+	parent := defsCrossWsThroughSlice.MustNewWorksheet("parent")
+	child1 := defsCrossWsThroughSlice.MustNewWorksheet("child")
+	child2 := defsCrossWsThroughSlice.MustNewWorksheet("child")
+	forciblySetId(parent, "parent-id")
+
+	require.Len(s.T(), child1.parents, 0)
+	require.Len(s.T(), child1.parents["parent"], 0)
+	require.Len(s.T(), child1.parents["parent"][2], 0)
+	require.Len(s.T(), child2.parents, 0)
+	require.Len(s.T(), child2.parents["parent"], 0)
+	require.Len(s.T(), child2.parents["parent"][2], 0)
+
+	parent.MustAppend("children", child1)
+	require.Len(s.T(), child1.parents, 1)
+	require.Len(s.T(), child1.parents["parent"], 1)
+	require.Len(s.T(), child1.parents["parent"][2], 1)
+	require.True(s.T(), child1.parents["parent"][2]["parent-id"] == parent)
+	require.Len(s.T(), child2.parents, 0)
+	require.Len(s.T(), child2.parents["parent"], 0)
+	require.Len(s.T(), child2.parents["parent"][2], 0)
+
+	parent.MustAppend("children", child2)
+	require.Len(s.T(), child1.parents, 1)
+	require.Len(s.T(), child1.parents["parent"], 1)
+	require.Len(s.T(), child1.parents["parent"][2], 1)
+	require.True(s.T(), child1.parents["parent"][2]["parent-id"] == parent)
+	require.Len(s.T(), child2.parents, 1)
+	require.Len(s.T(), child2.parents["parent"], 1)
+	require.Len(s.T(), child2.parents["parent"][2], 1)
+	require.True(s.T(), child2.parents["parent"][2]["parent-id"] == parent)
+
+	parent.Del("children", 0)
+	require.Len(s.T(), child1.parents, 0)
+	require.Len(s.T(), child1.parents["parent"], 0)
+	require.Len(s.T(), child1.parents["parent"][2], 0)
+	require.Len(s.T(), child2.parents, 1)
+	require.Len(s.T(), child2.parents["parent"], 1)
+	require.Len(s.T(), child2.parents["parent"][2], 1)
+	require.True(s.T(), child2.parents["parent"][2]["parent-id"] == parent)
+
+	parent.Del("children", 0)
+	require.Len(s.T(), child1.parents, 0)
+	require.Len(s.T(), child1.parents["parent"], 0)
+	require.Len(s.T(), child1.parents["parent"][2], 0)
+	require.Len(s.T(), child2.parents, 0)
+	require.Len(s.T(), child2.parents["parent"], 0)
+	require.Len(s.T(), child2.parents["parent"][2], 0)
+}
+
+func (s *Zuite) TestComputedBy_crossWsThroughSliceExample() {
+	parent := defsCrossWsThroughSlice.MustNewWorksheet("parent")
+
+	require.Equal(s.T(), "undefined", parent.MustGet("sum_child_amount").String())
+
+	child1 := defsCrossWsThroughSlice.MustNewWorksheet("child")
+	child1.MustSet("amount", MustNewValue("1.11"))
+	parent.MustAppend("children", child1)
+	require.Equal(s.T(), "1.11", parent.MustGet("sum_child_amount").String())
+
+	child2 := defsCrossWsThroughSlice.MustNewWorksheet("child")
+	child2.MustSet("amount", MustNewValue("2.22"))
+	parent.MustAppend("children", child2)
+	require.Equal(s.T(), "3.33", parent.MustGet("sum_child_amount").String())
+
+	parent.Del("children", 0)
+	require.Equal(s.T(), "2.22", parent.MustGet("sum_child_amount").String())
+
+	parent.Del("children", 0)
+	require.Equal(s.T(), "0", parent.MustGet("sum_child_amount").String())
 }

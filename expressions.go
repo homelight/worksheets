@@ -14,6 +14,7 @@ package worksheets
 
 import (
 	"fmt"
+	"strings"
 )
 
 type expression interface {
@@ -30,7 +31,7 @@ var _ = []expression{
 
 	&tExternal{},
 	&ePlugin{},
-	&tVar{},
+	tSelector(nil),
 	&tUnop{},
 	&tBinop{},
 	&tReturn{},
@@ -76,12 +77,49 @@ func (e *Bool) Compute(ws *Worksheet) (Value, error) {
 	return e, nil
 }
 
-func (e *tVar) Args() []string {
-	return []string{e.name}
+func (e tSelector) Args() []string {
+	return []string{strings.Join([]string(e), ".")}
 }
 
-func (e *tVar) Compute(ws *Worksheet) (Value, error) {
-	return ws.Get(e.name)
+func (e tSelector) Compute(ws *Worksheet) (Value, error) {
+	// TODO(pascal): raw get for internal use?
+	value, ok := ws.data[ws.def.fieldsByName[e[0]].index]
+	if !ok {
+		value = &Undefined{}
+	}
+
+	// base case
+	if len(e) == 1 {
+		return value, nil
+	}
+
+	// recursive case
+	if _, ok := value.(*Undefined); ok {
+		return value, nil
+	} else if selectedWs, ok := value.(*Worksheet); ok {
+		return tSelector(e[1:]).Compute(selectedWs)
+	} else if selectedSlice, ok := value.(*Slice); ok {
+		// returnedSlice :=newSlice(nil) // TODO(pascal)
+		var elements []sliceElement
+		for _, elem := range selectedSlice.elements {
+			subWs, ok := elem.value.(*Worksheet)
+			if !ok {
+				return nil, fmt.Errorf("sorry! more complex selectors are not supported yet!")
+			}
+			subValue, err := tSelector(e[1:]).Compute(subWs)
+			if err != nil {
+				return nil, err
+			}
+			elements = append(elements, sliceElement{
+				value: subValue,
+			})
+		}
+		return &Slice{
+			elements: elements,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("sorry! more complex selectors are not supported yet!")
 }
 
 func (e *tUnop) Args() []string {
@@ -241,7 +279,12 @@ func (e *ePlugin) Compute(ws *Worksheet) (Value, error) {
 	args := e.computedBy.Args()
 	values := make([]Value, len(args), len(args))
 	for i, arg := range args {
-		value := ws.MustGet(arg)
+		selector := argToSelector(arg)
+		value, err := selector.Compute(ws)
+		if err != nil {
+			// TODO(pascal): panic here, this should have failed earlier when binding Args
+			return nil, err
+		}
 		values[i] = value
 	}
 	return e.computedBy.Compute(values...), nil

@@ -95,7 +95,7 @@ func (m *marshaler) marshalValue(b *bytes.Buffer, value Value) {
 	case *Bool:
 		b.WriteString(strconv.FormatBool(v.value))
 
-	case *slice:
+	case *Slice:
 		b.WriteRune('[')
 		for i := range v.elements {
 			if i != 0 {

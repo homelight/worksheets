@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 
 	"github.com/satori/go.uuid"
 )
@@ -39,6 +40,14 @@ type Worksheet struct {
 
 	// data holds all the worksheet data.
 	data map[int]Value
+
+	// parents holds all the reverse pointers of worksheets pointing to this
+	// worksheet.
+	//
+	// The map goes from parent's worksheet name, field index of the parent
+	// pointing to this worksheet, and then the actual references to the parent
+	// worksheet by UUID.
+	parents map[string]map[int]map[string]*Worksheet
 }
 
 const (
@@ -85,28 +94,7 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 	}
 
 	for _, def := range defs {
-		var (
-			indexesUsed = make(map[int]bool)
-			namesUsed   = make(map[string]bool)
-		)
-		for _, field := range def.fields {
-			// Any bad index?
-			if field.index == 0 {
-				return nil, fmt.Errorf("%s.%s: index cannot be zero", def.name, field.name)
-			}
-
-			// Any index reused?
-			if _, ok := indexesUsed[field.index]; ok {
-				return nil, fmt.Errorf("%s.%s: index %d cannot be reused", def.name, field.name, field.index)
-			}
-			indexesUsed[field.index] = true
-
-			// Any names reused?
-			if _, ok := namesUsed[field.name]; ok {
-				return nil, fmt.Errorf("%s.%s: multiple fields named %s", def.name, field.name, field.name)
-			}
-			namesUsed[field.name] = true
-
+		for _, field := range def.fieldsByIndex {
 			// Any unresolved externals?
 			if _, ok := field.computedBy.(*tExternal); ok {
 				return nil, fmt.Errorf("%s.%s: missing plugin for external computed_by", def.name, field.name)
@@ -121,28 +109,31 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 
 	// Resolve computed_by & constrained_by dependencies
 	for _, def := range defs {
-		def.dependents = make(map[int][]int)
-		for _, field := range def.fields {
-
+		for _, field := range def.fieldsByIndex {
 			fieldTrigger := field.computedBy
 			if fieldTrigger == nil {
 				fieldTrigger = field.constrainedBy
 			}
 
 			if fieldTrigger != nil {
-				fieldName := field.name
 				args := fieldTrigger.Args()
 				if len(args) == 0 {
-					return nil, fmt.Errorf("%s.%s has no dependencies", def.name, fieldName)
+					return nil, fmt.Errorf("%s.%s has no dependencies", def.name, field.name)
 				}
 				for _, argName := range args {
-					dependent, ok := def.fieldsByName[argName]
+					selector := argToSelector(argName)
+					path, ok := selector.Select(def)
 					if !ok {
-						return nil, fmt.Errorf("%s.%s references unknown arg %s", def.name, fieldName, argName)
+						return nil, fmt.Errorf("%s.%s references unknown arg %s", def.name, field.name, argName)
 					}
+
+					// Only update the graph for computed fields; constrained
+					// fields don't need to be recalculated when args are
+					// set, only upon setting a new value.
 					if field.computedBy != nil {
-						// only update the graph for computed fields; constrained fields don't need to be recalculated when args are set, only upon setting a new value
-						def.dependents[dependent.index] = append(def.dependents[dependent.index], field.index)
+						for _, ascendant := range path {
+							ascendant.dependents = append(ascendant.dependents, field)
+						}
 					}
 				}
 			}
@@ -152,6 +143,34 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 	return &Definitions{
 		defs: defs,
 	}, nil
+}
+
+func argToSelector(arg string) tSelector {
+	return tSelector(strings.Split(arg, "."))
+}
+
+func (s tSelector) Select(elemType Type) ([]*Field, bool) {
+	switch typ := elemType.(type) {
+	case *Definition:
+		field, ok := typ.fieldsByName[s[0]]
+		if !ok {
+			return nil, false
+		}
+		var subPath []*Field
+		if len(s) > 1 {
+			var ok bool
+			subPath, ok = tSelector(s[1:]).Select(field.typ)
+			if !ok {
+				return nil, false
+			}
+		}
+		subPath = append(subPath, field)
+		return subPath, true
+	case *SliceType:
+		return s.Select(typ.elementType)
+	}
+
+	return nil, false
 }
 
 func resolveRefTypes(niceFieldName string, defs map[string]*Definition, locus interface{}) error {
@@ -264,9 +283,10 @@ func (defs *Definitions) newUninitializedWorksheet(name string) (*Worksheet, err
 	}
 
 	ws := &Worksheet{
-		def:  def,
-		orig: make(map[int]Value),
-		data: make(map[int]Value),
+		def:     def,
+		orig:    make(map[int]Value),
+		data:    make(map[int]Value),
+		parents: make(map[string]map[int]map[string]*Worksheet),
 	}
 
 	return ws, nil
@@ -366,40 +386,37 @@ func (ws *Worksheet) Set(name string, value Value) error {
 }
 
 func (ws *Worksheet) set(field *Field, value Value) error {
-	index := field.index
+	var (
+		index          = field.index
+		_, isUndefined = value.(*Undefined)
+	)
+
+	// oldValue
+	oldValue, ok := ws.data[index]
+	if !ok {
+		oldValue = &Undefined{}
+	}
 
 	// ident
-	if oldValue, ok := ws.data[index]; !ok {
-		if _, ok := value.(*Undefined); ok {
-			return nil
-		}
-	} else if oldValue.Equal(value) {
+	if oldValue.Equal(value) {
 		return nil
 	}
 
 	// type check
-	litType := value.Type()
-	if ok := litType.AssignableTo(field.typ); !ok {
-		return fmt.Errorf("cannot assign value of type %s to field of type %s", litType, field.typ)
+	if ok := value.Type().AssignableTo(field.typ); !ok {
+		return fmt.Errorf("cannot assign value of type %s to field of type %s", value.Type(), field.typ)
 	}
 
 	// store
-	if value.Type().AssignableTo(&UndefinedType{}) {
+	if isUndefined {
 		delete(ws.data, index)
 	} else {
 		ws.data[index] = value
 	}
 
-	// if this field is an ascendant to any other, recompute them
-	for _, dependentIndex := range ws.def.dependents[index] {
-		dependent := ws.def.fieldsByIndex[dependentIndex]
-		updatedValue, err := dependent.computedBy.Compute(ws)
-		if err != nil {
-			return err
-		}
-		if err := ws.set(dependent, updatedValue); err != nil {
-			return err
-		}
+	// dependents
+	if err := ws.handleDependentUpdates(field, oldValue, value); err != nil {
+		return err
 	}
 
 	return nil
@@ -466,14 +483,10 @@ func (ws *Worksheet) GetSlice(name string) ([]Value, error) {
 		return nil, nil
 	}
 
-	var values []Value
-	for _, element := range slice.elements {
-		values = append(values, element.value)
-	}
-	return values, nil
+	return slice.Elements(), nil
 }
 
-func (ws *Worksheet) getSlice(name string) (*Field, *slice, error) {
+func (ws *Worksheet) getSlice(name string) (*Field, *Slice, error) {
 	field, value, err := ws.get(name)
 	if err != nil {
 		return nil, nil, err
@@ -487,7 +500,7 @@ func (ws *Worksheet) getSlice(name string) (*Field, *slice, error) {
 		return field, nil, nil
 	}
 
-	return field, value.(*slice), nil
+	return field, value.(*Slice), nil
 }
 
 // Get gets a value for base types, e.g. text, number, or bool.
@@ -549,12 +562,17 @@ func (ws *Worksheet) Append(name string, element Value) error {
 	}
 
 	// append
-	slice := value.(*slice)
+	slice := value.(*Slice)
 	slice, err := slice.doAppend(element)
 	if err != nil {
 		return err
 	}
 	ws.data[index] = slice
+
+	// dependents
+	if err := ws.handleDependentUpdates(field, nil, element); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -576,13 +594,81 @@ func (ws *Worksheet) Del(name string, index int) error {
 		return err
 	}
 
-	slice, err = slice.doDel(index)
+	newSlice, err := slice.doDel(index)
 	if err != nil {
 		return err
 	}
+	deletedValue := slice.elements[index].value
+	ws.data[field.index] = newSlice
 
-	ws.data[field.index] = slice
+	// dependents
+	if err := ws.handleDependentUpdates(field, deletedValue, nil); err != nil {
+		return err
+	}
 
+	return nil
+}
+
+func (ws *Worksheet) handleDependentUpdates(field *Field, oldValue, newValue Value) error {
+	for _, dependentField := range field.dependents {
+		// 1. Gather all dependent worksheets which point to this worksheet,
+		// and need to be triggered.
+		var allDependents []*Worksheet
+		if dependentField.def == ws.def {
+			allDependents = []*Worksheet{ws}
+		} else {
+			for _, parentsByFieldIndex := range ws.parents[dependentField.def.name] {
+				for _, parent := range parentsByFieldIndex {
+					allDependents = append(allDependents, parent)
+				}
+			}
+		}
+
+		// 2. Trigger the compute by of all dependent worksheets.
+		for _, dependent := range allDependents {
+			updatedValue, err := dependentField.computedBy.Compute(dependent)
+			if err != nil {
+				return err
+			}
+			if err := dependent.set(dependentField, updatedValue); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Add ws to parent pointers of newValue.
+	for _, childWs := range extractChildWs(newValue) {
+		if _, ok := childWs.parents[ws.def.name]; !ok {
+			childWs.parents[ws.def.name] = make(map[int]map[string]*Worksheet)
+		}
+		if _, ok := childWs.parents[ws.def.name][field.index]; !ok {
+			childWs.parents[ws.def.name][field.index] = make(map[string]*Worksheet)
+		}
+		childWs.parents[ws.def.name][field.index][ws.Id()] = ws
+	}
+
+	// Remove ws from parent pointers of oldValue.
+	for _, childWs := range extractChildWs(oldValue) {
+		if _, ok := childWs.parents[ws.def.name]; ok {
+			if _, ok := childWs.parents[ws.def.name][field.index]; ok {
+				delete(childWs.parents[ws.def.name][field.index], ws.Id())
+				if len(childWs.parents[ws.def.name][field.index]) == 0 {
+					delete(childWs.parents[ws.def.name], field.index)
+					if len(childWs.parents[ws.def.name]) == 0 {
+						delete(childWs.parents, ws.def.name)
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func extractChildWs(value Value) []*Worksheet {
+	if childWs, ok := value.(*Worksheet); ok {
+		return []*Worksheet{childWs}
+	}
 	return nil
 }
 
@@ -624,7 +710,7 @@ func (ws *Worksheet) diff() map[int]change {
 	return diff
 }
 
-func diffSlices(before, after *slice) ([]int, []sliceElement) {
+func diffSlices(before, after *Slice) ([]int, []sliceElement) {
 	var (
 		b, a          int
 		ranksOfDels   []int

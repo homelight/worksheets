@@ -116,5 +116,9 @@ func (def *Definition) FieldByName(name string) *Field {
 }
 
 func (def *Definition) Fields() []*Field {
-	return def.fields
+	var fields []*Field
+	for _, field := range def.fieldsByIndex {
+		fields = append(fields, field)
+	}
+	return fields
 }

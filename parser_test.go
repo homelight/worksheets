@@ -24,13 +24,11 @@ func (s *Zuite) TestParser_parseWorksheet() {
 	cases := map[string]func(*Definition){
 		`worksheet simple {}`: func(ws *Definition) {
 			require.Equal(s.T(), "simple", ws.name)
-			require.Equal(s.T(), 2+0, len(ws.fields))
 			require.Equal(s.T(), 2+0, len(ws.fieldsByName))
 			require.Equal(s.T(), 2+0, len(ws.fieldsByIndex))
 		},
 		`worksheet simple {42:full_name text}`: func(ws *Definition) {
 			require.Equal(s.T(), "simple", ws.name)
-			require.Equal(s.T(), 2+1, len(ws.fields))
 			require.Equal(s.T(), 2+1, len(ws.fieldsByName))
 			require.Equal(s.T(), 2+1, len(ws.fieldsByIndex))
 
@@ -43,7 +41,8 @@ func (s *Zuite) TestParser_parseWorksheet() {
 		},
 		`  worksheet simple {42:full_name text 45:happy bool}`: func(ws *Definition) {
 			require.Equal(s.T(), "simple", ws.name)
-			require.Equal(s.T(), 2+2, len(ws.fields))
+			require.Equal(s.T(), 2+2, len(ws.fieldsByName))
+			require.Equal(s.T(), 2+2, len(ws.fieldsByIndex))
 
 			field1 := ws.fieldsByName["full_name"]
 			require.Equal(s.T(), 42, field1.index)
@@ -91,12 +90,14 @@ func (s *Zuite) TestParser_parseExpression() {
 		`"Alice"`:   &Text{"Alice"},
 		`true`:      &Bool{true},
 
-		// var
-		`foo`: &tVar{"foo"},
+		// selectors
+		`foo`:         tSelector([]string{"foo"}),
+		`foo.bar`:     tSelector([]string{"foo", "bar"}),
+		`foo.bar.baz`: tSelector([]string{"foo", "bar", "baz"}),
 
 		// unop and binop
 		`3 + 4`: &tBinop{opPlus, &Number{3, &NumberType{0}}, &Number{4, &NumberType{0}}, nil},
-		`!foo`:  &tUnop{opNot, &tVar{"foo"}},
+		`!foo`:  &tUnop{opNot, tSelector([]string{"foo"})},
 
 		// parentheses
 		`(true)`:          &Bool{true},

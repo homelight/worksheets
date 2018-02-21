@@ -18,28 +18,37 @@ import (
 
 type Definition struct {
 	name          string
-	fields        []*Field
 	fieldsByName  map[string]*Field
 	fieldsByIndex map[int]*Field
-
-	// derived values handling
-	externals  map[int]ComputedBy
-	dependents map[int][]int
 }
 
-func (def *Definition) addField(field *Field) {
-	def.fields = append(def.fields, field)
+func (def *Definition) addField(field *Field) error {
+	field.def = def
 
-	// Clobbering due to name reuse, or index reuse, is checked by validating
-	// the tree.
-	def.fieldsByName[field.name] = field
+	// Parsing guarantees user-defined fields are non-negative.
+	if field.index == 0 {
+		return fmt.Errorf("%s.%s: index cannot be zero", def.name, field.name)
+	}
+
+	if _, ok := def.fieldsByIndex[field.index]; ok {
+		return fmt.Errorf("%s.%s: index %d cannot be reused", def.name, field.name, field.index)
+	}
 	def.fieldsByIndex[field.index] = field
+
+	if _, ok := def.fieldsByName[field.name]; ok {
+		return fmt.Errorf("%s.%s: name %s cannot be reused", def.name, field.name, field.name)
+	}
+	def.fieldsByName[field.name] = field
+
+	return nil
 }
 
 type Field struct {
 	index         int
 	name          string
 	typ           Type
+	def           *Definition
+	dependents    []*Field
 	computedBy    expression
 	constrainedBy expression
 }
@@ -50,6 +59,10 @@ func (f *Field) Type() Type {
 
 func (f *Field) Name() string {
 	return f.name
+}
+
+func (f *Field) String() string {
+	return fmt.Sprintf("field(%s.%s, %s)", f.def.name, f.name, f.typ)
 }
 
 type tOp string
@@ -96,9 +109,9 @@ func (t *tBinop) String() string {
 	return fmt.Sprintf("binop(%s, %s, %s, %s)", t.op, t.left, t.right, t.round)
 }
 
-type tVar struct {
-	name string
-}
+// tSelector represents a selector such as referencing a field `foo`, or
+// referencing a field through a path such `foo.bar`.
+type tSelector []string
 
 type tReturn struct {
 	expr expression
