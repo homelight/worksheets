@@ -415,7 +415,7 @@ func (ws *Worksheet) set(field *Field, value Value) error {
 	}
 
 	// dependents
-	if err := ws.handleDependantUpdates(field, oldValue, value); err != nil {
+	if err := ws.handleDependentUpdates(field, oldValue, value); err != nil {
 		return err
 	}
 
@@ -570,7 +570,7 @@ func (ws *Worksheet) Append(name string, element Value) error {
 	ws.data[index] = slice
 
 	// dependents
-	if err := ws.handleDependantUpdates(field, nil, element); err != nil {
+	if err := ws.handleDependentUpdates(field, nil, element); err != nil {
 		return err
 	}
 
@@ -602,14 +602,14 @@ func (ws *Worksheet) Del(name string, index int) error {
 	ws.data[field.index] = newSlice
 
 	// dependents
-	if err := ws.handleDependantUpdates(field, deletedValue, nil); err != nil {
+	if err := ws.handleDependentUpdates(field, deletedValue, nil); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (ws *Worksheet) handleDependantUpdates(field *Field, oldValue, newValue Value) error {
+func (ws *Worksheet) handleDependentUpdates(field *Field, oldValue, newValue Value) error {
 	for _, dependentField := range field.dependents {
 		// 1. Gather all depedant worksheets which point to this worksheet,
 		// and need to be triggered.
