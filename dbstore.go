@@ -412,11 +412,17 @@ func (p *persister) update(ws *Worksheet) error {
 	// diff
 	ws.set(ws.def.fieldsByIndex[IndexVersion], &Number{int64(newVersion), &NumberType{0}})
 
-	// hack? Since loading the current version of ws always loads the current versions of all of its sub-worksheets,
-	// in order to know if one of those sub-worksheets has changed versions, we need to also see what the ws should
-	// look like at this version as loaded from the db (i.e. what it would look like once we've made some more changes).
-	// Once we swap out `orig` with the version loaded from the db, the diff will properly update the sub-worksheet versions
-	// The problem with the approach as implemented right here is that becasue of pointers, values are being written even when the sub worksheet hasn't changed
+	// HACK? (Alex) -- When loading HEAD of the current worksheet, the HEAD of all sub-worksheets is also loaded.
+	// This can be different than what's loaded when you load the worksheet at it's current version -- since when you
+	// load a worksheet at a specific version, we load the sub-worksheet at the version they were at when the parent
+	// worksheet was last saved.
+	// Therefore, in order to correctly compute the diff at the db level, we need to compare the current state of the
+	// worksheet with what'd be returned by loading the worksheet at its current version, which is what we do below
+	// when resetting `ws.orig`.
+	// HOWEVER, there's a bug with this approach, which is that when we load the same value twice, we get two different
+	// pointers to worksheets for the exact same value & version, so we end up writing new rows even when the version
+	// hasn't changed.
+
 	loadedWs, _ := p.s.Load(ws.Id(), ws.Version())
 	ws.orig = loadedWs.orig
 
