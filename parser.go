@@ -158,8 +158,8 @@ func (p *parser) parseField() (*Field, error) {
 	if err != nil {
 		return nil, err
 	}
-	index := 65536 + 1
-	if len(sIndex) <= len("65536") {
+	index := maxFieldIndex + 1
+	if len(sIndex) <= len(strconv.Itoa(maxFieldIndex)) {
 		index, err = strconv.Atoi(sIndex)
 		if err != nil {
 			// unexpected since sIndex should conform to pIndex

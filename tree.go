@@ -14,7 +14,10 @@ package worksheets
 
 import (
 	"fmt"
+	"math"
 )
+
+const maxFieldIndex = math.MaxUint16
 
 type Definition struct {
 	name          string
@@ -32,8 +35,8 @@ func (def *Definition) addField(field *Field) error {
 
 	if _, ok := def.fieldsByIndex[field.index]; ok {
 		return fmt.Errorf("%s.%s: index %d cannot be reused", def.name, field.name, field.index)
-	} else if field.index > 65536 {
-		return fmt.Errorf("%s.%s: index cannot be greater than 65536", def.name, field.name)
+	} else if field.index > maxFieldIndex {
+		return fmt.Errorf("%s.%s: index cannot be greater than %d", def.name, field.name, maxFieldIndex)
 	}
 	def.fieldsByIndex[field.index] = field
 
