@@ -307,13 +307,14 @@ func (s *Zuite) TestParser_parseLiteral() {
 
 func (s *Zuite) TestParser_parseType() {
 	cases := map[string]Type{
-		`undefined`:  &UndefinedType{},
-		`text`:       &TextType{},
-		`bool`:       &BoolType{},
-		`number[5]`:  &NumberType{5},
-		`number[32]`: &NumberType{32},
-		`[]bool`:     &SliceType{&BoolType{}},
-		`foobar`:     &Definition{name: "foobar"},
+		`undefined`:     &UndefinedType{},
+		`text`:          &TextType{},
+		`bool`:          &BoolType{},
+		`number[5]`:     &NumberType{5},
+		`number[32]`:    &NumberType{32},
+		`[]bool`:        &SliceType{&BoolType{}},
+		`[][]number[9]`: &SliceType{&SliceType{&NumberType{9}}},
+		`foobar`:        &Definition{name: "foobar"},
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))
