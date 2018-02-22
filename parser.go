@@ -158,10 +158,13 @@ func (p *parser) parseField() (*Field, error) {
 	if err != nil {
 		return nil, err
 	}
-	index, err := strconv.Atoi(sIndex)
-	if err != nil {
-		// unexpected since sIndex should conform to pIndex
-		panic(err)
+	index := maxFieldIndex + 1
+	if len(sIndex) <= len(strconv.Itoa(maxFieldIndex)) {
+		index, err = strconv.Atoi(sIndex)
+		if err != nil {
+			// unexpected since sIndex should conform to pIndex
+			panic(err)
+		}
 	}
 
 	_, err = p.nextAndCheck(pColon)
@@ -519,17 +522,12 @@ func (p *parser) parseRound() (*tRound, error) {
 	}
 	p.next()
 
-	sIndex, err := p.nextAndCheck(pIndex)
+	scale, err := p.parseScale()
 	if err != nil {
 		return nil, err
 	}
-	index, err := strconv.Atoi(sIndex)
-	if err != nil {
-		// unexpected since sIndex should conform to pIndex
-		panic(err)
-	}
 
-	return &tRound{RoundingMode(mode), index}, nil
+	return &tRound{RoundingMode(mode), scale}, nil
 }
 
 func (p *parser) parseType() (Type, error) {
@@ -563,14 +561,9 @@ func (p *parser) parseType() (Type, error) {
 			if err != nil {
 				return nil, err
 			}
-			sScale, err := p.nextAndCheck(pIndex)
+			scale, err := p.parseScale()
 			if err != nil {
 				return nil, err
-			}
-			scale, err := strconv.Atoi(sScale)
-			if err != nil {
-				// unexpected since sIndex should conform to pIndex
-				panic(err)
 			}
 			_, err = p.nextAndCheck(pRbracket)
 			if err != nil {
@@ -598,6 +591,27 @@ func (p *parser) parseType() (Type, error) {
 	default:
 		panic(fmt.Sprintf("unknown choice %s", choice))
 	}
+}
+
+const maxScale = 32
+
+func (p *parser) parseScale() (int, error) {
+	sScale, err := p.nextAndCheck(pIndex)
+	if err != nil {
+		return -1, err
+	}
+	var scale int = maxScale + 1
+	if len(sScale) <= len(strconv.Itoa(maxScale)) {
+		scale, err = strconv.Atoi(sScale)
+		if err != nil {
+			// unexpected since sScale should conform to pIndex
+			panic(err)
+		}
+	}
+	if scale > maxScale {
+		return -1, fmt.Errorf("scale cannot be greater than 32")
+	}
+	return scale, nil
 }
 
 func (p *parser) parseLiteral() (Value, error) {

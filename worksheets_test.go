@@ -49,6 +49,18 @@ func (s *Zuite) TestExample() {
 	require.False(s.T(), isSet)
 }
 
+func (s *Zuite) TestNewDefinitionsGood() {
+	cases := []string{
+		`worksheet simple {
+			65535:index_at_max bool
+		}`,
+	}
+	for _, ex := range cases {
+		_, err := NewDefinitions(strings.NewReader(ex))
+		assert.NoError(s.T(), err, ex)
+	}
+}
+
 func (s *Zuite) TestNewDefinitionsErrors() {
 	cases := map[string]string{
 		// crap input
@@ -59,6 +71,14 @@ func (s *Zuite) TestNewDefinitionsErrors() {
 		`work sheet`:      `expecting worksheet`,
 
 		// worksheet semantics
+		`worksheet simple {
+			65536:index_too_large bool
+		}`: `simple.index_too_large: index cannot be greater than 65535`,
+
+		`worksheet simple {
+			9999999999999999999999999999999999999999999999999:index_too_large bool
+		}`: `simple.index_too_large: index cannot be greater than 65535`,
+
 		`worksheet simple {
 			0:no_can_do_with_zero bool
 		}`: `simple.no_can_do_with_zero: index cannot be zero`,

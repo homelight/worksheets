@@ -1,0 +1,5 @@
+worksheet a_b_c_d {
+	789 : foo computed_by {
+		external
+	}
+}
