@@ -241,6 +241,9 @@ func (s *Zuite) TestParser_parseExpressionErrors() {
 		`1_234._67`: `number fraction cannot start with underscore`,
 		`1_234.+7`:  `number cannot terminate with dot`,
 
+		`5 round down 33`:                                                `scale cannot be greater than 32`,
+		`5 round down 9999999999999999999999999999999999999999999999999`: `scale cannot be greater than 32`,
+
 		// will need to revisit when we implement mod operator
 		`4%0`:     `number must terminate with percent if present`,
 		`-1%_000`: `number must terminate with percent if present`,
