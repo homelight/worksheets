@@ -14,11 +14,13 @@ package worksheets
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
 
 func (s *Zuite) TestComputedBy_externalComputedBy() {
@@ -394,14 +396,14 @@ func (p sumPlugin) Compute(values ...Value) Value {
 
 var defsCrossWsThroughSlice = MustNewDefinitions(strings.NewReader(`
 worksheet parent {
-	1:sum_child_amount number[2] computed_by {
+	10:sum_child_amount number[2] computed_by {
 		external
 	}
-	2:children []child
+	20:children []child
 }
 
 worksheet child {
-	5:amount number[2]
+	50:amount number[2]
 }`), Options{
 	Plugins: map[string]map[string]ComputedBy{
 		"parent": {
@@ -417,47 +419,35 @@ func (s *Zuite) TestComputedBy_crossWsThroughSliceParentPointers() {
 	forciblySetId(parent, "parent-id")
 
 	require.Len(s.T(), child1.parents, 0)
-	require.Len(s.T(), child1.parents["parent"], 0)
-	require.Len(s.T(), child1.parents["parent"][2], 0)
 	require.Len(s.T(), child2.parents, 0)
-	require.Len(s.T(), child2.parents["parent"], 0)
-	require.Len(s.T(), child2.parents["parent"][2], 0)
 
 	parent.MustAppend("children", child1)
 	require.Len(s.T(), child1.parents, 1)
 	require.Len(s.T(), child1.parents["parent"], 1)
-	require.Len(s.T(), child1.parents["parent"][2], 1)
-	require.True(s.T(), child1.parents["parent"][2]["parent-id"] == parent)
+	require.Len(s.T(), child1.parents["parent"][20], 1)
+	require.True(s.T(), child1.parents["parent"][20]["parent-id"] == parent)
 	require.Len(s.T(), child2.parents, 0)
-	require.Len(s.T(), child2.parents["parent"], 0)
-	require.Len(s.T(), child2.parents["parent"][2], 0)
 
 	parent.MustAppend("children", child2)
 	require.Len(s.T(), child1.parents, 1)
 	require.Len(s.T(), child1.parents["parent"], 1)
-	require.Len(s.T(), child1.parents["parent"][2], 1)
-	require.True(s.T(), child1.parents["parent"][2]["parent-id"] == parent)
+	require.Len(s.T(), child1.parents["parent"][20], 1)
+	require.True(s.T(), child1.parents["parent"][20]["parent-id"] == parent)
 	require.Len(s.T(), child2.parents, 1)
 	require.Len(s.T(), child2.parents["parent"], 1)
-	require.Len(s.T(), child2.parents["parent"][2], 1)
-	require.True(s.T(), child2.parents["parent"][2]["parent-id"] == parent)
+	require.Len(s.T(), child2.parents["parent"][20], 1)
+	require.True(s.T(), child2.parents["parent"][20]["parent-id"] == parent)
 
 	parent.Del("children", 0)
 	require.Len(s.T(), child1.parents, 0)
-	require.Len(s.T(), child1.parents["parent"], 0)
-	require.Len(s.T(), child1.parents["parent"][2], 0)
 	require.Len(s.T(), child2.parents, 1)
 	require.Len(s.T(), child2.parents["parent"], 1)
-	require.Len(s.T(), child2.parents["parent"][2], 1)
-	require.True(s.T(), child2.parents["parent"][2]["parent-id"] == parent)
+	require.Len(s.T(), child2.parents["parent"][20], 1)
+	require.True(s.T(), child2.parents["parent"][20]["parent-id"] == parent)
 
 	parent.Del("children", 0)
 	require.Len(s.T(), child1.parents, 0)
-	require.Len(s.T(), child1.parents["parent"], 0)
-	require.Len(s.T(), child1.parents["parent"][2], 0)
 	require.Len(s.T(), child2.parents, 0)
-	require.Len(s.T(), child2.parents["parent"], 0)
-	require.Len(s.T(), child2.parents["parent"][2], 0)
 }
 
 func (s *Zuite) TestComputedBy_crossWsThroughSliceExample() {
@@ -480,4 +470,381 @@ func (s *Zuite) TestComputedBy_crossWsThroughSliceExample() {
 
 	parent.Del("children", 0)
 	require.Equal(s.T(), "0", parent.MustGet("sum_child_amount").String())
+}
+
+func (s *DbZuite) TestComputedBy_crossWs_parentsRefsPersistence() {
+	store := NewStore(defsCrossWs)
+
+	// We create a parent, pointing to a child.
+	var (
+		parentId = "aaaaaaaa-9be5-41e4-9b56-787f52f5a198"
+		childId  = "bbbbbbbb-9be5-41e4-9b56-787f52f5a198"
+	)
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		parent := defsCrossWs.MustNewWorksheet("parent")
+		forciblySetId(parent, parentId)
+		child := defsCrossWs.MustNewWorksheet("child")
+		forciblySetId(child, childId)
+		child.MustSet("amount", MustNewValue("6.66"))
+		parent.MustSet("child", child)
+		session := store.Open(tx)
+		return session.Save(parent)
+	})
+
+	// 1. Ensure parent pointers are properly stored on save.
+	_, _, parentsRecs, _ := s.DbState()
+
+	require.Equal(s.T(), []rParent{
+		{
+			ChildId:          childId,
+			ParentId:         parentId,
+			ParentFieldIndex: 2,
+		},
+	}, parentsRecs)
+
+	// 2. Ensure parent pointers (and parent worksheets) are correctly loaded.
+	var childParentsAfterLoad parentsRefs
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := store.Open(tx)
+		child, err := session.Load(childId)
+		if err != nil {
+			return err
+		}
+		childParentsAfterLoad = child.parents
+		return nil
+	})
+
+	require.Len(s.T(), childParentsAfterLoad, 1)
+	require.Len(s.T(), childParentsAfterLoad["parent"], 1)
+	require.Len(s.T(), childParentsAfterLoad["parent"][2], 1)
+	require.NotNil(s.T(), childParentsAfterLoad["parent"][2][parentId])
+	require.Equal(s.T(), `6.66`, childParentsAfterLoad["parent"][2][parentId].MustGet("child_amount").String())
+
+	// 3. Ensure that when a ref is removed from the parent, the parent record
+	// is properly removed (even when the child is not loaded).
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := store.Open(tx)
+		parent, err := session.Load(parentId)
+		if err != nil {
+			return err
+		}
+		parent.MustUnset("child")
+		return session.Update(parent)
+	})
+
+	_, _, parentsRecs, _ = s.DbState()
+
+	require.Empty(s.T(), parentsRecs)
+}
+
+func (s *DbZuite) TestComputedBy_crossWs_twoParentsOneChildRefsPersistence() {
+	store := NewStore(defsCrossWs)
+
+	// We create two parents, pointing to the same child.
+	var (
+		parent1Id = "aaaaaaaa-9be5-41e4-9b56-787f52f5a198"
+		parent2Id = "bbbbbbbb-9be5-41e4-9b56-787f52f5a198"
+		childId   = "cccccccc-9be5-41e4-9b56-787f52f5a198"
+	)
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		parent1 := defsCrossWs.MustNewWorksheet("parent")
+		forciblySetId(parent1, parent1Id)
+		parent2 := defsCrossWs.MustNewWorksheet("parent")
+		forciblySetId(parent2, parent2Id)
+		child := defsCrossWs.MustNewWorksheet("child")
+		forciblySetId(child, childId)
+		child.MustSet("amount", MustNewValue("6.66"))
+		parent1.MustSet("child", child)
+		parent2.MustSet("child", child)
+
+		session := store.Open(tx)
+		if err := session.Save(parent1); err != nil {
+			return err
+		}
+		if err := session.Save(parent2); err != nil {
+			return err
+		}
+		return nil
+	})
+
+	// 1. Ensure parent pointers are properly stored on save.
+	_, _, parentsRecs, _ := s.DbState()
+
+	require.Equal(s.T(), []rParent{
+		{
+			ChildId:          childId,
+			ParentId:         parent1Id,
+			ParentFieldIndex: 2,
+		},
+		{
+			ChildId:          childId,
+			ParentId:         parent2Id,
+			ParentFieldIndex: 2,
+		},
+	}, parentsRecs)
+
+	// 2. Ensure that when a ref is removed from a parent, the parent record
+	// is properly removed (even when the child is not loaded), and that no
+	// other parent record is touched.
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := store.Open(tx)
+		parent1, err := session.Load(parent1Id)
+		if err != nil {
+			return err
+		}
+		parent1.MustUnset("child")
+		return session.Update(parent1)
+	})
+
+	_, _, parentsRecs, _ = s.DbState()
+
+	require.Equal(s.T(), []rParent{
+		{
+			ChildId:          childId,
+			ParentId:         parent2Id,
+			ParentFieldIndex: 2,
+		},
+	}, parentsRecs)
+}
+
+func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence() {
+	var (
+		store    = NewStore(defsCrossWsThroughSlice)
+		parentId = "aaaaaaaa-9be5-41e4-9b56-787f52f5a198"
+		child1Id = "bbbbbbbb-9be5-41e4-9b56-787f52f5a198"
+		child2Id = "cccccccc-9be5-41e4-9b56-787f52f5a198"
+	)
+
+	// We create a parent, pointing to a child through a slice.
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		parent := defsCrossWsThroughSlice.MustNewWorksheet("parent")
+		forciblySetId(parent, parentId)
+		child1 := defsCrossWsThroughSlice.MustNewWorksheet("child")
+		forciblySetId(child1, child1Id)
+		child1.MustSet("amount", MustNewValue("6.66"))
+		parent.MustAppend("children", child1)
+		session := store.Open(tx)
+		return session.Save(parent)
+	})
+
+	// 1. Ensure parent pointers are properly stored on save.
+	_, _, parentsRecs, _ := s.DbState()
+
+	require.Equal(s.T(), []rParent{
+		{
+			ChildId:          child1Id,
+			ParentId:         parentId,
+			ParentFieldIndex: 20,
+		},
+	}, parentsRecs)
+
+	// 2. Add another child, ensure the new ref is also recorded.
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := store.Open(tx)
+		parent, err := session.Load(parentId)
+		if err != nil {
+			return err
+		}
+		child2 := defsCrossWsThroughSlice.MustNewWorksheet("child")
+		forciblySetId(child2, child2Id)
+		child2.MustSet("amount", MustNewValue("7.77"))
+		parent.MustAppend("children", child2)
+		return session.Update(parent)
+	})
+
+	_, _, parentsRecs, _ = s.DbState()
+
+	require.Equal(s.T(), []rParent{
+		{
+			ChildId:          child1Id,
+			ParentId:         parentId,
+			ParentFieldIndex: 20,
+		},
+		{
+			ChildId:          child2Id,
+			ParentId:         parentId,
+			ParentFieldIndex: 20,
+		},
+	}, parentsRecs)
+
+	// 3. Remove a child, ensure ref is removed as well.
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := store.Open(tx)
+		parent, err := session.Load(parentId)
+		if err != nil {
+			return err
+		}
+		parent.MustDel("children", 0)
+		return session.Update(parent)
+	})
+
+	_, _, parentsRecs, _ = s.DbState()
+
+	require.Equal(s.T(), []rParent{
+		{
+			ChildId:          child2Id,
+			ParentId:         parentId,
+			ParentFieldIndex: 20,
+		},
+	}, parentsRecs)
+}
+
+func (s *DbZuite) TestComputedBy_crossWs_updateOfChildCarriesToParent() {
+	var (
+		store    = NewStore(defsCrossWsThroughSlice)
+		parentId = "aaaaaaaa-9be5-41e4-9b56-787f52f5a198"
+		child1Id = "bbbbbbbb-9be5-41e4-9b56-787f52f5a198"
+		child2Id = "cccccccc-9be5-41e4-9b56-787f52f5a198"
+	)
+
+	// We create a parent, pointing to two children through a slice.
+	var childrenSliceId string
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		parent := defsCrossWsThroughSlice.MustNewWorksheet("parent")
+		child1 := defsCrossWsThroughSlice.MustNewWorksheet("child")
+		child2 := defsCrossWsThroughSlice.MustNewWorksheet("child")
+		forciblySetId(parent, parentId)
+		forciblySetId(child1, child1Id)
+		forciblySetId(child2, child2Id)
+		child1.MustSet("amount", MustNewValue("6.66"))
+		child2.MustSet("amount", MustNewValue("7.77"))
+		parent.MustAppend("children", child1)
+		parent.MustAppend("children", child2)
+		childrenSliceId = parent.data[20].(*Slice).id
+		session := store.Open(tx)
+		return session.Save(parent)
+	})
+
+	// Load only child2, update its amount, persist. Then, in a separate
+	// transaction, load parent, and observe its sum being properly updated.
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := store.Open(tx)
+		child2, err := session.Load(child2Id)
+		if err != nil {
+			return err
+		}
+		child2.MustSet("amount", MustNewValue("8.88"))
+		return session.Update(child2)
+	})
+
+	var sumOfChildren Value
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := store.Open(tx)
+		parent, err := session.Load(parentId)
+		if err != nil {
+			return err
+		}
+		sumOfChildren = parent.MustGet("sum_child_amount")
+		return nil
+	})
+	require.Equal(s.T(), `15.54` /* 6.66 + 8.88 */, sumOfChildren.String())
+
+	// Inspect rValues.
+	_, valuesRecs, _, _ := s.DbState()
+
+	require.Equal(s.T(), []rValueForTesting{
+		// parent's values
+		{
+			WorksheetId: parentId,
+			Index:       IndexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       parentId,
+		},
+		{
+			WorksheetId: parentId,
+			Index:       IndexVersion,
+			FromVersion: 1,
+			ToVersion:   1,
+			Value:       `1`,
+		},
+		{
+			WorksheetId: parentId,
+			Index:       IndexVersion,
+			FromVersion: 2,
+			ToVersion:   math.MaxInt32,
+			Value:       `2`,
+		},
+		{
+			WorksheetId: parentId,
+			Index:       10,
+			FromVersion: 1,
+			ToVersion:   1,
+			Value:       `14.43`, // 6.66 + 7.77
+		},
+		{
+			WorksheetId: parentId,
+			Index:       10,
+			FromVersion: 2,
+			ToVersion:   math.MaxInt32,
+			Value:       `15.54`, // 6.66 + 8.88
+		},
+		{
+			WorksheetId: parentId,
+			Index:       20,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `[:2:` + childrenSliceId,
+		},
+
+		// child1's values
+		{
+			WorksheetId: child1Id,
+			Index:       IndexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       child1Id,
+		},
+		{
+			WorksheetId: child1Id,
+			Index:       IndexVersion,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `1`,
+		},
+		{
+			WorksheetId: child1Id,
+			Index:       50,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `6.66`,
+		},
+
+		// child2's values
+		{
+			WorksheetId: child2Id,
+			Index:       IndexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       child2Id,
+		},
+		{
+			WorksheetId: child2Id,
+			Index:       IndexVersion,
+			FromVersion: 1,
+			ToVersion:   1,
+			Value:       `1`,
+		},
+		{
+			WorksheetId: child2Id,
+			Index:       IndexVersion,
+			FromVersion: 2,
+			ToVersion:   math.MaxInt32,
+			Value:       `2`,
+		},
+		{
+			WorksheetId: child2Id,
+			Index:       50,
+			FromVersion: 1,
+			ToVersion:   1,
+			Value:       `7.77`,
+		},
+		{
+			WorksheetId: child2Id,
+			Index:       50,
+			FromVersion: 2,
+			ToVersion:   math.MaxInt32,
+			Value:       `8.88`,
+		},
+	}, valuesRecs)
 }

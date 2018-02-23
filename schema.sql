@@ -31,6 +31,15 @@ create table worksheet_values (
   unique(id)
 );
 
+drop table if exists worksheet_parents;
+create table worksheet_parents (
+  child_id           uuid,
+  parent_id          uuid,
+  parent_field_index int,
+
+  unique(child_id, parent_id, parent_field_index)
+);
+
 drop table if exists worksheet_slice_elements;
 create table worksheet_slice_elements (
   id             serial,

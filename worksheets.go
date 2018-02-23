@@ -30,6 +30,43 @@ type Definitions struct {
 	defs map[string]*Definition
 }
 
+// parentsRefs records and organizes references to all parents of a worksheet,
+// i.e. all worksheets which point directly (ref), or indirectly (e.g. via a
+// ref in a slice) to the worksheet.
+//
+// The map goes from parent's worksheet name, field index of the parent
+// pointing to this worksheet, and then the actual references to the parent
+// worksheet by ID.
+type parentsRefs map[string]map[int]map[string]*Worksheet
+
+func (parents parentsRefs) addParentViaFieldIndex(parent *Worksheet, fieldIndex int) {
+	byParentFieldIndex, ok := parents[parent.def.name]
+	if !ok {
+		byParentFieldIndex = make(map[int]map[string]*Worksheet)
+		parents[parent.def.name] = byParentFieldIndex
+	}
+	byParentId, ok := byParentFieldIndex[fieldIndex]
+	if !ok {
+		byParentId = make(map[string]*Worksheet)
+		byParentFieldIndex[fieldIndex] = byParentId
+	}
+	byParentId[parent.Id()] = parent
+}
+
+func (parents parentsRefs) removeParentViaFieldIndex(parent *Worksheet, fieldIndex int) {
+	if _, ok := parents[parent.def.name]; ok {
+		if _, ok := parents[parent.def.name][fieldIndex]; ok {
+			delete(parents[parent.def.name][fieldIndex], parent.Id())
+			if len(parents[parent.def.name][fieldIndex]) == 0 {
+				delete(parents[parent.def.name], fieldIndex)
+				if len(parents[parent.def.name]) == 0 {
+					delete(parents, parent.def.name)
+				}
+			}
+		}
+	}
+}
+
 // Worksheet is ... TODO(pascal): documentation binge
 type Worksheet struct {
 	// def holds the definition of this worksheet.
@@ -43,11 +80,7 @@ type Worksheet struct {
 
 	// parents holds all the reverse pointers of worksheets pointing to this
 	// worksheet.
-	//
-	// The map goes from parent's worksheet name, field index of the parent
-	// pointing to this worksheet, and then the actual references to the parent
-	// worksheet by UUID.
-	parents map[string]map[int]map[string]*Worksheet
+	parents parentsRefs
 }
 
 const (
@@ -638,28 +671,12 @@ func (ws *Worksheet) handleDependentUpdates(field *Field, oldValue, newValue Val
 
 	// Add ws to parent pointers of newValue.
 	for _, childWs := range extractChildWs(newValue) {
-		if _, ok := childWs.parents[ws.def.name]; !ok {
-			childWs.parents[ws.def.name] = make(map[int]map[string]*Worksheet)
-		}
-		if _, ok := childWs.parents[ws.def.name][field.index]; !ok {
-			childWs.parents[ws.def.name][field.index] = make(map[string]*Worksheet)
-		}
-		childWs.parents[ws.def.name][field.index][ws.Id()] = ws
+		childWs.parents.addParentViaFieldIndex(ws, field.index)
 	}
 
 	// Remove ws from parent pointers of oldValue.
 	for _, childWs := range extractChildWs(oldValue) {
-		if _, ok := childWs.parents[ws.def.name]; ok {
-			if _, ok := childWs.parents[ws.def.name][field.index]; ok {
-				delete(childWs.parents[ws.def.name][field.index], ws.Id())
-				if len(childWs.parents[ws.def.name][field.index]) == 0 {
-					delete(childWs.parents[ws.def.name], field.index)
-					if len(childWs.parents[ws.def.name]) == 0 {
-						delete(childWs.parents, ws.def.name)
-					}
-				}
-			}
-		}
+		childWs.parents.removeParentViaFieldIndex(ws, field.index)
 	}
 
 	return nil
@@ -668,6 +685,9 @@ func (ws *Worksheet) handleDependentUpdates(field *Field, oldValue, newValue Val
 func extractChildWs(value Value) []*Worksheet {
 	if childWs, ok := value.(*Worksheet); ok {
 		return []*Worksheet{childWs}
+	}
+	if _, ok := value.(*Slice); ok {
+		panic("slices-of-slices are not supported yet")
 	}
 	return nil
 }
@@ -710,11 +730,16 @@ func (ws *Worksheet) diff() map[int]change {
 	return diff
 }
 
-func diffSlices(before, after *Slice) ([]int, []sliceElement) {
+type sliceChange struct {
+	deleted []sliceElement
+	added   []sliceElement
+}
+
+func diffSlices(before, after *Slice) sliceChange {
 	var (
-		b, a          int
-		ranksOfDels   []int
-		elementsAdded []sliceElement
+		b, a            int
+		elementsDeleted []sliceElement
+		elementsAdded   []sliceElement
 	)
 	for b < len(before.elements) && a < len(after.elements) {
 		bElement, aElement := before.elements[b], after.elements[a]
@@ -722,13 +747,13 @@ func diffSlices(before, after *Slice) ([]int, []sliceElement) {
 			if !bElement.value.Equal(aElement.value) {
 				// we've replaced the value at this rank
 				// represent as a delete and an add
-				ranksOfDels = append(ranksOfDels, bElement.rank)
+				elementsDeleted = append(elementsDeleted, bElement)
 				elementsAdded = append(elementsAdded, aElement)
 			}
 			b++
 			a++
 		} else if bElement.rank < aElement.rank {
-			ranksOfDels = append(ranksOfDels, bElement.rank)
+			elementsDeleted = append(elementsDeleted, bElement)
 			b++
 		} else if aElement.rank < bElement.rank {
 			elementsAdded = append(elementsAdded, aElement)
@@ -736,10 +761,10 @@ func diffSlices(before, after *Slice) ([]int, []sliceElement) {
 		}
 	}
 	for ; b < len(before.elements); b++ {
-		ranksOfDels = append(ranksOfDels, before.elements[b].rank)
+		elementsDeleted = append(elementsDeleted, before.elements[b])
 	}
 	for ; a < len(after.elements); a++ {
 		elementsAdded = append(elementsAdded, after.elements[a])
 	}
-	return ranksOfDels, elementsAdded
+	return sliceChange{elementsDeleted, elementsAdded}
 }

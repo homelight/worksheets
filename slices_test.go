@@ -180,7 +180,7 @@ func (s *DbZuite) TestSliceSave() {
 		return session.Save(ws)
 	})
 
-	wsRecs, valuesRecs, sliceElementsRecs := s.DbState()
+	wsRecs, valuesRecs, _, sliceElementsRecs := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -303,7 +303,7 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 		return session.Update(ws)
 	})
 
-	wsRecs, valuesRecs, sliceElementsRecs := s.DbState()
+	wsRecs, valuesRecs, _, sliceElementsRecs := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -403,16 +403,20 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 		ws := defs.MustNewWorksheet("with_slice_of_refs")
 		simple1 := defs.MustNewWorksheet("simple")
 		simple2 := defs.MustNewWorksheet("simple")
-		ws.MustAppend("many_simples", simple1)
-		ws.MustAppend("many_simples", simple2)
-		simple1.MustSet("name", alice)
-		simple2.MustSet("name", bob)
 
 		// We forcibly set worksheets' identifiers to have a known ordering when
 		// comparing the db state.
 		forciblySetId(ws, wsId)
 		forciblySetId(simple1, simple1Id)
 		forciblySetId(simple2, simple2Id)
+
+		// ws.many_simples = [simple1, simple2]
+		// simple1.name = alice
+		// simple2.name = bob
+		ws.MustAppend("many_simples", simple1)
+		ws.MustAppend("many_simples", simple2)
+		simple1.MustSet("name", alice)
+		simple2.MustSet("name", bob)
 
 		// We keep the slice' identifier handy for assertions.
 		wsSliceId = (ws.data[42].(*Slice)).id
@@ -421,7 +425,7 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 		return session.Save(ws)
 	})
 
-	wsRecs, valuesRecs, sliceElementsRecs := s.DbState()
+	wsRecs, valuesRecs, parentsRecs, sliceElementsRecs := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -506,6 +510,19 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 			Value:       `Bob`,
 		},
 	}, valuesRecs)
+
+	require.Equal(s.T(), []rParent{
+		{
+			ChildId:          simple1Id,
+			ParentId:         wsId,
+			ParentFieldIndex: 42,
+		},
+		{
+			ChildId:          simple2Id,
+			ParentId:         wsId,
+			ParentFieldIndex: 42,
+		},
+	}, parentsRecs)
 
 	require.Equal(s.T(), []rSliceElementForTesting{
 		{
