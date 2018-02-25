@@ -15,6 +15,7 @@ package worksheets
 import (
 	"fmt"
 	"math"
+	"strings"
 )
 
 const maxFieldIndex = math.MaxUint16
@@ -118,6 +119,16 @@ func (t *tBinop) String() string {
 // referencing a field through a path such `foo.bar`.
 type tSelector []string
 
+func (t tSelector) String() string {
+	return strings.Join(t, ".")
+}
+
 type tReturn struct {
 	expr expression
+}
+
+// tCall represents a function invocation such as `len(some_slice)`.
+type tCall struct {
+	name tSelector
+	args []expression
 }

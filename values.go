@@ -120,6 +120,14 @@ func (value *Undefined) String() string {
 	return "undefined"
 }
 
+func NewNumberFromInt(num int) *Number {
+	return &Number{int64(num), &NumberType{0}}
+}
+
+func NewNumberFromFloat64(num float64) *Number {
+	return MustNewValue(strconv.FormatFloat(num, 'f', -1, 64)).(*Number)
+}
+
 func (value *Number) Type() Type {
 	return value.typ
 }

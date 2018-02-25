@@ -35,6 +35,7 @@ var _ = []expression{
 	&tUnop{},
 	&tBinop{},
 	&tReturn{},
+	&tCall{},
 }
 
 func (e *tExternal) Args() []string {
@@ -265,6 +266,76 @@ func (e *tReturn) Args() []string {
 
 func (e *tReturn) Compute(ws *Worksheet) (Value, error) {
 	return e.expr.Compute(ws)
+}
+
+func (e *tCall) Args() []string {
+	var args []string
+	for _, expr := range e.args {
+		args = append(args, expr.Args()...)
+	}
+	return args
+}
+
+var functions = map[string]struct {
+	argsNum int
+	fn      func([]Value) (Value, error)
+}{
+	"len": {1, func(args []Value) (Value, error) {
+		arg := args[0]
+		switch v := arg.(type) {
+		case *Undefined:
+			return v, nil
+		case *Text:
+			return NewNumberFromInt(len(v.value)), nil
+		case *Slice:
+			return NewNumberFromInt(len(v.elements)), nil
+		default:
+			return nil, fmt.Errorf("len expects argument #1 to be text, or slice")
+		}
+	}},
+	"sum": {1, func(args []Value) (Value, error) {
+		arg := args[0]
+		switch v := arg.(type) {
+		case *Slice:
+			numType, ok := v.typ.elementType.(*NumberType)
+			if !ok {
+				return nil, fmt.Errorf("sum expects argument #1 to be slice of numbers")
+			}
+			sum := &Number{0, numType}
+			for _, elem := range v.elements {
+				if num, ok := elem.value.(*Number); ok {
+					sum = sum.Plus(num)
+				} else {
+					return &Undefined{}, nil
+				}
+			}
+			return sum, nil
+		default:
+			return nil, fmt.Errorf("sum expects argument #1 to be slice of numbers")
+		}
+	}},
+}
+
+func (e *tCall) Compute(ws *Worksheet) (Value, error) {
+	fn, ok := functions[e.name[0]]
+	if len(e.name) != 1 || !ok {
+		return nil, fmt.Errorf("unknown function %s", e.name)
+	}
+
+	if len(e.args) != fn.argsNum {
+		return nil, fmt.Errorf("%s expects %d argument(s)", e.name, fn.argsNum)
+	}
+
+	var args []Value
+	for _, expr := range e.args {
+		arg, err := expr.Compute(ws)
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, arg)
+	}
+
+	return fn.fn(args)
 }
 
 type ePlugin struct {
