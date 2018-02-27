@@ -622,9 +622,26 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence() {
 		child1 := defsCrossWsThroughSlice.MustNewWorksheet("child")
 		forciblySetId(child1, child1Id)
 		child1.MustSet("amount", MustNewValue("6.66"))
-		parent.MustAppend("children", child1)
 		session := store.Open(tx)
+		err := session.Save(child1)
+		if err != nil {
+			return err
+		}
 		return session.Save(parent)
+	})
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := store.Open(tx)
+		parent, err := session.Load(parentId)
+		if err != nil {
+			return err
+		}
+		child1, err := session.Load(child1Id)
+		if err != nil {
+			return err
+		}
+		parent.MustAppend("children", child1)
+		return session.Update(parent)
 	})
 
 	// 1. Ensure parent pointers are properly stored on save.
