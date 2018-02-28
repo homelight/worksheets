@@ -95,6 +95,24 @@ func (s *Zuite) TestParser_parseExpression() {
 		`foo.bar`:     tSelector([]string{"foo", "bar"}),
 		`foo.bar.baz`: tSelector([]string{"foo", "bar", "baz"}),
 
+		// calls
+		`len(something)`: &tCall{
+			tSelector([]string{"len"}),
+			[]expression{tSelector([]string{"something"})},
+		},
+		`first_of(undefined, 6, "Alice")`: &tCall{
+			tSelector([]string{"first_of"}),
+			[]expression{
+				&Undefined{},
+				&Number{6, &NumberType{0}},
+				&Text{"Alice"},
+			},
+		},
+		`foo.len()`: &tCall{
+			tSelector([]string{"foo", "len"}),
+			nil,
+		},
+
 		// unop and binop
 		`3 + 4`: &tBinop{opPlus, &Number{3, &NumberType{0}}, &Number{4, &NumberType{0}}, nil},
 		`!foo`:  &tUnop{opNot, tSelector([]string{"foo"})},
@@ -243,6 +261,10 @@ func (s *Zuite) TestParser_parseExpressionErrors() {
 
 		`5 round down 33`:                                                `scale cannot be greater than 32`,
 		`5 round down 9999999999999999999999999999999999999999999999999`: `scale cannot be greater than 32`,
+
+		`len(5,`:  `expecting expression`,
+		`len(5,)`: `expecting expression`,
+		`len(5!`:  `expecting , or )`,
 
 		// will need to revisit when we implement mod operator
 		`4%0`:     `number must terminate with percent if present`,

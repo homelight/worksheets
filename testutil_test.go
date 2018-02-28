@@ -34,14 +34,16 @@ worksheet simple {
 }
 
 worksheet all_types {
-	1:text      text
-	2:bool      bool
-	3:num_0     number[0]
-	4:num_2     number[2]
-	5:undefined undefined
-	6:ws        all_types
-	7:slice_t   []text
-	8:slice_ws  []all_types
+	 1:text      text
+	 2:bool      bool
+	 3:num_0     number[0]
+	 4:num_2     number[2]
+	 5:undefined undefined
+	 6:ws        all_types
+	 7:slice_t   []text
+	 9:slice_n0  []number[0]
+	10:slice_n2  []number[2]
+	 8:slice_ws  []all_types
 }
 
 worksheet with_slice {

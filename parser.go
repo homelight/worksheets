@@ -51,6 +51,7 @@ var (
 	pDiv                = newTokenPattern("/", "\\/")
 	pNot                = newTokenPattern("!", "\\!")
 	pDot                = newTokenPattern(".", "\\.")
+	pComma              = newTokenPattern(",", "\\,")
 	pEqual              = newTokenPattern("==", "\\=\\=")
 	pNotEqual           = newTokenPattern("!=", "\\!\\=")
 	pGreaterThan        = newTokenPattern(">", "\\>")
@@ -314,7 +315,41 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 			}
 			path = append(path, name)
 		}
-		first = tSelector(path)
+		selector := tSelector(path)
+		if !p.peek(pLparen) {
+			first = selector
+		} else {
+			p.next()
+			var (
+				moreArgs bool
+				args     []expression
+			)
+			if p.peek(pRparen) {
+				p.next()
+			} else {
+				moreArgs = true
+			}
+			for moreArgs {
+				exp, err := p.parseExpression(true)
+				if err != nil {
+					return nil, err
+				}
+				args = append(args, exp)
+				choice, ok := p.peekWithChoice([]*tokenPattern{
+					pRparen,
+					pComma,
+				}, []string{
+					"done",
+					"more",
+				})
+				if !ok {
+					return nil, fmt.Errorf("expecting , or )")
+				}
+				p.next()
+				moreArgs = choice == "more"
+			}
+			first = &tCall{selector, args}
+		}
 
 	case "paren":
 		p.next()

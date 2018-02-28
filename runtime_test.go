@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func (s *Zuite) TestRuntime_parseAndEvalNumericalExpr() {
+func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 	cases := map[string]string{
 		// equal
 		`4 == 4`:           `true`,
@@ -134,9 +134,30 @@ func (s *Zuite) TestRuntime_parseAndEvalNumericalExpr() {
 		`45 >= undefined`:        `undefined`,
 		`undefined >= 86`:        `undefined`,
 		`undefined >= undefined`: `undefined`,
-	}
 
+		// functions
+		`len("Bob")`:     `3`,
+		`len(undefined)`: `undefined`,
+		`len(slice_t)`:   `2`,
+		`len(text)`:      `5`,
+
+		`sum(slice_n0)`: `10`,
+		`sum(slice_n2)`: `11.10`,
+	}
 	for input, output := range cases {
+		// fixture
+		ws := defs.MustNewWorksheet("all_types")
+		ws.MustSet("text", alice)
+		ws.MustAppend("slice_t", alice)
+		ws.MustAppend("slice_t", bob)
+		ws.MustAppend("slice_n0", NewNumberFromInt(2))
+		ws.MustAppend("slice_n0", NewNumberFromInt(3))
+		ws.MustAppend("slice_n0", NewNumberFromInt(5))
+		ws.MustAppend("slice_n2", NewNumberFromFloat64(2.22))
+		ws.MustAppend("slice_n2", NewNumberFromFloat64(3.33))
+		ws.MustAppend("slice_n2", NewNumberFromFloat64(5.55))
+
+		// test
 		expected := MustNewValue(output)
 		p := newParser(strings.NewReader(input))
 
@@ -144,8 +165,34 @@ func (s *Zuite) TestRuntime_parseAndEvalNumericalExpr() {
 		require.NoError(s.T(), err, input)
 		require.Equal(s.T(), "", p.next(), "%s should have reached eof", input)
 
-		actual, err := expr.Compute(nil)
+		actual, err := expr.Compute(ws)
 		require.NoError(s.T(), err, input)
 		assert.Equal(s.T(), expected, actual, "%s should equal %s was %s", input, output, actual)
+	}
+}
+
+func (s *Zuite) TestRuntime_parseAndEvalExprExpectingFailure() {
+	cases := map[string]string{
+		`no_such_func()`: `unknown function no_such_func`,
+		`no.such.func()`: `unknown function no.such.func`,
+		`len(1, 2)`:      `len expects 1 argument(s)`,
+		`len(1)`:         `len expects argument #1 to be text, or slice`,
+		`sum(1, 2)`:      `sum expects 1 argument(s)`,
+		`sum(1)`:         `sum expects argument #1 to be slice of numbers`,
+		`sum(slice_t)`:   `sum expects argument #1 to be slice of numbers`,
+	}
+	for input, output := range cases {
+		// fixture
+		ws := defs.MustNewWorksheet("all_types")
+
+		// test
+		p := newParser(strings.NewReader(input))
+
+		expr, err := p.parseExpression(true)
+		require.NoError(s.T(), err, input)
+		require.Equal(s.T(), "", p.next(), "%s should have reached eof", input)
+
+		_, err = expr.Compute(ws)
+		require.EqualError(s.T(), err, output, input)
 	}
 }
