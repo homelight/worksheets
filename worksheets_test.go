@@ -322,45 +322,45 @@ func (s *Zuite) TestWorksheet_diff() {
 
 func (s *Zuite) TestWorksheet_diffSlices() {
 	cases := []struct {
-		before, after map[int]Value
-		ranksOfDels   []int
-		elementsAdded []sliceElement
+		before, after   map[int]Value
+		elementsDeleted []sliceElement
+		elementsAdded   []sliceElement
 	}{
 		{
-			before:        map[int]Value{},
-			after:         map[int]Value{17: alice},
-			ranksOfDels:   nil,
-			elementsAdded: []sliceElement{{rank: 17, value: alice}},
+			before:          map[int]Value{},
+			after:           map[int]Value{17: alice},
+			elementsDeleted: nil,
+			elementsAdded:   []sliceElement{{rank: 17, value: alice}},
 		},
 		{
-			before:        map[int]Value{17: alice},
-			after:         map[int]Value{17: bob},
-			ranksOfDels:   []int{17},
-			elementsAdded: []sliceElement{{rank: 17, value: bob}},
+			before:          map[int]Value{17: alice},
+			after:           map[int]Value{17: bob},
+			elementsDeleted: []sliceElement{{rank: 17, value: alice}},
+			elementsAdded:   []sliceElement{{rank: 17, value: bob}},
 		},
 		{
-			before:        map[int]Value{17: alice},
-			after:         map[int]Value{},
-			ranksOfDels:   []int{17},
-			elementsAdded: nil,
+			before:          map[int]Value{17: alice},
+			after:           map[int]Value{},
+			elementsDeleted: []sliceElement{{rank: 17, value: alice}},
+			elementsAdded:   nil,
 		},
 		{
-			before:        map[int]Value{17: alice, 67: bob},
-			after:         map[int]Value{2: carol, 67: bob},
-			ranksOfDels:   []int{17},
-			elementsAdded: []sliceElement{{2, carol}},
+			before:          map[int]Value{17: alice, 67: bob},
+			after:           map[int]Value{2: carol, 67: bob},
+			elementsDeleted: []sliceElement{{rank: 17, value: alice}},
+			elementsAdded:   []sliceElement{{2, carol}},
 		},
 		{
-			before:        map[int]Value{1: alice, 3: bob, 5: carol},
-			after:         map[int]Value{2: carol},
-			ranksOfDels:   []int{1, 3, 5},
-			elementsAdded: []sliceElement{{2, carol}},
+			before:          map[int]Value{1: alice, 3: bob, 5: carol},
+			after:           map[int]Value{2: carol},
+			elementsDeleted: []sliceElement{{rank: 1, value: alice}, {rank: 3, value: bob}, {rank: 5, value: carol}},
+			elementsAdded:   []sliceElement{{2, carol}},
 		},
 	}
 	for _, ex := range cases {
-		actualRanksOfDels, actualElementsAdded := diffSlices(toSlice(ex.before), toSlice(ex.after))
-		assert.Equal(s.T(), ex.ranksOfDels, actualRanksOfDels, "dels: %v to %v", ex.before, ex.after)
-		assert.Equal(s.T(), ex.elementsAdded, actualElementsAdded, "adds: %v to %v", ex.before, ex.after)
+		sliceChange := diffSlices(toSlice(ex.before), toSlice(ex.after))
+		assert.Equal(s.T(), ex.elementsDeleted, sliceChange.deleted, "dels: %v to %v", ex.before, ex.after)
+		assert.Equal(s.T(), ex.elementsAdded, sliceChange.added, "adds: %v to %v", ex.before, ex.after)
 	}
 }
 

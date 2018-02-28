@@ -58,6 +58,11 @@ func (s *DbZuite) TearDownSuite() {
 	}
 }
 
+func (s *DbZuite) MustRunTransaction(fn func(tx *runner.Tx) error) {
+	err := RunTransaction(s.db, fn)
+	require.NoError(s.T(), err)
+}
+
 func TestRunAllTheDbTests(t *testing.T) {
 	suite.Run(t, new(DbZuite))
 }
@@ -80,11 +85,12 @@ type rSliceElementForTesting struct {
 	IsUndefined bool
 }
 
-func (s *DbZuite) DbState() ([]rWorksheet, []rValueForTesting, []rSliceElementForTesting) {
+func (s *DbZuite) DbState() ([]rWorksheet, []rValueForTesting, []rParent, []rSliceElementForTesting) {
 	var (
 		err                 error
 		wsRecs              []rWorksheet
 		dbValuesRecs        []rValue
+		parentsRecs         []rParent
 		dbSliceElementsRecs []rSliceElement
 	)
 
@@ -95,11 +101,18 @@ func (s *DbZuite) DbState() ([]rWorksheet, []rValueForTesting, []rSliceElementFo
 		QueryStructs(&wsRecs)
 	require.NoError(s.T(), err)
 
-	s.db.
+	err = s.db.
 		Select("*").
 		From("worksheet_values").
 		OrderBy("worksheet_id, index, from_version").
 		QueryStructs(&dbValuesRecs)
+	require.NoError(s.T(), err)
+
+	err = s.db.
+		Select("*").
+		From("worksheet_parents").
+		OrderBy("child_id, parent_id, parent_field_index").
+		QueryStructs(&parentsRecs)
 	require.NoError(s.T(), err)
 
 	err = s.db.
@@ -141,7 +154,7 @@ func (s *DbZuite) DbState() ([]rWorksheet, []rValueForTesting, []rSliceElementFo
 		}
 	}
 
-	return wsRecs, valuesRecs, sliceElementsRecs
+	return wsRecs, valuesRecs, parentsRecs, sliceElementsRecs
 }
 
 func p(v string) *string {

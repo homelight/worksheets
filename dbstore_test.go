@@ -21,7 +21,7 @@ import (
 	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
 
-func (s *DbZuite) TestExample() {
+func (s *DbZuite) TestDbExample() {
 	ws := s.store.defs.MustNewWorksheet("simple")
 	ws.MustSet("name", NewText("Alice"))
 
@@ -38,6 +38,8 @@ func (s *DbZuite) TestExample() {
 		return err
 	})
 
+	require.Len(s.T(), wsFromStore.MustGet("id").String(), 38)
+	require.Equal(s.T(), `1`, wsFromStore.MustGet("version").String())
 	require.Equal(s.T(), `"Alice"`, wsFromStore.MustGet("name").String())
 }
 
@@ -53,7 +55,7 @@ func (s *DbZuite) TestSave() {
 		return session.Save(ws)
 	})
 
-	wsRecs, valuesRecs, _ := s.DbState()
+	wsRecs, valuesRecs, _, _ := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -111,7 +113,7 @@ func (s *DbZuite) TestUpdate() {
 		return session.Update(ws)
 	})
 
-	wsRecs, valuesRecs, _ := s.DbState()
+	wsRecs, valuesRecs, _, _ := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -222,7 +224,7 @@ func (s *DbZuite) TestProperlyLoadUndefinedField() {
 	require.False(s.T(), fresh.MustIsSet("age"))
 
 	// Lastly, check db state.
-	wsRecs, valuesRecs, _ := s.DbState()
+	wsRecs, valuesRecs, _, _ := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -383,9 +385,4 @@ func (s *DbZuite) TestSignoffPattern() {
 	// which means that is_signedoff should not have been modified
 	require.Equal(s.T(), "3", ws.MustGet("version").String())
 	require.Equal(s.T(), "false", ws.MustGet("is_signedoff").String())
-}
-
-func (s *DbZuite) MustRunTransaction(fn func(tx *runner.Tx) error) {
-	err := RunTransaction(s.db, fn)
-	require.NoError(s.T(), err)
 }

@@ -55,7 +55,7 @@ func (s *DbZuite) TestRefsSave_noDataInRefWorksheet() {
 		return session.Save(ws)
 	})
 
-	wsRecs, valuesRecs, _ := s.DbState()
+	wsRecs, valuesRecs, _, _ := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -134,7 +134,7 @@ func (s *DbZuite) TestRefsSave_withDataInRefWorksheet() {
 		return session.Save(ws)
 	})
 
-	wsRecs, valuesRecs, _ := s.DbState()
+	wsRecs, valuesRecs, _, _ := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -220,19 +220,14 @@ func (s *DbZuite) TestRefsSave_refWorksheetAlreadySaved() {
 	forciblySetId(ws, wsId)
 	forciblySetId(simple, simpleId)
 
-	// We first save simple.
+	// We save simple. Because ws is a parent to simple, we will also
+	// saveOrUpdate ws.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
 		return session.Save(simple)
 	})
 
-	// Then we proceed to save ws.
-	s.MustRunTransaction(func(tx *runner.Tx) error {
-		session := s.store.Open(tx)
-		return session.Save(ws)
-	})
-
-	wsRecs, valuesRecs, _ := s.DbState()
+	wsRecs, valuesRecs, _, _ := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -305,7 +300,7 @@ func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 	forciblySetId(ws, wsId)
 	forciblySetId(simple, simpleId)
 
-	// We first save simple.
+	// We first save simple, this also saves ws since it is a parent.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
 		return session.Save(simple)
@@ -317,10 +312,10 @@ func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 	// Then we proceed to save ws.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		return session.SaveOrUpdate(ws)
 	})
 
-	wsRecs, valuesRecs, _ := s.DbState()
+	wsRecs, valuesRecs, _, _ := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -407,7 +402,7 @@ func (s *DbZuite) TestRefsSave_withCycles() {
 		return session.Save(ws)
 	})
 
-	wsRecs, valuesRecs, _ := s.DbState()
+	wsRecs, valuesRecs, _, _ := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -454,13 +449,16 @@ func (s *DbZuite) TestRefsLoad_noCycles() {
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		ws := defs.MustNewWorksheet("with_refs")
 		simple := defs.MustNewWorksheet("simple")
-		ws.MustSet("simple", simple)
-		simple.MustSet("name", bob)
 
 		// We forcibly set both worksheets' identifiers to have a known ordering
 		// when comparing the db state.
 		forciblySetId(ws, wsId)
 		forciblySetId(simple, simpleId)
+
+		// ws.simple = simple
+		// simple.name = bob
+		ws.MustSet("simple", simple)
+		simple.MustSet("name", bob)
 
 		session := s.store.Open(tx)
 		return session.Save(ws)
@@ -541,7 +539,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentNoChangeInChild() {
 		return session.Update(ws)
 	})
 
-	wsRecs, valuesRecs, _ := s.DbState()
+	wsRecs, valuesRecs, _, _ := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -658,7 +656,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChangesInChild() {
 		return session.Update(ws)
 	})
 
-	wsRecs, valuesRecs, _ := s.DbState()
+	wsRecs, valuesRecs, _, _ := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -784,7 +782,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChildRequiringToBeSaved() {
 		return session.Update(ws)
 	})
 
-	wsRecs, valuesRecs, _ := s.DbState()
+	wsRecs, valuesRecs, _, _ := s.DbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
