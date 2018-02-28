@@ -381,18 +381,16 @@ func (p *persister) save(ws *Worksheet) error {
 			Value:       p.writeValue(value),
 		})
 
-		if _, ok := value.(*Slice); !ok {
-			for _, childWs := range extractChildWs(value) {
-				adoptedChildren[index] = append(adoptedChildren[index], childWs.Id())
-			}
-		}
-
 		if slice, ok := value.(*Slice); ok {
 			slicesToInsert = append(slicesToInsert, slice)
 			for _, elem := range slice.elements {
 				for _, childWs := range extractChildWs(elem.value) {
 					adoptedChildren[index] = append(adoptedChildren[index], childWs.Id())
 				}
+			}
+		} else {
+			for _, childWs := range extractChildWs(value) {
+				adoptedChildren[index] = append(adoptedChildren[index], childWs.Id())
 			}
 		}
 	}
@@ -499,6 +497,8 @@ func (p *persister) update(ws *Worksheet) error {
 	)
 	for index, change := range diff {
 		valuesToUpdate = append(valuesToUpdate, index)
+
+		// non-slice values
 		if _, ok := change.before.(*Slice); !ok {
 			for _, childWs := range extractChildWs(change.before) {
 				orphanedChildren[index] = append(orphanedChildren[index], childWs.Id())
@@ -509,6 +509,8 @@ func (p *persister) update(ws *Worksheet) error {
 				adoptedChildren[index] = append(adoptedChildren[index], childWs.Id())
 			}
 		}
+
+		// slice values
 		if sliceAfter, ok := change.after.(*Slice); ok {
 			var sliceBefore *Slice
 			if actualSliceBefore, ok := change.before.(*Slice); ok {
