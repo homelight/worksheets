@@ -54,16 +54,20 @@ func (parents parentsRefs) addParentViaFieldIndex(parent *Worksheet, fieldIndex 
 }
 
 func (parents parentsRefs) removeParentViaFieldIndex(parent *Worksheet, fieldIndex int) {
-	if _, ok := parents[parent.def.name]; ok {
-		if _, ok := parents[parent.def.name][fieldIndex]; ok {
-			delete(parents[parent.def.name][fieldIndex], parent.Id())
-			if len(parents[parent.def.name][fieldIndex]) == 0 {
-				delete(parents[parent.def.name], fieldIndex)
-				if len(parents[parent.def.name]) == 0 {
-					delete(parents, parent.def.name)
-				}
-			}
-		}
+	parentName := parent.def.name
+
+	if _, ok := parents[parentName]; !ok {
+		return
+	} else if _, ok := parents[parentName][fieldIndex]; !ok {
+		return
+	}
+
+	delete(parents[parentName][fieldIndex], parent.Id())
+	if len(parents[parentName][fieldIndex]) == 0 {
+		delete(parents[parentName], fieldIndex)
+	}
+	if len(parents[parentName]) == 0 {
+		delete(parents, parentName)
 	}
 }
 
