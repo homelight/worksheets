@@ -607,7 +607,7 @@ func (s *DbZuite) TestComputedBy_crossWs_twoParentsOneChildRefsPersistence() {
 	}, parentsRecs)
 }
 
-func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence() {
+func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
 	var (
 		store    = NewStore(defsCrossWsThroughSlice)
 		parentId = "aaaaaaaa-9be5-41e4-9b56-787f52f5a198"
@@ -683,6 +683,60 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence() {
 	require.Equal(s.T(), []rParent{
 		{
 			ChildId:          child2Id,
+			ParentId:         parentId,
+			ParentFieldIndex: 20,
+		},
+	}, parentsRecs)
+}
+
+func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence2() {
+	var (
+		store    = NewStore(defsCrossWsThroughSlice)
+		parentId = "aaaaaaaa-9be5-41e4-9b56-787f52f5a198"
+		childId  = "bbbbbbbb-9be5-41e4-9b56-787f52f5a198"
+	)
+
+	// We create a parent ws, and a child ws, but we do not connect them yet.
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		parent := defsCrossWsThroughSlice.MustNewWorksheet("parent")
+		forciblySetId(parent, parentId)
+
+		child := defsCrossWsThroughSlice.MustNewWorksheet("child")
+		forciblySetId(child, childId)
+		child.MustSet("amount", MustNewValue("6.66"))
+
+		session := store.Open(tx)
+		if err := session.Save(parent); err != nil {
+			return err
+		}
+		if err := session.Save(child); err != nil {
+			return err
+		}
+		return nil
+	})
+
+	// In a subsequent transaction, we connect the parent to the child.
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := store.Open(tx)
+		parent, err := session.Load(parentId)
+		if err != nil {
+			return err
+		}
+		child, err := session.Load(childId)
+		if err != nil {
+			return err
+		}
+
+		parent.MustAppend("children", child)
+		return session.Update(parent)
+	})
+
+	// Now, ensure parent pointers are properly stored on save.
+	_, _, parentsRecs, _ := s.DbState()
+
+	require.Equal(s.T(), []rParent{
+		{
+			ChildId:          childId,
 			ParentId:         parentId,
 			ParentFieldIndex: 20,
 		},
