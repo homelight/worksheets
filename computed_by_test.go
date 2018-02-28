@@ -557,14 +557,9 @@ func (s *DbZuite) TestComputedBy_crossWs_twoParentsOneChildRefsPersistence() {
 		parent1.MustSet("child", child)
 		parent2.MustSet("child", child)
 
-		session := store.Open(tx)
-		if err := session.Save(parent1); err != nil {
-			return err
-		}
-		if err := session.Save(parent2); err != nil {
-			return err
-		}
-		return nil
+		// Since parent1 -> child -> parent2, when saving parent1, we also
+		// save parent2!
+		return store.Open(tx).Save(parent1)
 	})
 
 	// 1. Ensure parent pointers are properly stored on save.

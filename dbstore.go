@@ -336,9 +336,18 @@ func (p *persister) save(ws *Worksheet) error {
 
 	// cascade updates to children and parents
 	for _, value := range ws.data {
-		for _, wsToCascade := range worksheetsToCascade(value) {
-			if err := p.saveOrUpdate(wsToCascade); err != nil {
+		for _, childWs := range worksheetsToCascade(value) {
+			if err := p.saveOrUpdate(childWs); err != nil {
 				return err
+			}
+		}
+	}
+	for _, byParentFieldIndex := range ws.parents {
+		for _, byParentId := range byParentFieldIndex {
+			for _, parentWs := range byParentId {
+				if err := p.saveOrUpdate(parentWs); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -357,6 +366,9 @@ func (p *persister) save(ws *Worksheet) error {
 		return err
 	}
 
+	// adopted children
+	adoptedChildren := make(map[int][]string)
+
 	// insert rValues
 	var slicesToInsert []*Slice
 	insertValues := p.s.tx.InsertInto("worksheet_values").Columns("*").Blacklist("id")
@@ -369,8 +381,19 @@ func (p *persister) save(ws *Worksheet) error {
 			Value:       p.writeValue(value),
 		})
 
+		if _, ok := value.(*Slice); !ok {
+			for _, childWs := range extractChildWs(value) {
+				adoptedChildren[index] = append(adoptedChildren[index], childWs.Id())
+			}
+		}
+
 		if slice, ok := value.(*Slice); ok {
 			slicesToInsert = append(slicesToInsert, slice)
+			for _, elem := range slice.elements {
+				for _, childWs := range extractChildWs(elem.value) {
+					adoptedChildren[index] = append(adoptedChildren[index], childWs.Id())
+				}
+			}
 		}
 	}
 	if _, err := insertValues.Exec(); err != nil {
@@ -397,17 +420,15 @@ func (p *persister) save(ws *Worksheet) error {
 	}
 
 	// insert rParent
-	if len(ws.parents) != 0 {
-		insertParentElements := p.s.tx.InsertInto("worksheet_parents").Columns("*").Blacklist("id")
-		for _, byName := range ws.parents {
-			for parentFieldIndex, byParentFieldIndex := range byName {
-				for parentId, _ := range byParentFieldIndex {
-					insertParentElements.Record(rParent{
-						ChildId:          ws.Id(),
-						ParentId:         parentId,
-						ParentFieldIndex: parentFieldIndex,
-					})
-				}
+	if len(adoptedChildren) != 0 {
+		insertParentElements := p.s.tx.InsertInto("worksheet_parents").Columns("*")
+		for index, childrenWsId := range adoptedChildren {
+			for _, childId := range childrenWsId {
+				insertParentElements.Record(rParent{
+					ChildId:          childId,
+					ParentId:         ws.Id(),
+					ParentFieldIndex: index,
+				})
 			}
 		}
 		if _, err := insertParentElements.Exec(); err != nil {
@@ -430,7 +451,7 @@ func (p *persister) update(ws *Worksheet) error {
 	}
 	p.graph[ws.Id()] = true
 
-	// cascade worksheets
+	// cascade updates to children and parents
 	for _, value := range ws.data {
 		for _, childWs := range worksheetsToCascade(value) {
 			if err := p.saveOrUpdate(childWs); err != nil {
@@ -474,12 +495,18 @@ func (p *persister) update(ws *Worksheet) error {
 		slicesElementsDeleted = make(map[string][]sliceElement)
 		slicesElementsAdded   = make(map[string][]sliceElement)
 		orphanedChildren      = make(map[int][]interface{})
+		adoptedChildren       = make(map[int][]string)
 	)
 	for index, change := range diff {
 		valuesToUpdate = append(valuesToUpdate, index)
 		if _, ok := change.before.(*Slice); !ok {
 			for _, childWs := range extractChildWs(change.before) {
 				orphanedChildren[index] = append(orphanedChildren[index], childWs.Id())
+			}
+		}
+		if _, ok := change.after.(*Slice); !ok {
+			for _, childWs := range extractChildWs(change.after) {
+				adoptedChildren[index] = append(adoptedChildren[index], childWs.Id())
 			}
 		}
 		if sliceAfter, ok := change.after.(*Slice); ok {
@@ -505,6 +532,11 @@ func (p *persister) update(ws *Worksheet) error {
 				}
 				if len(sliceChange.added) != 0 {
 					slicesElementsAdded[sliceId] = sliceChange.added
+					for _, add := range sliceChange.added {
+						for _, childWs := range extractChildWs(add.value) {
+							adoptedChildren[index] = append(adoptedChildren[index], childWs.Id())
+						}
+					}
 				}
 			}
 		}
@@ -572,9 +604,6 @@ func (p *persister) update(ws *Worksheet) error {
 	}
 
 	// update rParent
-	// TODO(pascal): Possible race condition since we're updating a relation
-	// which is owned by both the parent and child, and we are missing a shared
-	// lock to synchronize on.
 	for index, childrenWsId := range orphanedChildren {
 		if _, err := p.s.tx.DeleteFrom("worksheet_parents").
 			Where("parent_id = $1", ws.Id()).
@@ -584,22 +613,15 @@ func (p *persister) update(ws *Worksheet) error {
 			return err
 		}
 	}
-	// TODO(pascal): We can avoid deleteing and recreating rows by doing proper
-	// diffing. This will do for now, we have other things to optimize before!
-	if _, err := p.s.tx.Exec("delete from worksheet_parents where child_id = $1", ws.Id()); err != nil {
-		return err
-	}
-	if len(ws.parents) != 0 {
-		insertParentElements := p.s.tx.InsertInto("worksheet_parents").Columns("*").Blacklist("id")
-		for _, byName := range ws.parents {
-			for parentFieldIndex, byParentFieldIndex := range byName {
-				for parentId, _ := range byParentFieldIndex {
-					insertParentElements.Record(rParent{
-						ChildId:          ws.Id(),
-						ParentId:         parentId,
-						ParentFieldIndex: parentFieldIndex,
-					})
-				}
+	if len(adoptedChildren) != 0 {
+		insertParentElements := p.s.tx.InsertInto("worksheet_parents").Columns("*")
+		for index, childrenWsId := range adoptedChildren {
+			for _, childId := range childrenWsId {
+				insertParentElements.Record(rParent{
+					ChildId:          childId,
+					ParentId:         ws.Id(),
+					ParentFieldIndex: index,
+				})
 			}
 		}
 		if _, err := insertParentElements.Exec(); err != nil {

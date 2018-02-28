@@ -220,16 +220,11 @@ func (s *DbZuite) TestRefsSave_refWorksheetAlreadySaved() {
 	forciblySetId(ws, wsId)
 	forciblySetId(simple, simpleId)
 
-	// We first save simple.
+	// We save simple. Because ws is a parent to simple, we will also
+	// saveOrUpdate ws.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
 		return session.Save(simple)
-	})
-
-	// Then we proceed to save ws.
-	s.MustRunTransaction(func(tx *runner.Tx) error {
-		session := s.store.Open(tx)
-		return session.Save(ws)
 	})
 
 	wsRecs, valuesRecs, _, _ := s.DbState()
@@ -305,7 +300,7 @@ func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 	forciblySetId(ws, wsId)
 	forciblySetId(simple, simpleId)
 
-	// We first save simple.
+	// We first save simple, this also saves ws since it is a parent.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
 		return session.Save(simple)
@@ -317,7 +312,7 @@ func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 	// Then we proceed to save ws.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		return session.SaveOrUpdate(ws)
 	})
 
 	wsRecs, valuesRecs, _, _ := s.DbState()
