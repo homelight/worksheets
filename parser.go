@@ -343,7 +343,7 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 					"more",
 				})
 				if !ok {
-					return nil, fmt.Errorf("good message here")
+					return nil, fmt.Errorf("expecting , or )")
 				}
 				p.next()
 				moreArgs = choice == "more"

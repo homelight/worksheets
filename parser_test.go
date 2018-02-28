@@ -262,7 +262,9 @@ func (s *Zuite) TestParser_parseExpressionErrors() {
 		`5 round down 33`:                                                `scale cannot be greater than 32`,
 		`5 round down 9999999999999999999999999999999999999999999999999`: `scale cannot be greater than 32`,
 
+		`len(5,`:  `expecting expression`,
 		`len(5,)`: `expecting expression`,
+		`len(5!`:  `expecting , or )`,
 
 		// will need to revisit when we implement mod operator
 		`4%0`:     `number must terminate with percent if present`,
