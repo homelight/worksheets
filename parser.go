@@ -106,14 +106,14 @@ func (p *parser) parseWorksheet() (*Definition, error) {
 		fieldsByIndex: make(map[int]*Field),
 	}
 	if err := ws.addField(&Field{
-		index: IndexId,
+		index: indexId,
 		name:  "id",
 		typ:   &TextType{},
 	}); err != nil {
 		panic(fmt.Sprintf("unexpected %s", err))
 	}
 	if err := ws.addField(&Field{
-		index: IndexVersion,
+		index: indexVersion,
 		name:  "version",
 		typ:   &NumberType{},
 	}); err != nil {

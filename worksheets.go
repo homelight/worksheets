@@ -88,11 +88,11 @@ type Worksheet struct {
 }
 
 const (
-	// IndexId is the reserved index to store a worksheet's identifier.
-	IndexId = -2
+	// indexId is the reserved index to store a worksheet's identifier.
+	indexId = -2
 
-	// IndexVersion is the reserved index to store a worksheet's version.
-	IndexVersion = -1
+	// indexVersion is the reserved index to store a worksheet's version.
+	indexVersion = -1
 )
 
 type ComputedBy interface {
@@ -331,10 +331,10 @@ func (defs *Definitions) newUninitializedWorksheet(name string) (*Worksheet, err
 
 func (ws *Worksheet) validate() error {
 	// ensure we have an id and a version
-	if _, ok := ws.data[IndexId]; !ok {
+	if _, ok := ws.data[indexId]; !ok {
 		return fmt.Errorf("missing id")
 	}
-	if _, ok := ws.data[IndexVersion]; !ok {
+	if _, ok := ws.data[indexVersion]; !ok {
 		return fmt.Errorf("missing version")
 	}
 
@@ -353,11 +353,11 @@ func (ws *Worksheet) validate() error {
 }
 
 func (ws *Worksheet) Id() string {
-	return ws.data[IndexId].(*Text).value
+	return ws.data[indexId].(*Text).value
 }
 
 func (ws *Worksheet) Version() int {
-	return int(ws.data[IndexVersion].(*Number).value)
+	return int(ws.data[indexVersion].(*Number).value)
 }
 
 func (ws *Worksheet) Name() string {

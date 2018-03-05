@@ -473,7 +473,7 @@ func (ws *Worksheet) Equal(that Value) bool {
 func (ws *Worksheet) String() string {
 	fieldNames := make([]string, 0, len(ws.data)-2)
 	for index := range ws.data {
-		if index != IndexId && index != IndexVersion {
+		if index != indexId && index != indexVersion {
 			fieldNames = append(fieldNames, ws.def.fieldsByIndex[index].name)
 		}
 	}

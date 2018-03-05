@@ -169,7 +169,7 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 	// Before placing the worksheet in the graph, we set the id manually so
 	// callers can rely on this even if the worksheet itself is not fully
 	// loaded.
-	ws.data[IndexId] = NewText(id)
+	ws.data[indexId] = NewText(id)
 	l.graph[id] = ws
 
 	var valuesRecs []rValue
@@ -471,14 +471,14 @@ func (p *persister) update(ws *Worksheet) error {
 	newVersion := oldVersion + 1
 
 	// diff
-	ws.set(ws.def.fieldsByIndex[IndexVersion], &Number{int64(newVersion), &NumberType{0}})
+	ws.set(ws.def.fieldsByIndex[indexVersion], &Number{int64(newVersion), &NumberType{0}})
 	diff := ws.diff()
 
 	// plan rollback
 	hasFailed := true
 	defer func() {
 		if hasFailed {
-			ws.set(ws.def.fieldsByIndex[IndexVersion], &Number{int64(oldVersion), &NumberType{0}})
+			ws.set(ws.def.fieldsByIndex[indexVersion], &Number{int64(oldVersion), &NumberType{0}})
 		}
 	}()
 

@@ -193,14 +193,14 @@ func (s *DbZuite) TestSliceSave() {
 	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: ws.Id(),
-			Index:       IndexId,
+			Index:       indexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       ws.Id(),
 		},
 		{
 			WorksheetId: ws.Id(),
-			Index:       IndexVersion,
+			Index:       indexVersion,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       `1`,
@@ -316,28 +316,28 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: wsId,
-			Index:       IndexId,
+			Index:       indexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       wsId,
 		},
 		{
 			WorksheetId: wsId,
-			Index:       IndexVersion,
+			Index:       indexVersion,
 			FromVersion: 1,
 			ToVersion:   1,
 			Value:       `1`,
 		},
 		{
 			WorksheetId: wsId,
-			Index:       IndexVersion,
+			Index:       indexVersion,
 			FromVersion: 2,
 			ToVersion:   2,
 			Value:       `2`,
 		},
 		{
 			WorksheetId: wsId,
-			Index:       IndexVersion,
+			Index:       indexVersion,
 			FromVersion: 3,
 			ToVersion:   math.MaxInt32,
 			Value:       `3`,
@@ -448,14 +448,14 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: wsId,
-			Index:       IndexId,
+			Index:       indexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       wsId,
 		},
 		{
 			WorksheetId: wsId,
-			Index:       IndexVersion,
+			Index:       indexVersion,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       `1`,
@@ -469,14 +469,14 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 		},
 		{
 			WorksheetId: simple1Id,
-			Index:       IndexId,
+			Index:       indexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       simple1Id,
 		},
 		{
 			WorksheetId: simple1Id,
-			Index:       IndexVersion,
+			Index:       indexVersion,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       `1`,
@@ -490,14 +490,14 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 		},
 		{
 			WorksheetId: simple2Id,
-			Index:       IndexId,
+			Index:       indexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       simple2Id,
 		},
 		{
 			WorksheetId: simple2Id,
-			Index:       IndexVersion,
+			Index:       indexVersion,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       `1`,
