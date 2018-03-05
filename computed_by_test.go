@@ -795,21 +795,21 @@ func (s *DbZuite) TestComputedBy_crossWs_updateOfChildCarriesToParent() {
 		// parent's values
 		{
 			WorksheetId: parentId,
-			Index:       IndexId,
+			Index:       indexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       parentId,
 		},
 		{
 			WorksheetId: parentId,
-			Index:       IndexVersion,
+			Index:       indexVersion,
 			FromVersion: 1,
 			ToVersion:   1,
 			Value:       `1`,
 		},
 		{
 			WorksheetId: parentId,
-			Index:       IndexVersion,
+			Index:       indexVersion,
 			FromVersion: 2,
 			ToVersion:   math.MaxInt32,
 			Value:       `2`,
@@ -839,14 +839,14 @@ func (s *DbZuite) TestComputedBy_crossWs_updateOfChildCarriesToParent() {
 		// child1's values
 		{
 			WorksheetId: child1Id,
-			Index:       IndexId,
+			Index:       indexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       child1Id,
 		},
 		{
 			WorksheetId: child1Id,
-			Index:       IndexVersion,
+			Index:       indexVersion,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       `1`,
@@ -862,21 +862,21 @@ func (s *DbZuite) TestComputedBy_crossWs_updateOfChildCarriesToParent() {
 		// child2's values
 		{
 			WorksheetId: child2Id,
-			Index:       IndexId,
+			Index:       indexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       child2Id,
 		},
 		{
 			WorksheetId: child2Id,
-			Index:       IndexVersion,
+			Index:       indexVersion,
 			FromVersion: 1,
 			ToVersion:   1,
 			Value:       `1`,
 		},
 		{
 			WorksheetId: child2Id,
-			Index:       IndexVersion,
+			Index:       indexVersion,
 			FromVersion: 2,
 			ToVersion:   math.MaxInt32,
 			Value:       `2`,

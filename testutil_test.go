@@ -64,7 +64,7 @@ worksheet with_refs_and_cycles {
 }`))
 
 func forciblySetId(ws *Worksheet, id string) {
-	ws.data[IndexId] = NewText(id)
+	ws.data[indexId] = NewText(id)
 }
 
 type Zuite struct {

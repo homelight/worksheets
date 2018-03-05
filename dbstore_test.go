@@ -68,14 +68,14 @@ func (s *DbZuite) TestSave() {
 	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: ws.Id(),
-			Index:       IndexId,
+			Index:       indexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       ws.Id(),
 		},
 		{
 			WorksheetId: ws.Id(),
-			Index:       IndexVersion,
+			Index:       indexVersion,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       `1`,
@@ -126,21 +126,21 @@ func (s *DbZuite) TestUpdate() {
 	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: ws.Id(),
-			Index:       IndexId,
+			Index:       indexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       ws.Id(),
 		},
 		{
 			WorksheetId: ws.Id(),
-			Index:       IndexVersion,
+			Index:       indexVersion,
 			FromVersion: 1,
 			ToVersion:   1,
 			Value:       `1`,
 		},
 		{
 			WorksheetId: ws.Id(),
-			Index:       IndexVersion,
+			Index:       indexVersion,
 			FromVersion: 2,
 			ToVersion:   math.MaxInt32,
 			Value:       `2`,
@@ -237,21 +237,21 @@ func (s *DbZuite) TestProperlyLoadUndefinedField() {
 	require.Equal(s.T(), []rValueForTesting{
 		{
 			WorksheetId: wsId,
-			Index:       IndexId,
+			Index:       indexId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Value:       wsId,
 		},
 		{
 			WorksheetId: wsId,
-			Index:       IndexVersion,
+			Index:       indexVersion,
 			FromVersion: 1,
 			ToVersion:   1,
 			Value:       `1`,
 		},
 		{
 			WorksheetId: wsId,
-			Index:       IndexVersion,
+			Index:       indexVersion,
 			FromVersion: 2,
 			ToVersion:   math.MaxInt32,
 			Value:       `2`,
