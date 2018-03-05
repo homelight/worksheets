@@ -1,6 +1,27 @@
 version: 2
+shared: &run_steps
+  steps:
+    - checkout
+    # wait on postgres sql to start
+    - run:
+        command: while ! nc -z localhost 5432; do echo "postgres not ready"; sleep 0.1; done
+        timeout: 5
+
+    # postgres
+    - run: sudo apt install postgresql-client
+    - run: psql ws_test ws_user -h localhost -p 5432 -f /go/src/github.com/helloeave/worksheets/schema.sql
+
+    # golang
+    - run: go get -v -t -d ./...
+    - run: rm -Rf /go/src/github.com/satori/go.uuid
+    - run: mkdir /go/src/github.com/satori/go.uuid
+    - run: curl https://raw.githubusercontent.com/satori/go.uuid/b061729afc07e77a8aa4fad0a2fd840958f1942a/uuid.go > /go/src/github.com/satori/go.uuid/uuid.go
+    - run: go test -v ./...
+    - run: go run tools/wstest.go `find features -name '*.feature'`
+    - run: go build -tags=gofuzz ./...
+
 jobs:
-  build:
+  buildGo1.8:
     docker:
       - image: circleci/golang:1.8
       - image: circleci/postgres:9.5-alpine
@@ -10,24 +31,36 @@ jobs:
           POSTGRES_PASSWORD: ""
 
     working_directory: /go/src/github.com/helloeave/worksheets
+    <<: *run_steps
 
-    steps:
-      - checkout
+  buildGo1.9.4:
+    docker:
+      - image: circleci/golang:1.9.4
+      - image: circleci/postgres:9.5-alpine
+        environment:
+          POSTGRES_USER: ws_user
+          POSTGRES_DB: ws_test
+          POSTGRES_PASSWORD: ""
 
-      # wait on postgres sql to start
-      - run:
-          command: while ! nc -z localhost 5432; do echo "postgres not ready"; sleep 0.1; done
-          timeout: 5
+    working_directory: /go/src/github.com/helloeave/worksheets
+    <<: *run_steps
 
-      # postgres
-      - run: sudo apt install postgresql-client
-      - run: psql ws_test ws_user -h localhost -p 5432 -f /go/src/github.com/helloeave/worksheets/schema.sql
+  buildGo1.10:
+    docker:
+      - image: circleci/golang:1.10
+      - image: circleci/postgres:9.5-alpine
+        environment:
+          POSTGRES_USER: ws_user
+          POSTGRES_DB: ws_test
+          POSTGRES_PASSWORD: ""
 
-      # golang
-      - run: go get -v -t -d ./...
-      - run: rm -Rf /go/src/github.com/satori/go.uuid
-      - run: mkdir /go/src/github.com/satori/go.uuid
-      - run: curl https://raw.githubusercontent.com/satori/go.uuid/b061729afc07e77a8aa4fad0a2fd840958f1942a/uuid.go > /go/src/github.com/satori/go.uuid/uuid.go
-      - run: go test -v ./...
-      - run: go run tools/wstest.go `find features -name '*.feature'`
-      - run: go build -tags=gofuzz ./...
+    working_directory: /go/src/github.com/helloeave/worksheets
+    <<: *run_steps
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - buildGo1.8
+      - buildGo1.9.4
+      - buildGo1.10
