@@ -1,4 +1,25 @@
 version: 2
+shared: &run_steps
+  steps:
+    - checkout
+    # wait on postgres sql to start
+    - run:
+        command: while ! nc -z localhost 5432; do echo "postgres not ready"; sleep 0.1; done
+        timeout: 5
+
+    # postgres
+    - run: sudo apt install postgresql-client
+    - run: psql ws_test ws_user -h localhost -p 5432 -f /go/src/github.com/helloeave/worksheets/schema.sql
+
+    # golang
+    - run: go get -v -t -d ./...
+    - run: rm -Rf /go/src/github.com/satori/go.uuid
+    - run: mkdir /go/src/github.com/satori/go.uuid
+    - run: curl https://raw.githubusercontent.com/satori/go.uuid/b061729afc07e77a8aa4fad0a2fd840958f1942a/uuid.go > /go/src/github.com/satori/go.uuid/uuid.go
+    - run: go test -v ./...
+    - run: go run tools/wstest.go `find features -name '*.feature'`
+    - run: go build -tags=gofuzz ./...
+
 jobs:
   buildGo1.8:
     docker:
@@ -10,27 +31,7 @@ jobs:
           POSTGRES_PASSWORD: ""
 
     working_directory: /go/src/github.com/helloeave/worksheets
-
-    steps:
-      - checkout
-
-      # wait on postgres sql to start
-      - run:
-          command: while ! nc -z localhost 5432; do echo "postgres not ready"; sleep 0.1; done
-          timeout: 5
-
-      # postgres
-      - run: sudo apt install postgresql-client
-      - run: psql ws_test ws_user -h localhost -p 5432 -f /go/src/github.com/helloeave/worksheets/schema.sql
-
-      # golang
-      - run: go get -v -t -d ./...
-      - run: rm -Rf /go/src/github.com/satori/go.uuid
-      - run: mkdir /go/src/github.com/satori/go.uuid
-      - run: curl https://raw.githubusercontent.com/satori/go.uuid/b061729afc07e77a8aa4fad0a2fd840958f1942a/uuid.go > /go/src/github.com/satori/go.uuid/uuid.go
-      - run: go test -v ./...
-      - run: go run tools/wstest.go `find features -name '*.feature'`
-      - run: go build -tags=gofuzz ./...
+    <<: *run_steps
 
   buildGo1.9.4:
     docker:
@@ -42,27 +43,7 @@ jobs:
           POSTGRES_PASSWORD: ""
 
     working_directory: /go/src/github.com/helloeave/worksheets
-
-    steps:
-      - checkout
-
-      # wait on postgres sql to start
-      - run:
-          command: while ! nc -z localhost 5432; do echo "postgres not ready"; sleep 0.1; done
-          timeout: 5
-
-      # postgres
-      - run: sudo apt install postgresql-client
-      - run: psql ws_test ws_user -h localhost -p 5432 -f /go/src/github.com/helloeave/worksheets/schema.sql
-
-      # golang
-      - run: go get -v -t -d ./...
-      - run: rm -Rf /go/src/github.com/satori/go.uuid
-      - run: mkdir /go/src/github.com/satori/go.uuid
-      - run: curl https://raw.githubusercontent.com/satori/go.uuid/b061729afc07e77a8aa4fad0a2fd840958f1942a/uuid.go > /go/src/github.com/satori/go.uuid/uuid.go
-      - run: go test -v ./...
-      - run: go run tools/wstest.go `find features -name '*.feature'`
-      - run: go build -tags=gofuzz ./...
+    <<: *run_steps
 
   buildGo1.10:
     docker:
@@ -74,27 +55,7 @@ jobs:
           POSTGRES_PASSWORD: ""
 
     working_directory: /go/src/github.com/helloeave/worksheets
-
-    steps:
-      - checkout
-
-      # wait on postgres sql to start
-      - run:
-          command: while ! nc -z localhost 5432; do echo "postgres not ready"; sleep 0.1; done
-          timeout: 5
-
-      # postgres
-      - run: sudo apt install postgresql-client
-      - run: psql ws_test ws_user -h localhost -p 5432 -f /go/src/github.com/helloeave/worksheets/schema.sql
-
-      # golang
-      - run: go get -v -t -d ./...
-      - run: rm -Rf /go/src/github.com/satori/go.uuid
-      - run: mkdir /go/src/github.com/satori/go.uuid
-      - run: curl https://raw.githubusercontent.com/satori/go.uuid/b061729afc07e77a8aa4fad0a2fd840958f1942a/uuid.go > /go/src/github.com/satori/go.uuid/uuid.go
-      - run: go test -v ./...
-      - run: go run tools/wstest.go `find features -name '*.feature'`
-      - run: go build -tags=gofuzz ./...
+    <<: *run_steps
 
 workflows:
   version: 2
