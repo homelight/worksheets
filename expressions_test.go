@@ -55,7 +55,7 @@ func (s *Zuite) TestSelectors() {
 		slice, ok := actual.(*Slice)
 		require.True(s.T(), ok)
 		require.Equal(s.T(), []Value{alice}, slice.Elements())
-		require.Equal(s.T(), &SliceType{alice.Type()}, slice.Type())
+		require.Equal(s.T(), &SliceType{&TextType{}}, slice.Type())
 	}
 }
 
@@ -70,6 +70,17 @@ func (s *Zuite) TestSelectorSliceTypes() {
 		slice, ok := actual.(*Slice)
 		require.True(s.T(), ok)
 		require.Equal(s.T(), []Value{NewUndefined()}, slice.Elements())
+		require.Equal(s.T(), &SliceType{&TextType{}}, slice.Type())
+	}
+	// a selected empty slice should still be of the correct type
+	parent.MustDel("refs_to_children", 0)
+	{
+		actual, err := tSelector([]string{"refs_to_children", "name"}).Compute(parent)
+		require.NoError(s.T(), err)
+		slice, ok := actual.(*Slice)
+		require.True(s.T(), ok)
+		var values []Value
+		require.Equal(s.T(), values, slice.Elements())
 		require.Equal(s.T(), &SliceType{&TextType{}}, slice.Type())
 	}
 }
