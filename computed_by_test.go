@@ -492,7 +492,7 @@ func (s *DbZuite) TestComputedBy_crossWs_parentsRefsPersistence() {
 	})
 
 	// 1. Ensure parent pointers are properly stored on save.
-	_, _, parentsRecs, _ := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rParent{
 		{
@@ -500,7 +500,7 @@ func (s *DbZuite) TestComputedBy_crossWs_parentsRefsPersistence() {
 			ParentId:         parentId,
 			ParentFieldIndex: 2,
 		},
-	}, parentsRecs)
+	}, snap.parentsRecs)
 
 	// 2. Ensure parent pointers (and parent worksheets) are correctly loaded.
 	var childParentsAfterLoad parentsRefs
@@ -532,9 +532,9 @@ func (s *DbZuite) TestComputedBy_crossWs_parentsRefsPersistence() {
 		return session.Update(parent)
 	})
 
-	_, _, parentsRecs, _ = s.DbState()
+	snap = s.snapshotDbState()
 
-	require.Empty(s.T(), parentsRecs)
+	require.Empty(s.T(), snap.parentsRecs)
 }
 
 func (s *DbZuite) TestComputedBy_crossWs_twoParentsOneChildRefsPersistence() {
@@ -563,7 +563,7 @@ func (s *DbZuite) TestComputedBy_crossWs_twoParentsOneChildRefsPersistence() {
 	})
 
 	// 1. Ensure parent pointers are properly stored on save.
-	_, _, parentsRecs, _ := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rParent{
 		{
@@ -576,7 +576,7 @@ func (s *DbZuite) TestComputedBy_crossWs_twoParentsOneChildRefsPersistence() {
 			ParentId:         parent2Id,
 			ParentFieldIndex: 2,
 		},
-	}, parentsRecs)
+	}, snap.parentsRecs)
 
 	// 2. Ensure that when a ref is removed from a parent, the parent record
 	// is properly removed (even when the child is not loaded), and that no
@@ -591,7 +591,7 @@ func (s *DbZuite) TestComputedBy_crossWs_twoParentsOneChildRefsPersistence() {
 		return session.Update(parent1)
 	})
 
-	_, _, parentsRecs, _ = s.DbState()
+	snap = s.snapshotDbState()
 
 	require.Equal(s.T(), []rParent{
 		{
@@ -599,7 +599,7 @@ func (s *DbZuite) TestComputedBy_crossWs_twoParentsOneChildRefsPersistence() {
 			ParentId:         parent2Id,
 			ParentFieldIndex: 2,
 		},
-	}, parentsRecs)
+	}, snap.parentsRecs)
 }
 
 func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
@@ -623,7 +623,7 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
 	})
 
 	// 1. Ensure parent pointers are properly stored on save.
-	_, _, parentsRecs, _ := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rParent{
 		{
@@ -631,7 +631,7 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
 			ParentId:         parentId,
 			ParentFieldIndex: 20,
 		},
-	}, parentsRecs)
+	}, snap.parentsRecs)
 
 	// 2. Add another child, ensure the new ref is also recorded.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -647,7 +647,7 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
 		return session.Update(parent)
 	})
 
-	_, _, parentsRecs, _ = s.DbState()
+	snap = s.snapshotDbState()
 
 	require.Equal(s.T(), []rParent{
 		{
@@ -660,7 +660,7 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
 			ParentId:         parentId,
 			ParentFieldIndex: 20,
 		},
-	}, parentsRecs)
+	}, snap.parentsRecs)
 
 	// 3. Remove a child, ensure ref is removed as well.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -673,7 +673,7 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
 		return session.Update(parent)
 	})
 
-	_, _, parentsRecs, _ = s.DbState()
+	snap = s.snapshotDbState()
 
 	require.Equal(s.T(), []rParent{
 		{
@@ -681,7 +681,7 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
 			ParentId:         parentId,
 			ParentFieldIndex: 20,
 		},
-	}, parentsRecs)
+	}, snap.parentsRecs)
 }
 
 func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence2() {
@@ -727,7 +727,7 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence2() {
 	})
 
 	// Now, ensure parent pointers are properly stored on save.
-	_, _, parentsRecs, _ := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rParent{
 		{
@@ -735,7 +735,7 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence2() {
 			ParentId:         parentId,
 			ParentFieldIndex: 20,
 		},
-	}, parentsRecs)
+	}, snap.parentsRecs)
 }
 
 func (s *DbZuite) TestComputedBy_crossWs_updateOfChildCarriesToParent() {
@@ -788,8 +788,7 @@ func (s *DbZuite) TestComputedBy_crossWs_updateOfChildCarriesToParent() {
 	})
 	require.Equal(s.T(), `15.54` /* 6.66 + 8.88 */, sumOfChildren.String())
 
-	// Inspect rValues.
-	_, valuesRecs, _, _ := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rValueForTesting{
 		// parent's values
@@ -895,5 +894,5 @@ func (s *DbZuite) TestComputedBy_crossWs_updateOfChildCarriesToParent() {
 			ToVersion:   math.MaxInt32,
 			Value:       `8.88`,
 		},
-	}, valuesRecs)
+	}, snap.valuesRecs)
 }

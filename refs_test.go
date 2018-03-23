@@ -55,7 +55,7 @@ func (s *DbZuite) TestRefsSave_noDataInRefWorksheet() {
 		return session.Save(ws)
 	})
 
-	wsRecs, valuesRecs, _, _ := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -68,7 +68,7 @@ func (s *DbZuite) TestRefsSave_noDataInRefWorksheet() {
 			Version: 1,
 			Name:    "simple",
 		},
-	}, wsRecs)
+	}, snap.wsRecs)
 
 	require.Equal(s.T(), []rValueForTesting{
 		{
@@ -106,7 +106,7 @@ func (s *DbZuite) TestRefsSave_noDataInRefWorksheet() {
 			ToVersion:   math.MaxInt32,
 			Value:       `1`,
 		},
-	}, valuesRecs)
+	}, snap.valuesRecs)
 
 	// Upon Save, orig needs to be set to data.
 	require.Empty(s.T(), ws.diff())
@@ -134,7 +134,7 @@ func (s *DbZuite) TestRefsSave_withDataInRefWorksheet() {
 		return session.Save(ws)
 	})
 
-	wsRecs, valuesRecs, _, _ := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -147,7 +147,7 @@ func (s *DbZuite) TestRefsSave_withDataInRefWorksheet() {
 			Version: 1,
 			Name:    "simple",
 		},
-	}, wsRecs)
+	}, snap.wsRecs)
 
 	require.Equal(s.T(), []rValueForTesting{
 		{
@@ -199,7 +199,7 @@ func (s *DbZuite) TestRefsSave_withDataInRefWorksheet() {
 			ToVersion:   math.MaxInt32,
 			Value:       `120`,
 		},
-	}, valuesRecs)
+	}, snap.valuesRecs)
 
 	// Upon Save, orig needs to be set to data.
 	require.Empty(s.T(), ws.diff())
@@ -227,7 +227,7 @@ func (s *DbZuite) TestRefsSave_refWorksheetAlreadySaved() {
 		return session.Save(simple)
 	})
 
-	wsRecs, valuesRecs, _, _ := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -240,7 +240,7 @@ func (s *DbZuite) TestRefsSave_refWorksheetAlreadySaved() {
 			Version: 1,
 			Name:    "simple",
 		},
-	}, wsRecs)
+	}, snap.wsRecs)
 
 	require.Equal(s.T(), []rValueForTesting{
 		{
@@ -278,7 +278,7 @@ func (s *DbZuite) TestRefsSave_refWorksheetAlreadySaved() {
 			ToVersion:   math.MaxInt32,
 			Value:       `1`,
 		},
-	}, valuesRecs)
+	}, snap.valuesRecs)
 
 	// Upon Save, orig needs to be set to data.
 	require.Empty(s.T(), ws.diff())
@@ -315,7 +315,7 @@ func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 		return session.SaveOrUpdate(ws)
 	})
 
-	wsRecs, valuesRecs, _, _ := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -328,7 +328,7 @@ func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 			Version: 2,
 			Name:    "simple",
 		},
-	}, wsRecs)
+	}, snap.wsRecs)
 
 	require.Equal(s.T(), []rValueForTesting{
 		{
@@ -387,7 +387,7 @@ func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 			ToVersion:   math.MaxInt32,
 			Value:       `Carol`,
 		},
-	}, valuesRecs)
+	}, snap.valuesRecs)
 
 	// Upon Save, orig needs to be set to data.
 	require.Empty(s.T(), ws.diff())
@@ -402,7 +402,7 @@ func (s *DbZuite) TestRefsSave_withCycles() {
 		return session.Save(ws)
 	})
 
-	wsRecs, valuesRecs, _, _ := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -410,7 +410,7 @@ func (s *DbZuite) TestRefsSave_withCycles() {
 			Version: 1,
 			Name:    "with_refs_and_cycles",
 		},
-	}, wsRecs)
+	}, snap.wsRecs)
 
 	require.Equal(s.T(), []rValueForTesting{
 		{
@@ -434,7 +434,7 @@ func (s *DbZuite) TestRefsSave_withCycles() {
 			ToVersion:   math.MaxInt32,
 			Value:       fmt.Sprintf(`*:%s`, ws.Id()),
 		},
-	}, valuesRecs)
+	}, snap.valuesRecs)
 
 	// Upon Save, orig needs to be set to data.
 	require.Empty(s.T(), ws.diff())
@@ -539,7 +539,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentNoChangeInChild() {
 		return session.Update(ws)
 	})
 
-	wsRecs, valuesRecs, _, _ := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -552,7 +552,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentNoChangeInChild() {
 			Version: 1,
 			Name:    "simple",
 		},
-	}, wsRecs)
+	}, snap.wsRecs)
 
 	require.Equal(s.T(), []rValueForTesting{
 		{
@@ -618,7 +618,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentNoChangeInChild() {
 			ToVersion:   math.MaxInt32,
 			Value:       `Carol`,
 		},
-	}, valuesRecs)
+	}, snap.valuesRecs)
 
 	// Upon Update, there should be no more changes to persist.
 	require.Empty(s.T(), ws.diff())
@@ -656,7 +656,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChangesInChild() {
 		return session.Update(ws)
 	})
 
-	wsRecs, valuesRecs, _, _ := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -669,7 +669,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChangesInChild() {
 			Version: 2,
 			Name:    "simple",
 		},
-	}, wsRecs)
+	}, snap.wsRecs)
 
 	require.Equal(s.T(), []rValueForTesting{
 		{
@@ -749,7 +749,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChangesInChild() {
 			ToVersion:   math.MaxInt32,
 			Value:       `Bob`,
 		},
-	}, valuesRecs)
+	}, snap.valuesRecs)
 
 	// Upon Update, there should be no more changes to persist.
 	require.Empty(s.T(), ws.diff())
@@ -782,7 +782,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChildRequiringToBeSaved() {
 		return session.Update(ws)
 	})
 
-	wsRecs, valuesRecs, _, _ := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -795,7 +795,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChildRequiringToBeSaved() {
 			Version: 1,
 			Name:    "simple",
 		},
-	}, wsRecs)
+	}, snap.wsRecs)
 
 	require.Equal(s.T(), []rValueForTesting{
 		{
@@ -840,7 +840,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChildRequiringToBeSaved() {
 			ToVersion:   math.MaxInt32,
 			Value:       `1`,
 		},
-	}, valuesRecs)
+	}, snap.valuesRecs)
 
 	// Upon Update, there should be no more changes to persist.
 	require.Empty(s.T(), ws.diff())

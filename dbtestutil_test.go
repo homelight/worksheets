@@ -85,7 +85,14 @@ type rSliceElementForTesting struct {
 	IsUndefined bool
 }
 
-func (s *DbZuite) DbState() ([]rWorksheet, []rValueForTesting, []rParent, []rSliceElementForTesting) {
+type dbState struct {
+	wsRecs            []rWorksheet
+	valuesRecs        []rValueForTesting
+	parentsRecs       []rParent
+	sliceElementsRecs []rSliceElementForTesting
+}
+
+func (s *DbZuite) snapshotDbState() *dbState {
 	var (
 		err                 error
 		wsRecs              []rWorksheet
@@ -154,7 +161,12 @@ func (s *DbZuite) DbState() ([]rWorksheet, []rValueForTesting, []rParent, []rSli
 		}
 	}
 
-	return wsRecs, valuesRecs, parentsRecs, sliceElementsRecs
+	return &dbState{
+		wsRecs:            wsRecs,
+		valuesRecs:        valuesRecs,
+		parentsRecs:       parentsRecs,
+		sliceElementsRecs: sliceElementsRecs,
+	}
 }
 
 func p(v string) *string {
