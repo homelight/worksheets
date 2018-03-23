@@ -100,7 +100,11 @@ func (e tSelector) Compute(ws *Worksheet) (Value, error) {
 	} else if selectedWs, ok := value.(*Worksheet); ok {
 		return tSelector(e[1:]).Compute(selectedWs)
 	} else if selectedSlice, ok := value.(*Slice); ok {
-		// returnedSlice :=newSlice(nil) // TODO(pascal)
+		subWsDef, ok := ws.def.fieldsByName[e[0]].Type().(*SliceType).ElementType().(*Definition)
+		if !ok {
+			return nil, fmt.Errorf("sorry! more complex selectors are not supported yet!")
+		}
+		var elementType Type = subWsDef.fieldsByName[e[1]].Type()
 		var elements []sliceElement
 		for _, elem := range selectedSlice.elements {
 			subWs, ok := elem.value.(*Worksheet)
@@ -117,6 +121,7 @@ func (e tSelector) Compute(ws *Worksheet) (Value, error) {
 		}
 		return &Slice{
 			elements: elements,
+			typ:      &SliceType{elementType},
 		}, nil
 	}
 

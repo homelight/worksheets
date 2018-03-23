@@ -55,5 +55,31 @@ func (s *Zuite) TestSelectors() {
 		slice, ok := actual.(*Slice)
 		require.True(s.T(), ok)
 		require.Equal(s.T(), []Value{alice}, slice.Elements())
+		require.Equal(s.T(), &SliceType{&TextType{}}, slice.Type())
+	}
+}
+
+func (s *Zuite) TestSelectorSliceTypes() {
+	child := defsForSelectors.MustNewWorksheet("child")
+	parent := defsForSelectors.MustNewWorksheet("parent")
+	parent.MustAppend("refs_to_children", child)
+	// even with an undefined value, slice type should match field def type
+	{
+		actual, err := tSelector([]string{"refs_to_children", "name"}).Compute(parent)
+		require.NoError(s.T(), err)
+		slice, ok := actual.(*Slice)
+		require.True(s.T(), ok)
+		require.Equal(s.T(), []Value{NewUndefined()}, slice.Elements())
+		require.Equal(s.T(), &SliceType{&TextType{}}, slice.Type())
+	}
+	// a selected empty slice should still be of the correct type
+	parent.MustDel("refs_to_children", 0)
+	{
+		actual, err := tSelector([]string{"refs_to_children", "name"}).Compute(parent)
+		require.NoError(s.T(), err)
+		slice, ok := actual.(*Slice)
+		require.True(s.T(), ok)
+		require.Empty(s.T(), slice.Elements())
+		require.Equal(s.T(), &SliceType{&TextType{}}, slice.Type())
 	}
 }
