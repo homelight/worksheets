@@ -55,5 +55,6 @@ func (s *Zuite) TestSelectors() {
 		slice, ok := actual.(*Slice)
 		require.True(s.T(), ok)
 		require.Equal(s.T(), []Value{alice}, slice.Elements())
+		require.Equal(s.T(), &SliceType{alice.Type()}, slice.Type())
 	}
 }
