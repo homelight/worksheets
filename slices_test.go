@@ -180,7 +180,7 @@ func (s *DbZuite) TestSliceSave() {
 		return session.Save(ws)
 	})
 
-	wsRecs, valuesRecs, _, sliceElementsRecs := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -188,7 +188,7 @@ func (s *DbZuite) TestSliceSave() {
 			Version: 1,
 			Name:    "with_slice",
 		},
-	}, wsRecs)
+	}, snap.wsRecs)
 
 	require.Equal(s.T(), []rValueForTesting{
 		{
@@ -212,7 +212,7 @@ func (s *DbZuite) TestSliceSave() {
 			ToVersion:   math.MaxInt32,
 			Value:       fmt.Sprintf(`[:89:%s`, theSliceId),
 		},
-	}, valuesRecs)
+	}, snap.valuesRecs)
 
 	require.Equal(s.T(), []rSliceElementForTesting{
 		{
@@ -222,7 +222,7 @@ func (s *DbZuite) TestSliceSave() {
 			Rank:        1,
 			Value:       `Alice`,
 		},
-	}, sliceElementsRecs)
+	}, snap.sliceElementsRecs)
 
 	// Upon Save, orig needs to be set to data.
 	require.Empty(s.T(), ws.diff())
@@ -303,7 +303,7 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 		return session.Update(ws)
 	})
 
-	wsRecs, valuesRecs, _, sliceElementsRecs := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -311,7 +311,7 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 			Version: 3,
 			Name:    "with_slice",
 		},
-	}, wsRecs)
+	}, snap.wsRecs)
 
 	require.Equal(s.T(), []rValueForTesting{
 		{
@@ -363,7 +363,7 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 			ToVersion:   math.MaxInt32,
 			Value:       fmt.Sprintf(`[:3:%s`, theSliceId),
 		},
-	}, valuesRecs)
+	}, snap.valuesRecs)
 
 	require.Equal(s.T(), []rSliceElementForTesting{
 		{
@@ -387,7 +387,7 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 			Rank:        3,
 			Value:       `Alice`,
 		},
-	}, sliceElementsRecs)
+	}, snap.sliceElementsRecs)
 }
 
 func (s *DbZuite) TestSliceOfRefs_saveLoad() {
@@ -425,7 +425,7 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 		return session.Save(ws)
 	})
 
-	wsRecs, valuesRecs, parentsRecs, sliceElementsRecs := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -443,7 +443,7 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 			Version: 1,
 			Name:    "simple",
 		},
-	}, wsRecs)
+	}, snap.wsRecs)
 
 	require.Equal(s.T(), []rValueForTesting{
 		{
@@ -509,7 +509,7 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 			ToVersion:   math.MaxInt32,
 			Value:       `Bob`,
 		},
-	}, valuesRecs)
+	}, snap.valuesRecs)
 
 	require.Equal(s.T(), []rParent{
 		{
@@ -522,7 +522,7 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 			ParentId:         wsId,
 			ParentFieldIndex: 42,
 		},
-	}, parentsRecs)
+	}, snap.parentsRecs)
 
 	require.Equal(s.T(), []rSliceElementForTesting{
 		{
@@ -539,7 +539,7 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 			Rank:        2,
 			Value:       fmt.Sprintf("*:%s", simple2Id),
 		},
-	}, sliceElementsRecs)
+	}, snap.sliceElementsRecs)
 
 	// Load into a fresh worksheet, and look at the slice.
 	var fresh *Worksheet

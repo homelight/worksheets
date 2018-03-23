@@ -55,7 +55,7 @@ func (s *DbZuite) TestSave() {
 		return session.Save(ws)
 	})
 
-	wsRecs, valuesRecs, _, _ := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -63,7 +63,7 @@ func (s *DbZuite) TestSave() {
 			Version: 1,
 			Name:    "simple",
 		},
-	}, wsRecs)
+	}, snap.wsRecs)
 
 	require.Equal(s.T(), []rValueForTesting{
 		{
@@ -87,7 +87,7 @@ func (s *DbZuite) TestSave() {
 			ToVersion:   math.MaxInt32,
 			Value:       `Alice`,
 		},
-	}, valuesRecs)
+	}, snap.valuesRecs)
 
 	// Upon Save, orig needs to be set to data.
 	require.Empty(s.T(), ws.diff())
@@ -113,7 +113,7 @@ func (s *DbZuite) TestUpdate() {
 		return session.Update(ws)
 	})
 
-	wsRecs, valuesRecs, _, _ := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -121,7 +121,7 @@ func (s *DbZuite) TestUpdate() {
 			Version: 2,
 			Name:    "simple",
 		},
-	}, wsRecs)
+	}, snap.wsRecs)
 
 	require.Equal(s.T(), []rValueForTesting{
 		{
@@ -159,7 +159,7 @@ func (s *DbZuite) TestUpdate() {
 			ToVersion:   math.MaxInt32,
 			Value:       `Bob`,
 		},
-	}, valuesRecs)
+	}, snap.valuesRecs)
 
 	// Upon update, version must increase
 	require.Equal(s.T(), 2, ws.Version())
@@ -224,7 +224,7 @@ func (s *DbZuite) TestProperlyLoadUndefinedField() {
 	require.False(s.T(), fresh.MustIsSet("age"))
 
 	// Lastly, check db state.
-	wsRecs, valuesRecs, _, _ := s.DbState()
+	snap := s.snapshotDbState()
 
 	require.Equal(s.T(), []rWorksheet{
 		{
@@ -232,7 +232,7 @@ func (s *DbZuite) TestProperlyLoadUndefinedField() {
 			Version: 2,
 			Name:    "simple",
 		},
-	}, wsRecs)
+	}, snap.wsRecs)
 
 	require.Equal(s.T(), []rValueForTesting{
 		{
@@ -270,7 +270,7 @@ func (s *DbZuite) TestProperlyLoadUndefinedField() {
 			ToVersion:   math.MaxInt32,
 			IsUndefined: true,
 		},
-	}, valuesRecs)
+	}, snap.valuesRecs)
 }
 
 func (s *DbZuite) TestUpdateOnUpdateDoesNothing() {
