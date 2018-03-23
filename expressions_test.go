@@ -79,8 +79,7 @@ func (s *Zuite) TestSelectorSliceTypes() {
 		require.NoError(s.T(), err)
 		slice, ok := actual.(*Slice)
 		require.True(s.T(), ok)
-		var values []Value
-		require.Equal(s.T(), values, slice.Elements())
+		require.Empty(s.T(), slice.Elements())
 		require.Equal(s.T(), &SliceType{&TextType{}}, slice.Type())
 	}
 }
