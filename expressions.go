@@ -100,7 +100,7 @@ func (e tSelector) Compute(ws *Worksheet) (Value, error) {
 	} else if selectedWs, ok := value.(*Worksheet); ok {
 		return tSelector(e[1:]).Compute(selectedWs)
 	} else if selectedSlice, ok := value.(*Slice); ok {
-		var elementType Type
+		var elementType Type = &UndefinedType{}
 		var elements []sliceElement
 		for _, elem := range selectedSlice.elements {
 			subWs, ok := elem.value.(*Worksheet)
@@ -108,9 +108,11 @@ func (e tSelector) Compute(ws *Worksheet) (Value, error) {
 				return nil, fmt.Errorf("sorry! more complex selectors are not supported yet!")
 			}
 			subValue, err := tSelector(e[1:]).Compute(subWs)
-			elementType = subValue.Type()
 			if err != nil {
 				return nil, err
+			}
+			if _, ok := subValue.Type().(*UndefinedType); !ok {
+				elementType = subValue.Type()
 			}
 			elements = append(elements, sliceElement{
 				value: subValue,

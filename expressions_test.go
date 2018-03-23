@@ -58,3 +58,31 @@ func (s *Zuite) TestSelectors() {
 		require.Equal(s.T(), &SliceType{alice.Type()}, slice.Type())
 	}
 }
+
+func (s *Zuite) TestSelectorSliceTypes() {
+	child_1 := defsForSelectors.MustNewWorksheet("child")
+	child_2 := defsForSelectors.MustNewWorksheet("child")
+	parent := defsForSelectors.MustNewWorksheet("parent")
+	parent.MustAppend("refs_to_children", child_1)
+	parent.MustAppend("refs_to_children", child_2)
+	// all slice values undefined, slice type is also undefined
+	{
+		actual, err := tSelector([]string{"refs_to_children", "name"}).Compute(parent)
+		require.NoError(s.T(), err)
+		slice, ok := actual.(*Slice)
+		require.True(s.T(), ok)
+		require.Equal(s.T(), []Value{NewUndefined(), NewUndefined()}, slice.Elements())
+		require.Equal(s.T(), &SliceType{&UndefinedType{}}, slice.Type())
+	}
+
+	// at least one value set - slice type should match value type
+	child_1.MustSet("name", alice)
+	{
+		actual, err := tSelector([]string{"refs_to_children", "name"}).Compute(parent)
+		require.NoError(s.T(), err)
+		slice, ok := actual.(*Slice)
+		require.True(s.T(), ok)
+		require.Equal(s.T(), []Value{alice, NewUndefined()}, slice.Elements())
+		require.Equal(s.T(), &SliceType{alice.Type()}, slice.Type())
+	}
+}
