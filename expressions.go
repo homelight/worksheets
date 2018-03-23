@@ -111,9 +111,7 @@ func (e tSelector) Compute(ws *Worksheet) (Value, error) {
 			if err != nil {
 				return nil, err
 			}
-			if _, ok := subValue.Type().(*UndefinedType); !ok {
-				elementType = subValue.Type()
-			}
+			elementType = subWs.def.fieldsByName[e[1]].Type()
 			elements = append(elements, sliceElement{
 				value: subValue,
 			})
@@ -301,9 +299,6 @@ var functions = map[string]struct {
 		arg := args[0]
 		switch v := arg.(type) {
 		case *Slice:
-			if _, ok := v.typ.elementType.(*UndefinedType); ok {
-				return &Undefined{}, nil
-			}
 			numType, ok := v.typ.elementType.(*NumberType)
 			if !ok {
 				return nil, fmt.Errorf("sum expects argument #1 to be slice of numbers")
