@@ -100,7 +100,7 @@ func (e tSelector) Compute(ws *Worksheet) (Value, error) {
 	} else if selectedWs, ok := value.(*Worksheet); ok {
 		return tSelector(e[1:]).Compute(selectedWs)
 	} else if selectedSlice, ok := value.(*Slice); ok {
-		// returnedSlice :=newSlice(nil) // TODO(pascal)
+		var elementType Type
 		var elements []sliceElement
 		for _, elem := range selectedSlice.elements {
 			subWs, ok := elem.value.(*Worksheet)
@@ -108,6 +108,7 @@ func (e tSelector) Compute(ws *Worksheet) (Value, error) {
 				return nil, fmt.Errorf("sorry! more complex selectors are not supported yet!")
 			}
 			subValue, err := tSelector(e[1:]).Compute(subWs)
+			elementType = subValue.Type()
 			if err != nil {
 				return nil, err
 			}
@@ -117,6 +118,7 @@ func (e tSelector) Compute(ws *Worksheet) (Value, error) {
 		}
 		return &Slice{
 			elements: elements,
+			typ:      &SliceType{elementType},
 		}, nil
 	}
 
@@ -297,6 +299,9 @@ var functions = map[string]struct {
 		arg := args[0]
 		switch v := arg.(type) {
 		case *Slice:
+			if _, ok := v.typ.elementType.(*UndefinedType); ok {
+				return &Undefined{}, nil
+			}
 			numType, ok := v.typ.elementType.(*NumberType)
 			if !ok {
 				return nil, fmt.Errorf("sum expects argument #1 to be slice of numbers")
