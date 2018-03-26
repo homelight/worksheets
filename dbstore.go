@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/satori/go.uuid"
 	"gopkg.in/mgutz/dat.v2/dat"
 	"gopkg.in/mgutz/dat.v2/sqlx-runner"
@@ -633,7 +634,7 @@ func (p *persister) update(ws *Worksheet) error {
 	}
 
 	// insert rEdit
-	if _, err := p.s.tx.
+	_, err := p.s.tx.
 		InsertInto("worksheet_edits").
 		Columns("*").
 		Record(&rEdit{
@@ -642,7 +643,10 @@ func (p *persister) update(ws *Worksheet) error {
 			WorksheetId: ws.Id(),
 			ToVersion:   newVersion,
 		}).
-		Exec(); err != nil {
+		Exec()
+	if isSpecificUniqueConstraintErr(err, "worksheet_edits_worksheet_id_to_version_key") {
+		return fmt.Errorf("concurrent update detected (%s)", err)
+	} else if err != nil {
 		return err
 	}
 
@@ -800,5 +804,17 @@ func worksheetsToCascade(value Value) []*Worksheet {
 		return result
 	default:
 		return nil
+	}
+}
+
+func isSpecificUniqueConstraintErr(err error, uniqueConstraintName string) bool {
+	// Did we violate the unique constraint?
+	// See https://www.postgresql.org/docs/9.4/static/errcodes-appendix.html
+	switch err := err.(type) {
+	case *pq.Error:
+		return err.Code == pq.ErrorCode("23505") &&
+			strings.Contains(err.Error(), uniqueConstraintName)
+	default:
+		return false
 	}
 }

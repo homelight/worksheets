@@ -58,8 +58,23 @@ func (s *DbZuite) TearDownSuite() {
 	}
 }
 
+func (s *DbZuite) RunTransaction(fn func(tx *runner.Tx) error) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.AutoRollback()
+
+	err = fn(tx)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func (s *DbZuite) MustRunTransaction(fn func(tx *runner.Tx) error) {
-	err := RunTransaction(s.db, fn)
+	err := s.RunTransaction(fn)
 	require.NoError(s.T(), err)
 }
 

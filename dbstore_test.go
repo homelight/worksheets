@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/satori/go.uuid"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
@@ -384,7 +385,7 @@ func (s *DbZuite) TestUpdateOnUpdateDoesNothing() {
 	require.Equal(s.T(), 2, ws.Version())
 }
 
-func (s *DbZuite) TestUpdateDetectsConcurrentModifications() {
+func (s *DbZuite) TestUpdateDetectsConcurrentModifications_onWorksheetVersion() {
 	ws := s.store.defs.MustNewWorksheet("simple")
 	ws.MustSet("name", alice)
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -407,6 +408,38 @@ func (s *DbZuite) TestUpdateDetectsConcurrentModifications() {
 	})
 
 	require.EqualError(s.T(), errFromUpdate, "concurrent update detected")
+}
+
+func (s *DbZuite) TestUpdateDetectsConcurrentModifications_onEditRecordAlreadyPresent() {
+	ws := s.store.defs.MustNewWorksheet("simple")
+	ws.MustSet("name", alice)
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		_, err := session.Save(ws)
+		return err
+	})
+
+	// simulate other update racing to add the rEdit record
+	_, err := s.db.
+		InsertInto("worksheet_edits").
+		Columns("*").
+		Record(rEdit{
+			EditId:      uuid.NewV4().String(),
+			WorksheetId: ws.Id(),
+			ToVersion:   ws.Version() + 1,
+		}).
+		Exec()
+	require.NoError(s.T(), err)
+
+	// update should fail
+	ws.MustSet("name", bob)
+	errFromUpdate := s.RunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		_, err := session.Update(ws)
+		return err
+	})
+
+	require.Regexp(s.T(), `^concurrent update detected \(.*\)$`, errFromUpdate)
 }
 
 func (s *DbZuite) TestSignoffPattern() {
