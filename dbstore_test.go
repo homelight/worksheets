@@ -16,7 +16,9 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
+	"github.com/satori/go.uuid"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
@@ -27,7 +29,8 @@ func (s *DbZuite) TestDbExample() {
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	var wsFromStore *Worksheet
@@ -50,9 +53,14 @@ func (s *DbZuite) TestSave() {
 	err = ws.Set("name", NewText("Alice"))
 	require.NoError(s.T(), err)
 
+	var editId string
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		session.clock = &fakeClock{1234}
+
+		var err error
+		editId, err = session.Save(ws)
+		return err
 	})
 
 	snap := s.snapshotDbState()
@@ -64,6 +72,15 @@ func (s *DbZuite) TestSave() {
 			Name:    "simple",
 		},
 	}, snap.wsRecs)
+
+	require.Equal(s.T(), []rEdit{
+		{
+			EditId:      editId,
+			CreatedAt:   1234,
+			WorksheetId: ws.Id(),
+			ToVersion:   1,
+		},
+	}, snap.editRecs)
 
 	require.Equal(s.T(), []rValueForTesting{
 		{
@@ -91,6 +108,23 @@ func (s *DbZuite) TestSave() {
 
 	// Upon Save, orig needs to be set to data.
 	require.Empty(s.T(), ws.diff())
+
+	// Edit.
+	var (
+		editCreatedAt time.Time
+		editTouchedWs map[string]int
+	)
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+
+		var err error
+		editCreatedAt, editTouchedWs, err = session.Edit(editId)
+		return err
+	})
+	require.Equal(s.T(), int64(1234), editCreatedAt.UnixNano())
+	require.Equal(s.T(), map[string]int{
+		ws.Id(): 1,
+	}, editTouchedWs)
 }
 
 func (s *DbZuite) TestUpdate() {
@@ -100,17 +134,27 @@ func (s *DbZuite) TestUpdate() {
 	err = ws.Set("name", NewText("Alice"))
 	require.NoError(s.T(), err)
 
+	var saveId string
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		session.clock = &fakeClock{1000}
+
+		var err error
+		saveId, err = session.Save(ws)
+		return err
 	})
 
 	err = ws.Set("name", NewText("Bob"))
 	require.NoError(s.T(), err)
 
+	var updateId string
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Update(ws)
+		session.clock = &fakeClock{2000}
+
+		var err error
+		updateId, err = session.Update(ws)
+		return err
 	})
 
 	snap := s.snapshotDbState()
@@ -122,6 +166,21 @@ func (s *DbZuite) TestUpdate() {
 			Name:    "simple",
 		},
 	}, snap.wsRecs)
+
+	require.Equal(s.T(), []rEdit{
+		{
+			EditId:      saveId,
+			CreatedAt:   1000,
+			WorksheetId: ws.Id(),
+			ToVersion:   1,
+		},
+		{
+			EditId:      updateId,
+			CreatedAt:   2000,
+			WorksheetId: ws.Id(),
+			ToVersion:   2,
+		},
+	}, snap.editRecs)
 
 	require.Equal(s.T(), []rValueForTesting{
 		{
@@ -166,6 +225,23 @@ func (s *DbZuite) TestUpdate() {
 
 	// Upon Update, orig needs to be set to data.
 	require.Empty(s.T(), ws.diff())
+
+	// Edit.
+	var (
+		updateCreatedAt time.Time
+		updateTouchedWs map[string]int
+	)
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+
+		var err error
+		updateCreatedAt, updateTouchedWs, err = session.Edit(updateId)
+		return err
+	})
+	require.Equal(s.T(), int64(2000), updateCreatedAt.UnixNano())
+	require.Equal(s.T(), map[string]int{
+		ws.Id(): 2,
+	}, updateTouchedWs)
 }
 
 func (s *DbZuite) TestUpdateUndefinedField() {
@@ -177,7 +253,8 @@ func (s *DbZuite) TestUpdateUndefinedField() {
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	err = ws.Set("age", MustNewValue("73"))
@@ -185,7 +262,8 @@ func (s *DbZuite) TestUpdateUndefinedField() {
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Update(ws)
+		_, err := session.Update(ws)
+		return err
 	})
 }
 
@@ -197,7 +275,8 @@ func (s *DbZuite) TestProperlyLoadUndefinedField() {
 		ws.MustSet("age", MustNewValue("123456"))
 
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -209,7 +288,8 @@ func (s *DbZuite) TestProperlyLoadUndefinedField() {
 		}
 		ws.MustUnset("age")
 
-		return session.Update(ws)
+		_, err = session.Update(ws)
+		return err
 	})
 
 	// Fresh load should show age as being unset.
@@ -281,7 +361,8 @@ func (s *DbZuite) TestUpdateOnUpdateDoesNothing() {
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	require.Equal(s.T(), 1, ws.Version())
@@ -289,25 +370,28 @@ func (s *DbZuite) TestUpdateOnUpdateDoesNothing() {
 	ws.MustSet("name", bob)
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Update(ws)
+		_, err := session.Update(ws)
+		return err
 	})
 
 	require.Equal(s.T(), 2, ws.Version())
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Update(ws)
+		_, err := session.Update(ws)
+		return err
 	})
 
 	require.Equal(s.T(), 2, ws.Version())
 }
 
-func (s *DbZuite) TestUpdateDetectsConcurrentModifications() {
+func (s *DbZuite) TestUpdateDetectsConcurrentModifications_onWorksheetVersion() {
 	ws := s.store.defs.MustNewWorksheet("simple")
 	ws.MustSet("name", alice)
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	// simulate modification performed by other
@@ -319,11 +403,43 @@ func (s *DbZuite) TestUpdateDetectsConcurrentModifications() {
 	var errFromUpdate error
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		errFromUpdate = session.Update(ws)
+		_, errFromUpdate = session.Update(ws)
 		return nil
 	})
 
 	require.EqualError(s.T(), errFromUpdate, "concurrent update detected")
+}
+
+func (s *DbZuite) TestUpdateDetectsConcurrentModifications_onEditRecordAlreadyPresent() {
+	ws := s.store.defs.MustNewWorksheet("simple")
+	ws.MustSet("name", alice)
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		_, err := session.Save(ws)
+		return err
+	})
+
+	// simulate other update racing to add the rEdit record
+	_, err := s.db.
+		InsertInto("worksheet_edits").
+		Columns("*").
+		Record(rEdit{
+			EditId:      uuid.NewV4().String(),
+			WorksheetId: ws.Id(),
+			ToVersion:   ws.Version() + 1,
+		}).
+		Exec()
+	require.NoError(s.T(), err)
+
+	// update should fail
+	ws.MustSet("name", bob)
+	errFromUpdate := s.RunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		_, err := session.Update(ws)
+		return err
+	})
+
+	require.Regexp(s.T(), `^concurrent update detected \(.*\)$`, errFromUpdate)
 }
 
 func (s *DbZuite) TestSignoffPattern() {
@@ -345,7 +461,8 @@ func (s *DbZuite) TestSignoffPattern() {
 	ws.MustSet("data", NewText("important data 1"))
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.SaveOrUpdate(ws)
+		_, err := session.SaveOrUpdate(ws)
+		return err
 	})
 	require.Equal(s.T(), "1", ws.MustGet("version").String())
 	require.Equal(s.T(), "false", ws.MustGet("is_signedoff").String())
@@ -354,7 +471,8 @@ func (s *DbZuite) TestSignoffPattern() {
 	ws.MustSet("signoff_at", MustNewValue(fmt.Sprintf("%d", ws.Version())))
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.SaveOrUpdate(ws)
+		_, err := session.SaveOrUpdate(ws)
+		return err
 	})
 	require.Equal(s.T(), "2", ws.MustGet("version").String())
 	require.Equal(s.T(), "true", ws.MustGet("is_signedoff").String())
@@ -363,7 +481,8 @@ func (s *DbZuite) TestSignoffPattern() {
 	ws.MustSet("data", NewText("important data 2"))
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.SaveOrUpdate(ws)
+		_, err := session.SaveOrUpdate(ws)
+		return err
 	})
 	require.Equal(s.T(), "3", ws.MustGet("version").String())
 	require.Equal(s.T(), "false", ws.MustGet("is_signedoff").String())
@@ -377,7 +496,7 @@ func (s *DbZuite) TestSignoffPattern() {
 	var errFromUpdate error
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		errFromUpdate = session.SaveOrUpdate(ws)
+		_, errFromUpdate = session.SaveOrUpdate(ws)
 		return nil
 	})
 	require.EqualError(s.T(), errFromUpdate, "concurrent update detected")

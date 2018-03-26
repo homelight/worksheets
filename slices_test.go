@@ -177,7 +177,8 @@ func (s *DbZuite) TestSliceSave() {
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	snap := s.snapshotDbState()
@@ -243,7 +244,8 @@ func (s *DbZuite) TestSliceLoad() {
 		wsId, theSliceId = ws.Id(), (ws.data[42].(*Slice)).id
 
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	// Load into a fresh worksheet, and look at the slice.
@@ -278,7 +280,8 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 		wsId, theSliceId = ws.Id(), (ws.data[42].(*Slice)).id
 
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -289,7 +292,8 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 		}
 		ws.MustDel("names", 0)
 
-		return session.Update(ws)
+		_, err = session.Update(ws)
+		return err
 	})
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -300,7 +304,8 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 		}
 		ws.MustAppend("names", alice)
 
-		return session.Update(ws)
+		_, err = session.Update(ws)
+		return err
 	})
 
 	snap := s.snapshotDbState()
@@ -422,7 +427,8 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 		wsSliceId = (ws.data[42].(*Slice)).id
 
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	snap := s.snapshotDbState()
@@ -569,7 +575,8 @@ func (s *DbZuite) TestSliceUpdate_appendUndefinedAndEnsureItLoadsCorrectly() {
 		ws.MustAppend("names", NewUndefined())
 
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -581,7 +588,8 @@ func (s *DbZuite) TestSliceUpdate_appendUndefinedAndEnsureItLoadsCorrectly() {
 		ws.MustAppend("names", alice)
 		ws.MustAppend("names", NewUndefined())
 
-		return session.Update(ws)
+		_, err = session.Update(ws)
+		return err
 	})
 
 	var fresh *Worksheet
@@ -610,7 +618,8 @@ func (s *DbZuite) TestSliceUpdate_appendOntoUndefinedSlice() {
 		wsId = ws.Id()
 
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -621,7 +630,8 @@ func (s *DbZuite) TestSliceUpdate_appendOntoUndefinedSlice() {
 		}
 		ws.MustAppend("names", NewUndefined())
 
-		return session.Update(ws)
+		_, err = session.Update(ws)
+		return err
 	})
 
 	var fresh *Worksheet

@@ -19,6 +19,20 @@ create table worksheets (
   unique(id)
 );
 
+drop table if exists worksheet_edits;
+create table worksheet_edits (
+  edit_id        uuid,
+  created_at     bigint,
+  worksheet_id   uuid,
+  to_version     int,
+
+  -- Edits can modify any worksheet at most once.
+  unique(edit_id, worksheet_id),
+
+  -- Only one edit can lead to a worksheet being updated to a specific version.
+  unique(worksheet_id, to_version)
+);
+
 drop table if exists worksheet_values;
 create table worksheet_values (
   id             serial,

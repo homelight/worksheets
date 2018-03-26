@@ -18,7 +18,10 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/lib/pq"
+	"github.com/satori/go.uuid"
 	"gopkg.in/mgutz/dat.v2/dat"
 	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
@@ -28,11 +31,21 @@ type Store interface {
 	// Load loads the worksheet with identifier `id` from the store.
 	Load(id string) (*Worksheet, error)
 
-	// Save saves a new worksheet to the store.
-	Save(ws *Worksheet) error
+	// SaveOrUpdate saves or updates a worksheet to the store. On success,
+	// returns an edit identifier.
+	SaveOrUpdate(ws *Worksheet) (string, error)
 
-	// Update updates an existing worksheet in the store.
-	Update(ws *Worksheet) error
+	// Save saves a new worksheet to the store. On success, returns an edit
+	// identifier.
+	Save(ws *Worksheet) (string, error)
+
+	// Update updates an existing worksheet in the store. On success, returns an
+	// edit identifier.
+	Update(ws *Worksheet) (string, error)
+
+	// Edit returns a specific edit, the time at which the edit occured, and all
+	// worksheets modified as a map of their ids to the resulting version.
+	Edit(editId string) (time.Time, map[string]int, error)
 }
 
 type DbStore struct {
@@ -49,13 +62,30 @@ func (s *DbStore) Open(tx *runner.Tx) *Session {
 	return &Session{
 		DbStore: s,
 		tx:      tx,
+		clock:   &realClock{},
 	}
+}
+
+type clock interface {
+	// now returns the current time as a Unix time, the number of nanoseconds
+	// elapsed since January 1, 1970 UTC.
+	nowAsUnixNano() int64
+}
+
+type realClock struct{}
+
+// Assert realClock implements the clock interface.
+var _ clock = &realClock{}
+
+func (_ *realClock) nowAsUnixNano() int64 {
+	return time.Now().UnixNano()
 }
 
 // Session is the ... TODO(pascal): write
 type Session struct {
 	*DbStore
-	tx *runner.Tx
+	tx    *runner.Tx
+	clock clock
 }
 
 // Assert Session implements Store interface.
@@ -66,6 +96,14 @@ type rWorksheet struct {
 	Id      string `db:"id"`
 	Version int    `db:"version"`
 	Name    string `db:"name"`
+}
+
+// rEdit represents a record of the worksheet_edits table.
+type rEdit struct {
+	EditId      string `db:"edit_id"`
+	CreatedAt   int64  `db:"created_at"`
+	WorksheetId string `db:"worksheet_id"`
+	ToVersion   int    `db:"to_version"`
 }
 
 // rValue represents a record of the worksheet_values table.
@@ -97,9 +135,35 @@ type rSliceElement struct {
 
 var tableToEntities = map[string]interface{}{
 	"worksheets":               &rWorksheet{},
+	"worksheet_edits":          &rEdit{},
 	"worksheet_values":         &rValue{},
 	"worksheet_parents":        &rParent{},
 	"worksheet_slice_elements": &rSliceElement{},
+}
+
+func (s *Session) Edit(editId string) (time.Time, map[string]int, error) {
+	var editRecs []rEdit
+	if err := s.tx.
+		Select("*").
+		From("worksheet_edits").
+		Where("edit_id = $1", editId).
+		QueryStructs(&editRecs); err != nil {
+		return time.Time{}, nil, err
+	}
+	if len(editRecs) == 0 {
+		return time.Time{}, nil, fmt.Errorf("unknown edit %s", editId)
+	}
+
+	// By construction, all rEdit are set to the exact same time, hence choosing
+	// arbitrarily the first is safe.
+	createdAt := time.Unix(0, editRecs[0].CreatedAt)
+
+	touchedWs := make(map[string]int, len(editRecs))
+	for _, editRec := range editRecs {
+		touchedWs[editRec.WorksheetId] = editRec.ToVersion
+	}
+
+	return createdAt, touchedWs, nil
 }
 
 func (s *Session) Load(id string) (*Worksheet, error) {
@@ -111,28 +175,37 @@ func (s *Session) Load(id string) (*Worksheet, error) {
 	return loader.loadWorksheet(id)
 }
 
-func (s *Session) SaveOrUpdate(ws *Worksheet) error {
-	p := &persister{
-		s:     s,
-		graph: make(map[string]bool),
+func (s *Session) newPersister() *persister {
+	return &persister{
+		editId:    uuid.NewV4().String(),
+		createdAt: s.clock.nowAsUnixNano(),
+		s:         s,
+		graph:     make(map[string]bool),
 	}
-	return p.saveOrUpdate(ws)
 }
 
-func (s *Session) Save(ws *Worksheet) error {
-	p := &persister{
-		s:     s,
-		graph: make(map[string]bool),
+func (s *Session) SaveOrUpdate(ws *Worksheet) (string, error) {
+	p := s.newPersister()
+	if err := p.saveOrUpdate(ws); err != nil {
+		return "", err
 	}
-	return p.save(ws)
+	return p.editId, nil
 }
 
-func (s *Session) Update(ws *Worksheet) error {
-	p := &persister{
-		s:     s,
-		graph: make(map[string]bool),
+func (s *Session) Save(ws *Worksheet) (string, error) {
+	p := s.newPersister()
+	if err := p.save(ws); err != nil {
+		return "", err
 	}
-	return p.update(ws)
+	return p.editId, nil
+}
+
+func (s *Session) Update(ws *Worksheet) (string, error) {
+	p := s.newPersister()
+	if err := p.update(ws); err != nil {
+		return "", err
+	}
+	return p.editId, nil
 }
 
 type loader struct {
@@ -306,8 +379,10 @@ func (l *loader) nextSlicesToHydrate() map[string]*Slice {
 }
 
 type persister struct {
-	s     *Session
-	graph map[string]bool
+	editId    string
+	createdAt int64
+	s         *Session
+	graph     map[string]bool
 }
 
 func (p *persister) saveOrUpdate(ws *Worksheet) error {
@@ -353,7 +428,7 @@ func (p *persister) save(ws *Worksheet) error {
 	}
 
 	// insert rWorksheet
-	_, err := p.s.tx.
+	if _, err := p.s.tx.
 		InsertInto("worksheets").
 		Columns("*").
 		Record(&rWorksheet{
@@ -361,8 +436,21 @@ func (p *persister) save(ws *Worksheet) error {
 			Version: ws.Version(),
 			Name:    ws.Name(),
 		}).
-		Exec()
-	if err != nil {
+		Exec(); err != nil {
+		return err
+	}
+
+	// insert rEdit
+	if _, err := p.s.tx.
+		InsertInto("worksheet_edits").
+		Columns("*").
+		Record(&rEdit{
+			EditId:      p.editId,
+			CreatedAt:   p.createdAt,
+			WorksheetId: ws.Id(),
+			ToVersion:   ws.Version(),
+		}).
+		Exec(); err != nil {
 		return err
 	}
 
@@ -544,6 +632,23 @@ func (p *persister) update(ws *Worksheet) error {
 		}
 	}
 
+	// insert rEdit
+	_, err := p.s.tx.
+		InsertInto("worksheet_edits").
+		Columns("*").
+		Record(&rEdit{
+			EditId:      p.editId,
+			CreatedAt:   p.createdAt,
+			WorksheetId: ws.Id(),
+			ToVersion:   newVersion,
+		}).
+		Exec()
+	if isSpecificUniqueConstraintErr(err, "worksheet_edits_worksheet_id_to_version_key") {
+		return fmt.Errorf("concurrent update detected (%s)", err)
+	} else if err != nil {
+		return err
+	}
+
 	// update old rValues
 	if _, err := p.s.tx.
 		Update("worksheet_values").
@@ -698,5 +803,17 @@ func worksheetsToCascade(value Value) []*Worksheet {
 		return result
 	default:
 		return nil
+	}
+}
+
+func isSpecificUniqueConstraintErr(err error, uniqueConstraintName string) bool {
+	// Did we violate the unique constraint?
+	// See https://www.postgresql.org/docs/9.4/static/errcodes-appendix.html
+	switch err := err.(type) {
+	case *pq.Error:
+		return err.Code == pq.ErrorCode("23505") &&
+			strings.Contains(err.Error(), uniqueConstraintName)
+	default:
+		return false
 	}
 }

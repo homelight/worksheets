@@ -58,13 +58,39 @@ func (s *DbZuite) TearDownSuite() {
 	}
 }
 
+func (s *DbZuite) RunTransaction(fn func(tx *runner.Tx) error) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.AutoRollback()
+
+	err = fn(tx)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func (s *DbZuite) MustRunTransaction(fn func(tx *runner.Tx) error) {
-	err := RunTransaction(s.db, fn)
+	err := s.RunTransaction(fn)
 	require.NoError(s.T(), err)
 }
 
 func TestRunAllTheDbTests(t *testing.T) {
 	suite.Run(t, new(DbZuite))
+}
+
+type fakeClock struct {
+	now int64
+}
+
+// Assert that fakeClock implements the clock interface.
+var _ clock = &fakeClock{}
+
+func (fc *fakeClock) nowAsUnixNano() int64 {
+	return fc.now
 }
 
 type rValueForTesting struct {
@@ -87,6 +113,7 @@ type rSliceElementForTesting struct {
 
 type dbState struct {
 	wsRecs            []rWorksheet
+	editRecs          []rEdit
 	valuesRecs        []rValueForTesting
 	parentsRecs       []rParent
 	sliceElementsRecs []rSliceElementForTesting
@@ -96,6 +123,7 @@ func (s *DbZuite) snapshotDbState() *dbState {
 	var (
 		err                 error
 		wsRecs              []rWorksheet
+		editRecs            []rEdit
 		dbValuesRecs        []rValue
 		parentsRecs         []rParent
 		dbSliceElementsRecs []rSliceElement
@@ -106,6 +134,13 @@ func (s *DbZuite) snapshotDbState() *dbState {
 		From("worksheets").
 		OrderBy("id").
 		QueryStructs(&wsRecs)
+	require.NoError(s.T(), err)
+
+	err = s.db.
+		Select("*").
+		From("worksheet_edits").
+		OrderBy("worksheet_id, to_version").
+		QueryStructs(&editRecs)
 	require.NoError(s.T(), err)
 
 	err = s.db.
@@ -163,6 +198,7 @@ func (s *DbZuite) snapshotDbState() *dbState {
 
 	return &dbState{
 		wsRecs:            wsRecs,
+		editRecs:          editRecs,
 		valuesRecs:        valuesRecs,
 		parentsRecs:       parentsRecs,
 		sliceElementsRecs: sliceElementsRecs,

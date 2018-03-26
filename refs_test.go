@@ -52,7 +52,8 @@ func (s *DbZuite) TestRefsSave_noDataInRefWorksheet() {
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	snap := s.snapshotDbState()
@@ -131,7 +132,8 @@ func (s *DbZuite) TestRefsSave_withDataInRefWorksheet() {
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	snap := s.snapshotDbState()
@@ -224,7 +226,8 @@ func (s *DbZuite) TestRefsSave_refWorksheetAlreadySaved() {
 	// saveOrUpdate ws.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Save(simple)
+		_, err := session.Save(simple)
+		return err
 	})
 
 	snap := s.snapshotDbState()
@@ -303,7 +306,8 @@ func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 	// We first save simple, this also saves ws since it is a parent.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Save(simple)
+		_, err := session.Save(simple)
+		return err
 	})
 
 	// We update simple.
@@ -312,7 +316,8 @@ func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 	// Then we proceed to save ws.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.SaveOrUpdate(ws)
+		_, err := session.SaveOrUpdate(ws)
+		return err
 	})
 
 	snap := s.snapshotDbState()
@@ -399,7 +404,8 @@ func (s *DbZuite) TestRefsSave_withCycles() {
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	snap := s.snapshotDbState()
@@ -461,7 +467,8 @@ func (s *DbZuite) TestRefsLoad_noCycles() {
 		simple.MustSet("name", bob)
 
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	// Load into a fresh worksheet, and inspect.
@@ -490,7 +497,8 @@ func (s *DbZuite) TestRefsLoad_withCycles() {
 		ws.MustSet("point_to_me", ws)
 
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	// Load into a fresh worksheet, and inspect.
@@ -529,14 +537,16 @@ func (s *DbZuite) TestRefsUpdate_updateParentNoChangeInChild() {
 		simple.MustSet("name", carol)
 
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	// Update.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
 		ws.MustSet("some_flag", NewBool(true))
-		return session.Update(ws)
+		_, err := session.Update(ws)
+		return err
 	})
 
 	snap := s.snapshotDbState()
@@ -645,7 +655,8 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChangesInChild() {
 		simple.MustSet("name", carol)
 
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	// Update.
@@ -653,7 +664,8 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChangesInChild() {
 		session := s.store.Open(tx)
 		ws.MustSet("some_flag", NewBool(true))
 		simple.MustSet("name", bob)
-		return session.Update(ws)
+		_, err := session.Update(ws)
+		return err
 	})
 
 	snap := s.snapshotDbState()
@@ -772,14 +784,16 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChildRequiringToBeSaved() {
 	// persisted.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
-		return session.Save(ws)
+		_, err := session.Save(ws)
+		return err
 	})
 
 	// Update: we attach simple, which should now be persisted.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
 		ws.MustSet("simple", simple)
-		return session.Update(ws)
+		_, err := session.Update(ws)
+		return err
 	})
 
 	snap := s.snapshotDbState()

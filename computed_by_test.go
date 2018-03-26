@@ -488,7 +488,8 @@ func (s *DbZuite) TestComputedBy_crossWs_parentsRefsPersistence() {
 		child.MustSet("amount", MustNewValue("6.66"))
 		parent.MustSet("child", child)
 		session := store.Open(tx)
-		return session.Save(parent)
+		_, err := session.Save(parent)
+		return err
 	})
 
 	// 1. Ensure parent pointers are properly stored on save.
@@ -529,7 +530,8 @@ func (s *DbZuite) TestComputedBy_crossWs_parentsRefsPersistence() {
 			return err
 		}
 		parent.MustUnset("child")
-		return session.Update(parent)
+		_, err = session.Update(parent)
+		return err
 	})
 
 	snap = s.snapshotDbState()
@@ -559,7 +561,8 @@ func (s *DbZuite) TestComputedBy_crossWs_twoParentsOneChildRefsPersistence() {
 
 		// Since parent1 -> child -> parent2, when saving parent1, we also
 		// save parent2!
-		return store.Open(tx).Save(parent1)
+		_, err := store.Open(tx).Save(parent1)
+		return err
 	})
 
 	// 1. Ensure parent pointers are properly stored on save.
@@ -588,7 +591,8 @@ func (s *DbZuite) TestComputedBy_crossWs_twoParentsOneChildRefsPersistence() {
 			return err
 		}
 		parent1.MustUnset("child")
-		return session.Update(parent1)
+		_, err = session.Update(parent1)
+		return err
 	})
 
 	snap = s.snapshotDbState()
@@ -619,7 +623,8 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
 		child1.MustSet("amount", MustNewValue("6.66"))
 		parent.MustAppend("children", child1)
 		session := store.Open(tx)
-		return session.Save(parent)
+		_, err := session.Save(parent)
+		return err
 	})
 
 	// 1. Ensure parent pointers are properly stored on save.
@@ -644,7 +649,8 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
 		forciblySetId(child2, child2Id)
 		child2.MustSet("amount", MustNewValue("7.77"))
 		parent.MustAppend("children", child2)
-		return session.Update(parent)
+		_, err = session.Update(parent)
+		return err
 	})
 
 	snap = s.snapshotDbState()
@@ -670,7 +676,8 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
 			return err
 		}
 		parent.MustDel("children", 0)
-		return session.Update(parent)
+		_, err = session.Update(parent)
+		return err
 	})
 
 	snap = s.snapshotDbState()
@@ -701,10 +708,10 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence2() {
 		child.MustSet("amount", MustNewValue("6.66"))
 
 		session := store.Open(tx)
-		if err := session.Save(parent); err != nil {
+		if _, err := session.Save(parent); err != nil {
 			return err
 		}
-		if err := session.Save(child); err != nil {
+		if _, err := session.Save(child); err != nil {
 			return err
 		}
 		return nil
@@ -723,7 +730,8 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence2() {
 		}
 
 		parent.MustAppend("children", child)
-		return session.Update(parent)
+		_, err = session.Update(parent)
+		return err
 	})
 
 	// Now, ensure parent pointers are properly stored on save.
@@ -761,7 +769,8 @@ func (s *DbZuite) TestComputedBy_crossWs_updateOfChildCarriesToParent() {
 		parent.MustAppend("children", child2)
 		childrenSliceId = parent.data[20].(*Slice).id
 		session := store.Open(tx)
-		return session.Save(parent)
+		_, err := session.Save(parent)
+		return err
 	})
 
 	// Load only child2, update its amount, persist. Then, in a separate
@@ -773,7 +782,8 @@ func (s *DbZuite) TestComputedBy_crossWs_updateOfChildCarriesToParent() {
 			return err
 		}
 		child2.MustSet("amount", MustNewValue("8.88"))
-		return session.Update(child2)
+		_, err = session.Update(child2)
+		return err
 	})
 
 	var sumOfChildren Value
