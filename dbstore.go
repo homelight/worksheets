@@ -147,7 +147,6 @@ func (s *Session) Edit(editId string) (time.Time, map[string]int, error) {
 		Select("*").
 		From("worksheet_edits").
 		Where("edit_id = $1", editId).
-		OrderBy("worksheet_id, to_version").
 		QueryStructs(&editRecs); err != nil {
 		return time.Time{}, nil, err
 	}
