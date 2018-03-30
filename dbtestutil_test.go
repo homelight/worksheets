@@ -173,8 +173,8 @@ func (s *DbZuite) snapshotDbState() *dbState {
 			FromVersion: dbValueRec.FromVersion,
 			ToVersion:   dbValueRec.ToVersion,
 		}
-		if dbValueRec.Value.Valid {
-			valuesRecs[i].Value = dbValueRec.Value.String
+		if dbValueRec.Value != nil {
+			valuesRecs[i].Value = *dbValueRec.Value
 		} else {
 			valuesRecs[i].IsUndefined = true
 		}
@@ -189,8 +189,8 @@ func (s *DbZuite) snapshotDbState() *dbState {
 			FromVersion: dbSliceElementRec.FromVersion,
 			ToVersion:   dbSliceElementRec.ToVersion,
 		}
-		if dbSliceElementRec.Value.Valid {
-			sliceElementsRecs[i].Value = dbSliceElementRec.Value.String
+		if dbSliceElementRec.Value != nil {
+			sliceElementsRecs[i].Value = *dbSliceElementRec.Value
 		} else {
 			sliceElementsRecs[i].IsUndefined = true
 		}
