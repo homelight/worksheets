@@ -320,34 +320,36 @@ var functions = map[string]struct {
 		}
 	}},
 	"sumiftrue": {2, func(args []Value) (Value, error) {
-		arg := args[0]
-		condition := args[1]
-		switch v := arg.(type) {
-		case *Slice:
-			numType, ok := v.typ.elementType.(*NumberType)
-			if !ok {
-				return nil, fmt.Errorf("sumiftrue expects argument #1 to be slice of numbers")
-			}
-			conditionSlice := condition.(*Slice)
-			_, ok = conditionSlice.typ.elementType.(*BoolType)
-			if !ok {
-				return nil, fmt.Errorf("sumiftrue expects argument #2 to be slice of bools")
-			}
-			sum := &Number{0, numType}
-			for i, elem := range v.elements {
-				if num, ok := elem.value.(*Number); ok {
-					conditionElem := conditionSlice.elements[i]
-					if val, ok := conditionElem.value.(*Bool); ok && val.Value() {
-						sum = sum.Plus(num)
-					}
-				} else {
-					return &Undefined{}, nil
-				}
-			}
-			return sum, nil
-		default:
-			return nil, fmt.Errorf("sum expects argument #1 to be slice of numbers")
+		values, ok := args[0].(*Slice)
+		if !ok {
+			return nil, fmt.Errorf("sumiftrue expects argument #1 to be slice of numbers")
+		} else if _, ok := values.typ.elementType.(*NumberType); !ok {
+			return nil, fmt.Errorf("sumiftrue expects argument #1 to be slice of numbers")
 		}
+
+		conditions, ok := args[1].(*Slice)
+		if !ok {
+			return nil, fmt.Errorf("sumiftrue expects argument #2 to be slice of bools")
+		} else if _, ok := conditions.typ.elementType.(*BoolType); !ok {
+			return nil, fmt.Errorf("sumiftrue expects argument #2 to be slice of bools")
+		}
+
+		if len(values.Elements()) != len(conditions.Elements()) {
+			return nil, fmt.Errorf("sumiftrue expects argument #1 and argument #2 to be the same length")
+		}
+
+		numType, _ := values.typ.elementType.(*NumberType)
+		sum := &Number{0, numType}
+		for i := 0; i < len(values.Elements()); i++ {
+			if num, ok := values.elements[i].value.(*Number); ok {
+				if val, ok := conditions.elements[i].value.(*Bool); ok && val.Value() {
+					sum = sum.Plus(num)
+				}
+			} else {
+				return &Undefined{}, nil
+			}
+		}
+		return sum, nil
 	}},
 }
 
