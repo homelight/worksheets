@@ -319,6 +319,48 @@ var functions = map[string]struct {
 			return nil, fmt.Errorf("sum expects argument #1 to be slice of numbers")
 		}
 	}},
+	"sumiftrue": {2, func(args []Value) (Value, error) {
+		if _, ok := args[0].(*Undefined); ok {
+			return &Undefined{}, nil
+		}
+		values, ok := args[0].(*Slice)
+		if !ok {
+			return nil, fmt.Errorf("sumiftrue expects argument #1 to be slice of numbers")
+		} else if _, ok := values.typ.elementType.(*NumberType); !ok {
+			return nil, fmt.Errorf("sumiftrue expects argument #1 to be slice of numbers")
+		}
+
+		if _, ok := args[1].(*Undefined); ok {
+			return &Undefined{}, nil
+		}
+		conditions, ok := args[1].(*Slice)
+		if !ok {
+			return nil, fmt.Errorf("sumiftrue expects argument #2 to be slice of bools")
+		} else if _, ok := conditions.typ.elementType.(*BoolType); !ok {
+			return nil, fmt.Errorf("sumiftrue expects argument #2 to be slice of bools")
+		}
+
+		if len(values.Elements()) != len(conditions.Elements()) {
+			return nil, fmt.Errorf("sumiftrue expects argument #1 and argument #2 to be the same length")
+		}
+
+		numType, _ := values.typ.elementType.(*NumberType)
+		sum := &Number{0, numType}
+		for i := 0; i < len(values.Elements()); i++ {
+			if num, ok := values.elements[i].value.(*Number); ok {
+				if val, ok := conditions.elements[i].value.(*Bool); ok {
+					if val.Value() {
+						sum = sum.Plus(num)
+					}
+				} else {
+					return &Undefined{}, nil
+				}
+			} else {
+				return &Undefined{}, nil
+			}
+		}
+		return sum, nil
+	}},
 }
 
 func (e *tCall) Compute(ws *Worksheet) (Value, error) {
