@@ -145,11 +145,13 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 		`sum(slice_n2)`: `11.10`,
 		`sum(slice_nu)`: `undefined`,
 
-		`sumiftrue(slice_n0, slice_b)`:  `7`,
-		`sumiftrue(slice_n2, slice_b)`:  `7.77`,
-		`sumiftrue(slice_nu, slice_b)`:  `undefined`,
-		`sumiftrue(slice_n0, slice_bu)`: `undefined`,
-		`sumiftrue(slice_nu, slice_bu)`: `undefined`,
+		`sumiftrue(slice_n0, slice_b)`:   `7`,
+		`sumiftrue(slice_n2, slice_b)`:   `7.77`,
+		`sumiftrue(slice_nu, slice_b)`:   `undefined`,
+		`sumiftrue(slice_n0, slice_bu)`:  `undefined`,
+		`sumiftrue(slice_nu, slice_bu)`:  `undefined`,
+		`sumiftrue(undefined, slice_b)`:  `undefined`,
+		`sumiftrue(slice_n0, undefined)`: `undefined`,
 	}
 	for input, output := range cases {
 		// fixture

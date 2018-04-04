@@ -320,6 +320,9 @@ var functions = map[string]struct {
 		}
 	}},
 	"sumiftrue": {2, func(args []Value) (Value, error) {
+		if _, ok := args[0].(*Undefined); ok {
+			return &Undefined{}, nil
+		}
 		values, ok := args[0].(*Slice)
 		if !ok {
 			return nil, fmt.Errorf("sumiftrue expects argument #1 to be slice of numbers")
@@ -327,6 +330,9 @@ var functions = map[string]struct {
 			return nil, fmt.Errorf("sumiftrue expects argument #1 to be slice of numbers")
 		}
 
+		if _, ok := args[1].(*Undefined); ok {
+			return &Undefined{}, nil
+		}
 		conditions, ok := args[1].(*Slice)
 		if !ok {
 			return nil, fmt.Errorf("sumiftrue expects argument #2 to be slice of bools")
