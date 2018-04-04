@@ -143,9 +143,13 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 
 		`sum(slice_n0)`: `10`,
 		`sum(slice_n2)`: `11.10`,
+		`sum(slice_nu)`: `undefined`,
 
-		`sumiftrue(slice_n0, slice_b)`: `7`,
-		`sumiftrue(slice_n2, slice_b)`: `7.77`,
+		`sumiftrue(slice_n0, slice_b)`:  `7`,
+		`sumiftrue(slice_n2, slice_b)`:  `7.77`,
+		`sumiftrue(slice_nu, slice_b)`:  `undefined`,
+		`sumiftrue(slice_n0, slice_bu)`: `undefined`,
+		`sumiftrue(slice_nu, slice_bu)`: `undefined`,
 	}
 	for input, output := range cases {
 		// fixture
@@ -159,9 +163,15 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 		ws.MustAppend("slice_n2", NewNumberFromFloat64(2.22))
 		ws.MustAppend("slice_n2", NewNumberFromFloat64(3.33))
 		ws.MustAppend("slice_n2", NewNumberFromFloat64(5.55))
+		ws.MustAppend("slice_nu", NewUndefined())
+		ws.MustAppend("slice_nu", NewNumberFromInt(3))
+		ws.MustAppend("slice_nu", NewNumberFromInt(5))
 		ws.MustAppend("slice_b", NewBool(true))
 		ws.MustAppend("slice_b", NewBool(false))
 		ws.MustAppend("slice_b", NewBool(true))
+		ws.MustAppend("slice_bu", NewUndefined())
+		ws.MustAppend("slice_bu", NewBool(false))
+		ws.MustAppend("slice_bu", NewBool(true))
 
 		// test
 		expected := MustNewValue(output)
