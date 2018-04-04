@@ -143,6 +143,9 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 
 		`sum(slice_n0)`: `10`,
 		`sum(slice_n2)`: `11.10`,
+
+		`sumiftrue(slice_n0, slice_b)`: `7`,
+		`sumiftrue(slice_n2, slice_b)`: `7.77`,
 	}
 	for input, output := range cases {
 		// fixture
@@ -156,6 +159,9 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 		ws.MustAppend("slice_n2", NewNumberFromFloat64(2.22))
 		ws.MustAppend("slice_n2", NewNumberFromFloat64(3.33))
 		ws.MustAppend("slice_n2", NewNumberFromFloat64(5.55))
+		ws.MustAppend("slice_b", NewBool(true))
+		ws.MustAppend("slice_b", NewBool(false))
+		ws.MustAppend("slice_b", NewBool(true))
 
 		// test
 		expected := MustNewValue(output)

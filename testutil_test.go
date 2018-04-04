@@ -41,6 +41,7 @@ worksheet all_types {
 	 5:undefined undefined
 	 6:ws        all_types
 	 7:slice_t   []text
+	 13:slice_b  []bool
 	 9:slice_n0  []number[0]
 	10:slice_n2  []number[2]
 	 8:slice_ws  []all_types

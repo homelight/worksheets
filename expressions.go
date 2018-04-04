@@ -319,6 +319,36 @@ var functions = map[string]struct {
 			return nil, fmt.Errorf("sum expects argument #1 to be slice of numbers")
 		}
 	}},
+	"sumiftrue": {2, func(args []Value) (Value, error) {
+		arg := args[0]
+		condition := args[1]
+		switch v := arg.(type) {
+		case *Slice:
+			numType, ok := v.typ.elementType.(*NumberType)
+			if !ok {
+				return nil, fmt.Errorf("sumiftrue expects argument #1 to be slice of numbers")
+			}
+			conditionSlice := condition.(*Slice)
+			_, ok = conditionSlice.typ.elementType.(*BoolType)
+			if !ok {
+				return nil, fmt.Errorf("sumiftrue expects argument #2 to be slice of bools")
+			}
+			sum := &Number{0, numType}
+			for i, elem := range v.elements {
+				if num, ok := elem.value.(*Number); ok {
+					conditionElem := conditionSlice.elements[i]
+					if val, ok := conditionElem.value.(*Bool); ok && val.Value() {
+						sum = sum.Plus(num)
+					}
+				} else {
+					return &Undefined{}, nil
+				}
+			}
+			return sum, nil
+		default:
+			return nil, fmt.Errorf("sum expects argument #1 to be slice of numbers")
+		}
+	}},
 }
 
 func (e *tCall) Compute(ws *Worksheet) (Value, error) {
