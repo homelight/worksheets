@@ -342,8 +342,12 @@ var functions = map[string]struct {
 		sum := &Number{0, numType}
 		for i := 0; i < len(values.Elements()); i++ {
 			if num, ok := values.elements[i].value.(*Number); ok {
-				if val, ok := conditions.elements[i].value.(*Bool); ok && val.Value() {
-					sum = sum.Plus(num)
+				if val, ok := conditions.elements[i].value.(*Bool); ok {
+					if val.Value() {
+						sum = sum.Plus(num)
+					}
+				} else {
+					return &Undefined{}, nil
 				}
 			} else {
 				return &Undefined{}, nil
