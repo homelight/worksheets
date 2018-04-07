@@ -431,7 +431,7 @@ func (ws *Worksheet) set(field *Field, value Value) error {
 	// oldValue
 	oldValue, ok := ws.data[index]
 	if !ok {
-		oldValue = &Undefined{}
+		oldValue = vUndefined
 	}
 
 	// ident
@@ -566,7 +566,7 @@ func (ws *Worksheet) get(name string) (*Field, Value, error) {
 	// is a value set for this field?
 	value, ok := ws.data[index]
 	if !ok {
-		return field, &Undefined{}, nil
+		return field, vUndefined, nil
 	}
 
 	return field, value, nil
@@ -716,11 +716,11 @@ func (ws *Worksheet) diff() map[int]change {
 		if hasOrig && !hasData {
 			diff[index] = change{
 				before: orig,
-				after:  &Undefined{},
+				after:  vUndefined,
 			}
 		} else if !hasOrig && hasData {
 			diff[index] = change{
-				before: &Undefined{},
+				before: vUndefined,
 				after:  data,
 			}
 		} else if !orig.Equal(data) {

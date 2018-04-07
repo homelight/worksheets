@@ -22,7 +22,7 @@ func (s *Zuite) TestValueString() {
 	ws.MustSet("age", MustNewValue("73"))
 
 	cases := map[Value]string{
-		&Undefined{}: "undefined",
+		vUndefined: "undefined",
 
 		&Text{`Hello, "World"!`}: `"Hello, \"World\"!"`,
 

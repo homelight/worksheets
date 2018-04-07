@@ -250,11 +250,11 @@ func (s *Zuite) TestWorksheet_diff() {
 	// initial diff
 	require.Equal(s.T(), map[int]change{
 		indexId: change{
-			before: &Undefined{},
+			before: vUndefined,
 			after:  NewText(ws.Id()),
 		},
 		indexVersion: change{
-			before: &Undefined{},
+			before: vUndefined,
 			after:  MustNewValue("1"),
 		},
 	}, ws.diff())
@@ -266,15 +266,15 @@ func (s *Zuite) TestWorksheet_diff() {
 	// now, also expecting Alice
 	require.Equal(s.T(), map[int]change{
 		indexId: change{
-			before: &Undefined{},
+			before: vUndefined,
 			after:  NewText(ws.Id()),
 		},
 		indexVersion: change{
-			before: &Undefined{},
+			before: vUndefined,
 			after:  MustNewValue("1"),
 		},
 		1: change{
-			before: &Undefined{},
+			before: vUndefined,
 			after:  alice,
 		},
 	}, ws.diff())
@@ -285,15 +285,15 @@ func (s *Zuite) TestWorksheet_diff() {
 
 	require.Equal(s.T(), map[int]change{
 		indexId: change{
-			before: &Undefined{},
+			before: vUndefined,
 			after:  NewText(ws.Id()),
 		},
 		indexVersion: change{
-			before: &Undefined{},
+			before: vUndefined,
 			after:  MustNewValue("1"),
 		},
 		1: change{
-			before: &Undefined{},
+			before: vUndefined,
 			after:  bob,
 		},
 	}, ws.diff())
@@ -306,16 +306,16 @@ func (s *Zuite) TestWorksheet_diff() {
 	// now, name should go to an explicit undefine
 	require.Equal(s.T(), map[int]change{
 		indexId: change{
-			before: &Undefined{},
+			before: vUndefined,
 			after:  NewText(ws.Id()),
 		},
 		indexVersion: change{
-			before: &Undefined{},
+			before: vUndefined,
 			after:  MustNewValue("1"),
 		},
 		1: change{
 			before: bob,
-			after:  &Undefined{},
+			after:  vUndefined,
 		},
 	}, ws.diff())
 }
