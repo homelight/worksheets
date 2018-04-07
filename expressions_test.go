@@ -33,7 +33,7 @@ func (s *Zuite) TestSelectors() {
 	child := defsForSelectors.MustNewWorksheet("child")
 	child.MustSet("name", alice)
 	{
-		actual, err := tSelector([]string{"name"}).Compute(child)
+		actual, err := tSelector([]string{"name"}).compute(child)
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), alice, actual)
 	}
@@ -42,7 +42,7 @@ func (s *Zuite) TestSelectors() {
 	parent := defsForSelectors.MustNewWorksheet("parent")
 	parent.MustSet("ref_to_child", child)
 	{
-		actual, err := tSelector([]string{"ref_to_child", "name"}).Compute(parent)
+		actual, err := tSelector([]string{"ref_to_child", "name"}).compute(parent)
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), alice, actual)
 	}
@@ -50,7 +50,7 @@ func (s *Zuite) TestSelectors() {
 	// slice expression
 	parent.MustAppend("refs_to_children", child)
 	{
-		actual, err := tSelector([]string{"refs_to_children", "name"}).Compute(parent)
+		actual, err := tSelector([]string{"refs_to_children", "name"}).compute(parent)
 		require.NoError(s.T(), err)
 		slice, ok := actual.(*Slice)
 		require.True(s.T(), ok)
@@ -65,7 +65,7 @@ func (s *Zuite) TestSelectorSliceTypes() {
 	parent.MustAppend("refs_to_children", child)
 	// even with an undefined value, slice type should match field def type
 	{
-		actual, err := tSelector([]string{"refs_to_children", "name"}).Compute(parent)
+		actual, err := tSelector([]string{"refs_to_children", "name"}).compute(parent)
 		require.NoError(s.T(), err)
 		slice, ok := actual.(*Slice)
 		require.True(s.T(), ok)
@@ -75,7 +75,7 @@ func (s *Zuite) TestSelectorSliceTypes() {
 	// a selected empty slice should still be of the correct type
 	parent.MustDel("refs_to_children", 0)
 	{
-		actual, err := tSelector([]string{"refs_to_children", "name"}).Compute(parent)
+		actual, err := tSelector([]string{"refs_to_children", "name"}).compute(parent)
 		require.NoError(s.T(), err)
 		slice, ok := actual.(*Slice)
 		require.True(s.T(), ok)

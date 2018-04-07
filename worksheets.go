@@ -16,7 +16,6 @@ import (
 	"fmt"
 	"io"
 	"strconv"
-	"strings"
 
 	"github.com/satori/go.uuid"
 )
@@ -153,15 +152,14 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 			}
 
 			if fieldTrigger != nil {
-				args := fieldTrigger.Args()
-				if len(args) == 0 {
+				selectors := fieldTrigger.selectors()
+				if len(selectors) == 0 {
 					return nil, fmt.Errorf("%s.%s has no dependencies", def.name, field.name)
 				}
-				for _, argName := range args {
-					selector := argToSelector(argName)
+				for _, selector := range selectors {
 					path, ok := selector.Select(def)
 					if !ok {
-						return nil, fmt.Errorf("%s.%s references unknown arg %s", def.name, field.name, argName)
+						return nil, fmt.Errorf("%s.%s references unknown arg %s", def.name, field.name, selector)
 					}
 
 					// Only update the graph for computed fields; constrained
@@ -180,10 +178,6 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 	return &Definitions{
 		defs: defs,
 	}, nil
-}
-
-func argToSelector(arg string) tSelector {
-	return tSelector(strings.Split(arg, "."))
 }
 
 func (s tSelector) Select(elemType Type) ([]*Field, bool) {
@@ -406,7 +400,7 @@ func (ws *Worksheet) Set(name string, value Value) error {
 		if err != nil {
 			return err
 		}
-		constrainedByResult, err := field.constrainedBy.Compute(ws)
+		constrainedByResult, err := field.constrainedBy.compute(ws)
 		if err != nil {
 			return err
 		}
@@ -663,7 +657,7 @@ func (ws *Worksheet) handleDependentUpdates(field *Field, oldValue, newValue Val
 
 		// 2. Trigger the compute by of all dependent worksheets.
 		for _, dependent := range allDependents {
-			updatedValue, err := dependentField.computedBy.Compute(dependent)
+			updatedValue, err := dependentField.computedBy.compute(dependent)
 			if err != nil {
 				return err
 			}

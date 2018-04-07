@@ -245,7 +245,7 @@ func (s *Zuite) TestParser_parseAndEvalExprToCheckOperatorPrecedence() {
 		expr, err := p.parseExpression(true)
 		require.NoError(s.T(), err, input)
 		require.Equal(s.T(), "", p.next(), "%s should have reached eof", input)
-		actual, err := expr.Compute(nil)
+		actual, err := expr.compute(nil)
 		require.NoError(s.T(), err, input)
 		assert.Equal(s.T(), expected, actual, "%s should equal %s was %s", input, output, actual)
 	}
