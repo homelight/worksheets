@@ -18,8 +18,8 @@ import (
 )
 
 type expression interface {
-	Args() []string
-	Compute(ws *Worksheet) (Value, error)
+	selectors() []tSelector
+	compute(ws *Worksheet) (Value, error)
 }
 
 // Assert that all expressions implement the expression interface
@@ -38,51 +38,51 @@ var _ = []expression{
 	&tCall{},
 }
 
-func (e *tExternal) Args() []string {
+func (e *tExternal) selectors() []tSelector {
 	panic(fmt.Sprintf("unresolved plugin in worksheet"))
 }
 
-func (e *tExternal) Compute(ws *Worksheet) (Value, error) {
+func (e *tExternal) compute(ws *Worksheet) (Value, error) {
 	panic(fmt.Sprintf("unresolved plugin in worksheet(%s)", ws.def.name))
 }
 
-func (e *Undefined) Args() []string {
+func (e *Undefined) selectors() []tSelector {
 	return nil
 }
 
-func (e *Undefined) Compute(ws *Worksheet) (Value, error) {
+func (e *Undefined) compute(ws *Worksheet) (Value, error) {
 	return e, nil
 }
 
-func (e *Number) Args() []string {
+func (e *Number) selectors() []tSelector {
 	return nil
 }
 
-func (e *Number) Compute(ws *Worksheet) (Value, error) {
+func (e *Number) compute(ws *Worksheet) (Value, error) {
 	return e, nil
 }
 
-func (e *Text) Args() []string {
+func (e *Text) selectors() []tSelector {
 	return nil
 }
 
-func (e *Text) Compute(ws *Worksheet) (Value, error) {
+func (e *Text) compute(ws *Worksheet) (Value, error) {
 	return e, nil
 }
 
-func (e *Bool) Args() []string {
+func (e *Bool) selectors() []tSelector {
 	return nil
 }
 
-func (e *Bool) Compute(ws *Worksheet) (Value, error) {
+func (e *Bool) compute(ws *Worksheet) (Value, error) {
 	return e, nil
 }
 
-func (e tSelector) Args() []string {
-	return []string{strings.Join([]string(e), ".")}
+func (e tSelector) selectors() []tSelector {
+	return []tSelector{e}
 }
 
-func (e tSelector) Compute(ws *Worksheet) (Value, error) {
+func (e tSelector) compute(ws *Worksheet) (Value, error) {
 	// TODO(pascal): raw get for internal use?
 	value, ok := ws.data[ws.def.fieldsByName[e[0]].index]
 	if !ok {
@@ -98,7 +98,7 @@ func (e tSelector) Compute(ws *Worksheet) (Value, error) {
 	if _, ok := value.(*Undefined); ok {
 		return value, nil
 	} else if selectedWs, ok := value.(*Worksheet); ok {
-		return tSelector(e[1:]).Compute(selectedWs)
+		return tSelector(e[1:]).compute(selectedWs)
 	} else if selectedSlice, ok := value.(*Slice); ok {
 		subWsDef, ok := ws.def.fieldsByName[e[0]].Type().(*SliceType).ElementType().(*Definition)
 		if !ok {
@@ -111,7 +111,7 @@ func (e tSelector) Compute(ws *Worksheet) (Value, error) {
 			if !ok {
 				return nil, fmt.Errorf("sorry! more complex selectors are not supported yet!")
 			}
-			subValue, err := tSelector(e[1:]).Compute(subWs)
+			subValue, err := tSelector(e[1:]).compute(subWs)
 			if err != nil {
 				return nil, err
 			}
@@ -128,12 +128,12 @@ func (e tSelector) Compute(ws *Worksheet) (Value, error) {
 	return nil, fmt.Errorf("sorry! more complex selectors are not supported yet!")
 }
 
-func (e *tUnop) Args() []string {
-	return e.expr.Args()
+func (e *tUnop) selectors() []tSelector {
+	return e.expr.selectors()
 }
 
-func (e *tUnop) Compute(ws *Worksheet) (Value, error) {
-	result, err := e.expr.Compute(ws)
+func (e *tUnop) compute(ws *Worksheet) (Value, error) {
+	result, err := e.expr.compute(ws)
 	if err != nil {
 		return nil, err
 	}
@@ -154,14 +154,14 @@ func (e *tUnop) Compute(ws *Worksheet) (Value, error) {
 	}
 }
 
-func (e *tBinop) Args() []string {
-	left := e.left.Args()
-	right := e.right.Args()
+func (e *tBinop) selectors() []tSelector {
+	left := e.left.selectors()
+	right := e.right.selectors()
 	return append(left, right...)
 }
 
-func (e *tBinop) Compute(ws *Worksheet) (Value, error) {
-	left, err := e.left.Compute(ws)
+func (e *tBinop) compute(ws *Worksheet) (Value, error) {
+	left, err := e.left.compute(ws)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func (e *tBinop) Compute(ws *Worksheet) (Value, error) {
 			return bLeft, nil
 		}
 
-		right, err := e.right.Compute(ws)
+		right, err := e.right.compute(ws)
 		if err != nil {
 			return nil, err
 		}
@@ -198,7 +198,7 @@ func (e *tBinop) Compute(ws *Worksheet) (Value, error) {
 		return bRight, nil
 	}
 
-	right, err := e.right.Compute(ws)
+	right, err := e.right.compute(ws)
 	if err != nil {
 		return nil, err
 	}
@@ -265,18 +265,18 @@ func (e *tBinop) Compute(ws *Worksheet) (Value, error) {
 	return result, nil
 }
 
-func (e *tReturn) Args() []string {
-	return e.expr.Args()
+func (e *tReturn) selectors() []tSelector {
+	return e.expr.selectors()
 }
 
-func (e *tReturn) Compute(ws *Worksheet) (Value, error) {
-	return e.expr.Compute(ws)
+func (e *tReturn) compute(ws *Worksheet) (Value, error) {
+	return e.expr.compute(ws)
 }
 
-func (e *tCall) Args() []string {
-	var args []string
+func (e *tCall) selectors() []tSelector {
+	var args []tSelector
 	for _, expr := range e.args {
-		args = append(args, expr.Args()...)
+		args = append(args, expr.selectors()...)
 	}
 	return args
 }
@@ -363,7 +363,7 @@ var functions = map[string]struct {
 	}},
 }
 
-func (e *tCall) Compute(ws *Worksheet) (Value, error) {
+func (e *tCall) compute(ws *Worksheet) (Value, error) {
 	fn, ok := functions[e.name[0]]
 	if len(e.name) != 1 || !ok {
 		return nil, fmt.Errorf("unknown function %s", e.name)
@@ -375,7 +375,7 @@ func (e *tCall) Compute(ws *Worksheet) (Value, error) {
 
 	var args []Value
 	for _, expr := range e.args {
-		arg, err := expr.Compute(ws)
+		arg, err := expr.compute(ws)
 		if err != nil {
 			return nil, err
 		}
@@ -389,16 +389,19 @@ type ePlugin struct {
 	computedBy ComputedBy
 }
 
-func (e *ePlugin) Args() []string {
-	return e.computedBy.Args()
+func (e *ePlugin) selectors() []tSelector {
+	var args []tSelector
+	for _, arg := range e.computedBy.Args() {
+		args = append(args, tSelector(strings.Split(arg, ".")))
+	}
+	return args
 }
 
-func (e *ePlugin) Compute(ws *Worksheet) (Value, error) {
-	args := e.computedBy.Args()
+func (e *ePlugin) compute(ws *Worksheet) (Value, error) {
+	args := e.selectors()
 	values := make([]Value, len(args), len(args))
 	for i, arg := range args {
-		selector := argToSelector(arg)
-		value, err := selector.Compute(ws)
+		value, err := arg.compute(ws)
 		if err != nil {
 			// TODO(pascal): panic here, this should have failed earlier when binding Args
 			return nil, err

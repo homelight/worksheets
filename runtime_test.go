@@ -183,7 +183,7 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 		require.NoError(s.T(), err, input)
 		require.Equal(s.T(), "", p.next(), "%s should have reached eof", input)
 
-		actual, err := expr.Compute(ws)
+		actual, err := expr.compute(ws)
 		require.NoError(s.T(), err, input)
 		assert.Equal(s.T(), expected, actual, "%s should equal %s was %s", input, output, actual)
 	}
@@ -210,7 +210,7 @@ func (s *Zuite) TestRuntime_parseAndEvalExprExpectingFailure() {
 		require.NoError(s.T(), err, input)
 		require.Equal(s.T(), "", p.next(), "%s should have reached eof", input)
 
-		_, err = expr.Compute(ws)
+		_, err = expr.compute(ws)
 		require.EqualError(s.T(), err, output, input)
 	}
 }
