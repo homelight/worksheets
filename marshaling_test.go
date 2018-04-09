@@ -28,7 +28,7 @@ func (s *Zuite) TestMarshaling_simple() {
 	ws.MustSet("bool", NewBool(true))
 	ws.MustSet("num_0", MustNewValue("123"))
 	ws.MustSet("num_2", MustNewValue("123.45"))
-	ws.MustSet("undefined", &Undefined{})
+	ws.MustSet("undefined", vUndefined)
 
 	expected := `{"the-id":{
 		"text": "some text with \" and stuff",
@@ -62,7 +62,7 @@ func (s *Zuite) TestMarshaling_sliceOfText() {
 func (s *Zuite) TestMarshaling_sliceWithUndefined() {
 	ws := defs.MustNewWorksheet("all_types")
 	forciblySetId(ws, "the-id")
-	ws.MustAppend("slice_t", &Undefined{})
+	ws.MustAppend("slice_t", vUndefined)
 	ws.MustAppend("slice_t", bob)
 
 	expected := `{"the-id":{

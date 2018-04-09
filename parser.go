@@ -655,7 +655,7 @@ func (p *parser) parseLiteral() (Value, error) {
 	token := p.next()
 	switch token {
 	case "undefined":
-		return &Undefined{}, nil
+		return vUndefined, nil
 	case "true":
 		return &Bool{true}, nil
 	case "false":

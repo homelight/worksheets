@@ -86,7 +86,7 @@ func (s *Zuite) TestParser_parseExpression() {
 		// literals
 		`3`:         &Number{3, &NumberType{0}},
 		`-5.12`:     &Number{-512, &NumberType{2}},
-		`undefined`: &Undefined{},
+		`undefined`: vUndefined,
 		`"Alice"`:   &Text{"Alice"},
 		`true`:      &Bool{true},
 
@@ -103,7 +103,7 @@ func (s *Zuite) TestParser_parseExpression() {
 		`first_of(undefined, 6, "Alice")`: &tCall{
 			tSelector([]string{"first_of"}),
 			[]expression{
-				&Undefined{},
+				vUndefined,
 				&Number{6, &NumberType{0}},
 				&Text{"Alice"},
 			},
@@ -297,7 +297,7 @@ func (s *Zuite) TestParser_parseNumberLiteralWithPercentAndSpace() {
 
 func (s *Zuite) TestParser_parseLiteral() {
 	cases := map[string]Value{
-		`undefined`: &Undefined{},
+		`undefined`: vUndefined,
 
 		`1`:                  &Number{1, &NumberType{0}},
 		`-123.67`:            &Number{-12367, &NumberType{2}},

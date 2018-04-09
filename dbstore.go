@@ -332,7 +332,7 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 
 func (l *loader) readValue(typ Type, optValue dat.NullString) (Value, error) {
 	if !optValue.Valid {
-		return &Undefined{}, nil
+		return vUndefined, nil
 	}
 
 	value := optValue.String

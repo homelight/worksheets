@@ -605,9 +605,9 @@ func (s *DbZuite) TestSliceUpdate_appendUndefinedAndEnsureItLoadsCorrectly() {
 	})
 
 	require.Equal(s.T(), []Value{
-		&Undefined{},
+		vUndefined,
 		alice,
-		&Undefined{},
+		vUndefined,
 	}, fresh.MustGetSlice("names"))
 }
 
@@ -647,6 +647,6 @@ func (s *DbZuite) TestSliceUpdate_appendOntoUndefinedSlice() {
 	})
 
 	require.Equal(s.T(), []Value{
-		&Undefined{},
+		vUndefined,
 	}, fresh.MustGetSlice("names"))
 }

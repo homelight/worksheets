@@ -388,7 +388,7 @@ func (p sumPlugin) Compute(values ...Value) Value {
 		if num, ok := elem.(*Number); ok {
 			sum = sum.Plus(num)
 		} else {
-			return &Undefined{}
+			return vUndefined
 		}
 	}
 	return sum

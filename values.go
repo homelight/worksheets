@@ -23,7 +23,8 @@ import (
 )
 
 var (
-	vZero = &Number{0, &NumberType{0}}
+	vUndefined = &Undefined{}
+	vZero      = &Number{0, &NumberType{0}}
 )
 
 // RoundingMode describes the rounding mode to be used in an operation.
@@ -104,7 +105,7 @@ func MustNewValue(value string) Value {
 }
 
 func NewUndefined() Value {
-	return &Undefined{}
+	return vUndefined
 }
 
 func (value *Undefined) Type() Type {

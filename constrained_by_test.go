@@ -135,13 +135,13 @@ func (fn area) Compute(values ...Value) Value {
 	case *Number:
 		field_a = t.value
 	case *Undefined:
-		return &Undefined{}
+		return vUndefined
 	}
 	switch t := values[1].(type) {
 	case *Number:
 		field_b = t.value
 	case *Undefined:
-		return &Undefined{}
+		return vUndefined
 	}
 	a := float64(field_a * field_b / 2)
 	areaVal, _ := NewValue(strconv.FormatFloat(a, 'f', 0, 64))

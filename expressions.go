@@ -24,7 +24,7 @@ type expression interface {
 
 // Assert that all expressions implement the expression interface
 var _ = []expression{
-	&Undefined{},
+	vUndefined,
 	&Number{},
 	&Text{},
 	&Bool{},
@@ -86,7 +86,7 @@ func (e tSelector) compute(ws *Worksheet) (Value, error) {
 	// TODO(pascal): raw get for internal use?
 	value, ok := ws.data[ws.def.fieldsByName[e[0]].index]
 	if !ok {
-		value = &Undefined{}
+		value = vUndefined
 	}
 
 	// base case
@@ -311,7 +311,7 @@ var functions = map[string]struct {
 				if num, ok := elem.value.(*Number); ok {
 					sum = sum.Plus(num)
 				} else {
-					return &Undefined{}, nil
+					return vUndefined, nil
 				}
 			}
 			return sum, nil
