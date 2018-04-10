@@ -18,9 +18,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/helloeave/dat/sqlx-runner"
 	"github.com/satori/go.uuid"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
 
 func (s *DbZuite) TestDbExample() {
@@ -424,7 +424,7 @@ func (s *DbZuite) TestUpdateDetectsConcurrentModifications_onEditRecordAlreadyPr
 		InsertInto("worksheet_edits").
 		Columns("*").
 		Record(rEdit{
-			EditId:      uuid.NewV4().String(),
+			EditId:      uuid.Must(uuid.NewV4()).String(),
 			WorksheetId: ws.Id(),
 			ToVersion:   ws.Version() + 1,
 		}).

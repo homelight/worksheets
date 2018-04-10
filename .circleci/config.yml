@@ -13,9 +13,6 @@ shared: &run_steps
 
     # golang
     - run: go get -v -t -d ./...
-    - run: rm -Rf /go/src/github.com/satori/go.uuid
-    - run: mkdir /go/src/github.com/satori/go.uuid
-    - run: curl https://raw.githubusercontent.com/satori/go.uuid/b061729afc07e77a8aa4fad0a2fd840958f1942a/uuid.go > /go/src/github.com/satori/go.uuid/uuid.go
     - run: go test -v ./...
     - run: go run tools/wstest.go `find features -name '*.feature'`
     - run: go build -tags=gofuzz ./...

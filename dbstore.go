@@ -20,10 +20,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/helloeave/dat/dat"
+	"github.com/helloeave/dat/sqlx-runner"
 	"github.com/lib/pq"
 	"github.com/satori/go.uuid"
-	"gopkg.in/mgutz/dat.v2/dat"
-	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
 
 // Store ... TODO(pascal): write about abstraction.
@@ -177,7 +177,7 @@ func (s *Session) Load(id string) (*Worksheet, error) {
 
 func (s *Session) newPersister() *persister {
 	return &persister{
-		editId:    uuid.NewV4().String(),
+		editId:    uuid.Must(uuid.NewV4()).String(),
 		createdAt: s.clock.nowAsUnixNano(),
 		s:         s,
 		graph:     make(map[string]bool),

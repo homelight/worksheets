@@ -16,8 +16,8 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/helloeave/dat/sqlx-runner"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
 
 func (s *Zuite) TestRefsExample() {

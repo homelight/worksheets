@@ -18,9 +18,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/helloeave/dat/sqlx-runner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
 
 func (s *Zuite) TestComputedBy_externalComputedBy() {

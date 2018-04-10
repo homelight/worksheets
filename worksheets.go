@@ -289,7 +289,8 @@ func (defs *Definitions) NewWorksheet(name string) (*Worksheet, error) {
 	}
 
 	// uuid
-	id := uuid.NewV4()
+	id := uuid.Must(uuid.NewV4())
+
 	if err := ws.Set("id", NewText(id.String())); err != nil {
 		panic(fmt.Sprintf("unexpected %s", err))
 	}

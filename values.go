@@ -378,7 +378,7 @@ type Slice struct {
 
 func newSlice(typ *SliceType) *Slice {
 	return &Slice{
-		id:  uuid.NewV4().String(),
+		id:  uuid.Must(uuid.NewV4()).String(),
 		typ: typ,
 	}
 }
