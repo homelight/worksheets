@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	runner "github.com/helloeave/dat/sqlx-runner"
+	"github.com/helloeave/dat/sqlx-runner"
 	"github.com/satori/go.uuid"
 	"github.com/stretchr/testify/require"
 )
