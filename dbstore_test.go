@@ -18,9 +18,9 @@ import (
 	"strings"
 	"time"
 
+	runner "github.com/helloeave/dat/sqlx-runner"
 	"github.com/satori/go.uuid"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
 
 func (s *DbZuite) TestDbExample() {

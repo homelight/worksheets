@@ -20,10 +20,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/helloeave/dat/dat"
+	runner "github.com/helloeave/dat/sqlx-runner"
 	"github.com/lib/pq"
 	"github.com/satori/go.uuid"
-	"gopkg.in/mgutz/dat.v2/dat"
-	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
 
 // Store ... TODO(pascal): write about abstraction.

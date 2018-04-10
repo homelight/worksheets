@@ -17,10 +17,10 @@ import (
 	"fmt"
 	"testing"
 
+	runner "github.com/helloeave/dat/sqlx-runner"
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"gopkg.in/mgutz/dat.v2/sqlx-runner"
 )
 
 type DbZuite struct {
