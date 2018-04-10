@@ -281,12 +281,51 @@ func (e *tCall) selectors() []tSelector {
 	return args
 }
 
+// fnArgs captures the expressions passed into pre-defined functions, as well
+// as the context (i.e. the worksheet) which those expressions should be
+// evaluated in. It futher guarantees that expressions are computed at most
+// once, ad the time where they are first accessed. This makes it possible
+// to have expressions flowing through into functions thus avoiding early
+// evaluation which may not be well-formed, such as `if(false, x / 0, y)`
+// where evaluating early would result in a division by 0.
+type fnArgs struct {
+	ws     *Worksheet
+	exprs  []expression
+	values []Value
+	errs   []error
+}
+
+func newFnArgs(ws *Worksheet, exprs []expression) *fnArgs {
+	args := fnArgs{
+		ws:     ws,
+		exprs:  make([]expression, len(exprs)),
+		values: make([]Value, len(exprs)),
+		errs:   make([]error, len(exprs)),
+	}
+	copy(args.exprs, exprs)
+	return &args
+}
+
+func (args *fnArgs) get(index int) (Value, error) {
+	// compute?
+	if expr := args.exprs[index]; expr != nil {
+		args.values[index], args.errs[index] = expr.compute(args.ws)
+		args.exprs[index] = nil
+	}
+
+	// get
+	return args.values[index], args.errs[index]
+}
+
 var functions = map[string]struct {
 	argsNum int
-	fn      func([]Value) (Value, error)
+	fn      func(args *fnArgs) (Value, error)
 }{
-	"len": {1, func(args []Value) (Value, error) {
-		arg := args[0]
+	"len": {1, func(args *fnArgs) (Value, error) {
+		arg, err := args.get(0)
+		if err != nil {
+			return nil, err
+		}
 		switch v := arg.(type) {
 		case *Undefined:
 			return v, nil
@@ -298,8 +337,11 @@ var functions = map[string]struct {
 			return nil, fmt.Errorf("len expects argument #1 to be text, or slice")
 		}
 	}},
-	"sum": {1, func(args []Value) (Value, error) {
-		arg := args[0]
+	"sum": {1, func(args *fnArgs) (Value, error) {
+		arg, err := args.get(0)
+		if err != nil {
+			return nil, err
+		}
 		switch v := arg.(type) {
 		case *Slice:
 			numType, ok := v.typ.elementType.(*NumberType)
@@ -319,21 +361,30 @@ var functions = map[string]struct {
 			return nil, fmt.Errorf("sum expects argument #1 to be slice of numbers")
 		}
 	}},
-	"sumiftrue": {2, func(args []Value) (Value, error) {
-		if _, ok := args[0].(*Undefined); ok {
-			return &Undefined{}, nil
+	"sumiftrue": {2, func(args *fnArgs) (Value, error) {
+		arg0, err := args.get(0)
+		if err != nil {
+			return nil, err
 		}
-		values, ok := args[0].(*Slice)
+		arg1, err := args.get(1)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, ok := arg0.(*Undefined); ok {
+			return vUndefined, nil
+		}
+		values, ok := arg0.(*Slice)
 		if !ok {
 			return nil, fmt.Errorf("sumiftrue expects argument #1 to be slice of numbers")
 		} else if _, ok := values.typ.elementType.(*NumberType); !ok {
 			return nil, fmt.Errorf("sumiftrue expects argument #1 to be slice of numbers")
 		}
 
-		if _, ok := args[1].(*Undefined); ok {
+		if _, ok := arg1.(*Undefined); ok {
 			return &Undefined{}, nil
 		}
-		conditions, ok := args[1].(*Slice)
+		conditions, ok := arg1.(*Slice)
 		if !ok {
 			return nil, fmt.Errorf("sumiftrue expects argument #2 to be slice of bools")
 		} else if _, ok := conditions.typ.elementType.(*BoolType); !ok {
@@ -361,6 +412,28 @@ var functions = map[string]struct {
 		}
 		return sum, nil
 	}},
+	"if": {3, func(args *fnArgs) (Value, error) {
+		cond, err := args.get(0)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, ok := cond.(*Undefined); ok {
+			return vUndefined, nil
+		}
+
+		if _, ok := cond.(*Bool); !ok {
+			return nil, fmt.Errorf("if expects argument #1 to be bool")
+		}
+
+		if cond.(*Bool).value {
+			// if-branch
+			return args.get(1)
+		} else {
+			// else-branch
+			return args.get(2)
+		}
+	}},
 }
 
 func (e *tCall) compute(ws *Worksheet) (Value, error) {
@@ -373,16 +446,7 @@ func (e *tCall) compute(ws *Worksheet) (Value, error) {
 		return nil, fmt.Errorf("%s expects %d argument(s)", e.name, fn.argsNum)
 	}
 
-	var args []Value
-	for _, expr := range e.args {
-		arg, err := expr.compute(ws)
-		if err != nil {
-			return nil, err
-		}
-		args = append(args, arg)
-	}
-
-	return fn.fn(args)
+	return fn.fn(newFnArgs(ws, e.args))
 }
 
 type ePlugin struct {

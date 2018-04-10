@@ -83,3 +83,24 @@ func (s *Zuite) TestSelectorSliceTypes() {
 		require.Equal(s.T(), &SliceType{&TextType{}}, slice.Type())
 	}
 }
+
+func (s *Zuite) TestFnArgs() {
+	args := newFnArgs(nil, []expression{vZero})
+	s.Len(args.exprs, 1)
+	s.NotNil(args.exprs[0])
+	s.Len(args.values, 1)
+	s.Nil(args.values[0])
+	s.Len(args.errs, 1)
+	s.Nil(args.errs[0])
+
+	v, err := args.get(0)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), vZero, v)
+
+	s.Len(args.exprs, 1)
+	s.Nil(args.exprs[0])
+	s.Len(args.values, 1)
+	s.Equal(vZero, args.values[0])
+	s.Len(args.errs, 1)
+	s.Nil(args.errs[0])
+}
