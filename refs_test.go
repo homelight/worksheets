@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"math"
 
-	runner "github.com/helloeave/dat/sqlx-runner"
+	"github.com/helloeave/dat/sqlx-runner"
 	"github.com/stretchr/testify/require"
 )
 

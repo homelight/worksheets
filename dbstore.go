@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/helloeave/dat/dat"
-	runner "github.com/helloeave/dat/sqlx-runner"
+	"github.com/helloeave/dat/sqlx-runner"
 	"github.com/lib/pq"
 	"github.com/satori/go.uuid"
 )
