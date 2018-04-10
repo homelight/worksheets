@@ -177,7 +177,7 @@ func (s *Session) Load(id string) (*Worksheet, error) {
 
 func (s *Session) newPersister() *persister {
 	return &persister{
-		editId:    uuid.NewV4().String(),
+		editId:    uuid.Must(uuid.NewV4()).String(),
 		createdAt: s.clock.nowAsUnixNano(),
 		s:         s,
 		graph:     make(map[string]bool),

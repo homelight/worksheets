@@ -424,7 +424,7 @@ func (s *DbZuite) TestUpdateDetectsConcurrentModifications_onEditRecordAlreadyPr
 		InsertInto("worksheet_edits").
 		Columns("*").
 		Record(rEdit{
-			EditId:      uuid.NewV4().String(),
+			EditId:      uuid.Must(uuid.NewV4()).String(),
 			WorksheetId: ws.Id(),
 			ToVersion:   ws.Version() + 1,
 		}).
