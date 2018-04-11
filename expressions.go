@@ -284,7 +284,7 @@ func (e *tCall) selectors() []tSelector {
 // fnArgs captures the expressions passed into pre-defined functions, as well
 // as the context (i.e. the worksheet) which those expressions should be
 // evaluated in. It futher guarantees that expressions are computed at most
-// once, ad the time where they are first accessed. This makes it possible
+// once, at the time when they are first accessed. This makes it possible
 // to have expressions flowing through into functions thus avoiding early
 // evaluation which may not be well-formed, such as `if(false, x / 0, y)`
 // where evaluating early would result in a division by 0.
