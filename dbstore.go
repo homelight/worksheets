@@ -13,14 +13,12 @@
 package worksheets
 
 import (
-	"database/sql"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/helloeave/dat/dat"
 	"github.com/helloeave/dat/sqlx-runner"
 	"github.com/lib/pq"
 	"github.com/satori/go.uuid"
@@ -108,12 +106,12 @@ type rEdit struct {
 
 // rValue represents a record of the worksheet_values table.
 type rValue struct {
-	Id          int64          `db:"id"`
-	WorksheetId string         `db:"worksheet_id"`
-	Index       int            `db:"index"`
-	FromVersion int            `db:"from_version"`
-	ToVersion   int            `db:"to_version"`
-	Value       dat.NullString `db:"value"`
+	Id          int64   `db:"id"`
+	WorksheetId string  `db:"worksheet_id"`
+	Index       int     `db:"index"`
+	FromVersion int     `db:"from_version"`
+	ToVersion   int     `db:"to_version"`
+	Value       *string `db:"value"`
 }
 
 // rParent represents a record of the worksheet_parents table.
@@ -125,12 +123,12 @@ type rParent struct {
 
 // rSliceElement represents a record of the worksheet_slice_elements table.
 type rSliceElement struct {
-	Id          int64          `db:"id"`
-	SliceId     string         `db:"slice_id"`
-	Rank        int            `db:"rank"`
-	FromVersion int            `db:"from_version"`
-	ToVersion   int            `db:"to_version"`
-	Value       dat.NullString `db:"value"`
+	Id          int64   `db:"id"`
+	SliceId     string  `db:"slice_id"`
+	Rank        int     `db:"rank"`
+	FromVersion int     `db:"from_version"`
+	ToVersion   int     `db:"to_version"`
+	Value       *string `db:"value"`
 }
 
 var tableToEntities = map[string]interface{}{
@@ -264,7 +262,7 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 		}
 
 		// load, and potentially defer hydration of value
-		if valueRec.Value.Valid {
+		if valueRec.Value != nil {
 			value, err := l.readValue(field.typ, valueRec.Value)
 			if err != nil {
 				return nil, err
@@ -330,12 +328,12 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 	return ws, nil
 }
 
-func (l *loader) readValue(typ Type, optValue dat.NullString) (Value, error) {
-	if !optValue.Valid {
-		return vUndefined, nil
+func (l *loader) readValue(typ Type, optValue *string) (Value, error) {
+	if optValue == nil {
+		return &Undefined{}, nil
 	}
 
-	value := optValue.String
+	value := *optValue
 	switch t := typ.(type) {
 	case *TextType:
 		return NewText(value), nil
@@ -756,9 +754,9 @@ func (p *persister) update(ws *Worksheet) error {
 	return nil
 }
 
-func (p *persister) writeValue(value Value) dat.NullString {
+func (p *persister) writeValue(value Value) *string {
 	if _, ok := value.(*Undefined); ok {
-		return dat.NullString{sql.NullString{"", false}}
+		return nil
 	}
 
 	var result string
@@ -772,7 +770,7 @@ func (p *persister) writeValue(value Value) dat.NullString {
 	default:
 		result = value.String()
 	}
-	return dat.NullStringFrom(result)
+	return &result
 }
 
 func inClause(column string, num int) string {
