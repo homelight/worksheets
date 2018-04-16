@@ -314,14 +314,16 @@ func (defs *Definitions) newUninitializedWorksheet(name string) (*Worksheet, err
 		return nil, fmt.Errorf("unknown worksheet %s", name)
 	}
 
-	ws := &Worksheet{
+	return def.newUninitializedWorksheet(), nil
+}
+
+func (def *Definition) newUninitializedWorksheet() *Worksheet {
+	return &Worksheet{
 		def:     def,
 		orig:    make(map[int]Value),
 		data:    make(map[int]Value),
 		parents: make(map[string]map[int]map[string]*Worksheet),
 	}
-
-	return ws, nil
 }
 
 func (ws *Worksheet) validate() error {

@@ -109,11 +109,14 @@ func (s *Zuite) TestSliceErrors_delOnNonSliceFailsEvenIfUndefined() {
 func (s *Zuite) TestSliceOps() {
 	slice1 := newSliceWithIdAndLastRank(&SliceType{&TextType{}}, "a-cool-id", 0)
 
+	require.Equal(s.T(), 0, slice1.lastRank)
 	require.Len(s.T(), slice1.elements, 0)
 
 	slice2, err := slice1.doAppend(alice)
 	require.NoError(s.T(), err)
 
+	require.Equal(s.T(), 0, slice1.lastRank)
+	require.Equal(s.T(), 1, slice2.lastRank)
 	require.Len(s.T(), slice1.elements, 0)
 	require.Len(s.T(), slice2.elements, 1)
 	require.Equal(s.T(), alice, slice2.elements[0].value)
@@ -121,6 +124,9 @@ func (s *Zuite) TestSliceOps() {
 	slice3, err := slice2.doDel(0)
 	require.NoError(s.T(), err)
 
+	require.Equal(s.T(), 0, slice1.lastRank)
+	require.Equal(s.T(), 1, slice2.lastRank)
+	require.Equal(s.T(), 1, slice3.lastRank)
 	require.Len(s.T(), slice1.elements, 0)
 	require.Len(s.T(), slice2.elements, 1)
 	require.Equal(s.T(), sliceElement{1, alice}, slice2.elements[0])
@@ -129,6 +135,10 @@ func (s *Zuite) TestSliceOps() {
 	slice4, err := slice3.doAppend(carol)
 	require.NoError(s.T(), err)
 
+	require.Equal(s.T(), 0, slice1.lastRank)
+	require.Equal(s.T(), 1, slice2.lastRank)
+	require.Equal(s.T(), 1, slice3.lastRank)
+	require.Equal(s.T(), 2, slice4.lastRank)
 	require.Len(s.T(), slice1.elements, 0)
 	require.Len(s.T(), slice2.elements, 1)
 	require.Equal(s.T(), sliceElement{1, alice}, slice2.elements[0])
@@ -139,6 +149,11 @@ func (s *Zuite) TestSliceOps() {
 	slice5, err := slice4.doAppend(bob)
 	require.NoError(s.T(), err)
 
+	require.Equal(s.T(), 0, slice1.lastRank)
+	require.Equal(s.T(), 1, slice2.lastRank)
+	require.Equal(s.T(), 1, slice3.lastRank)
+	require.Equal(s.T(), 2, slice4.lastRank)
+	require.Equal(s.T(), 3, slice5.lastRank)
 	require.Len(s.T(), slice1.elements, 0)
 	require.Len(s.T(), slice2.elements, 1)
 	require.Equal(s.T(), sliceElement{1, alice}, slice2.elements[0])
@@ -152,6 +167,12 @@ func (s *Zuite) TestSliceOps() {
 	slice6, err := slice5.doDel(0)
 	require.NoError(s.T(), err)
 
+	require.Equal(s.T(), 0, slice1.lastRank)
+	require.Equal(s.T(), 1, slice2.lastRank)
+	require.Equal(s.T(), 1, slice3.lastRank)
+	require.Equal(s.T(), 2, slice4.lastRank)
+	require.Equal(s.T(), 3, slice5.lastRank)
+	require.Equal(s.T(), 3, slice6.lastRank)
 	require.Len(s.T(), slice1.elements, 0)
 	require.Len(s.T(), slice2.elements, 1)
 	require.Equal(s.T(), sliceElement{1, alice}, slice2.elements[0])

@@ -405,12 +405,10 @@ func (value *Slice) doAppend(element Value) (*Slice, error) {
 	}
 
 	nextRank := value.lastRank + 1
-	value.lastRank++
-
 	slice := &Slice{
 		id:       value.id,
 		typ:      value.typ,
-		lastRank: value.lastRank,
+		lastRank: nextRank,
 		elements: append(value.elements, sliceElement{
 			rank:  nextRank,
 			value: element,
