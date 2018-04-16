@@ -31,10 +31,12 @@ worksheet dup_me {
 func (s *Zuite) TestClone_simple() {
 	ws := cloneDefs.MustNewWorksheet("dup_me")
 	ws.MustSet("value", NewText("Mary had a little lamb"))
+	ws.data[indexVersion] = MustNewValue("666")
 
 	dup := ws.Clone()
 	require.True(s.T(), ws != dup, "dup must be a different instance than ws")
 	require.NotEqual(s.T(), ws.Id(), dup.Id())
+	require.Equal(s.T(), 1, dup.Version())
 	require.Len(s.T(), dup.orig, 0)
 	require.Equal(s.T(), map[int]Value{
 		indexId:      NewText(dup.Id()),

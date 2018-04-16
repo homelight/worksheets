@@ -70,6 +70,8 @@ func (c *cloner) cloneWs(ws *Worksheet) *Worksheet {
 	// copy is done at the value level, and yields the same data, even in the
 	// case where definitions for various fields have changed since the creation
 	// of ws.
+	// The duplicated worksheet is a fresh new instance, with its own id, and
+	// its version set at 1.
 
 	dup := ws.def.newUninitializedWorksheet()
 	dup.data[indexId] = NewText(uuid.Must(uuid.NewV4()).String())
