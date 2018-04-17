@@ -195,7 +195,13 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 		}
 
 		// default conversion
-		value, err := convert(ft.Name, tag, ft.Type, field.typ, wsValue)
+		ctx := convertCtx{
+			sourceFieldName: field.name,
+			sourceType:      field.typ,
+			destFieldName:   ft.Name,
+			destType:        ft.Type,
+		}
+		value, err := convert(ctx, wsValue)
 		if err != nil {
 			return err
 		}
@@ -206,54 +212,64 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 	return nil
 }
 
-func convert(destFieldName, sourceFieldName string, destType reflect.Type, sourceType Type, value Value) (reflect.Value, error) {
-	if destType.Kind() == reflect.Ptr {
-		v, err := convert(destFieldName, sourceFieldName, destType.Elem(), sourceType, value)
+// convertCtx makes it easier to test than passing dest as reflect.StructField
+// and source as *Field.
+type convertCtx struct {
+	sourceFieldName string
+	sourceType      Type
+	destFieldName   string
+	destType        reflect.Type
+}
+
+func convert(ctx convertCtx, value Value) (reflect.Value, error) {
+	if ctx.destType.Kind() == reflect.Ptr {
+		ctx.destType = ctx.destType.Elem()
+		v, err := convert(ctx, value)
 		if err != nil {
 			return v, err
 		}
-		locus := reflect.New(destType.Elem())
+		locus := reflect.New(ctx.destType)
 		locus.Elem().Set(v)
 		return locus, nil
 	}
 
 	switch v := value.(type) {
 	case *Text:
-		if destType.Kind() == reflect.String {
+		if ctx.destType.Kind() == reflect.String {
 			return reflect.ValueOf(v.value), nil
 		}
 	case *Bool:
-		if destType.Kind() == reflect.Bool {
+		if ctx.destType.Kind() == reflect.Bool {
 			return reflect.ValueOf(v.value), nil
-		} else if destType.Kind() == reflect.String {
+		} else if ctx.destType.Kind() == reflect.String {
 			return reflect.ValueOf(v.String()), nil
 		}
 	case *Number:
 		// to string
-		if destType.Kind() == reflect.String {
+		if ctx.destType.Kind() == reflect.String {
 			return reflect.ValueOf(v.String()), nil
 		}
 
 		// to floats
-		if destType.Kind() == reflect.Float32 {
+		if ctx.destType.Kind() == reflect.Float32 {
 			if f, err := strconv.ParseFloat(v.String(), 32); err == nil {
 				return reflect.ValueOf(float32(f)), nil
 			}
-			return valueOutOfRange(destFieldName, sourceFieldName, destType, value)
-		} else if destType.Kind() == reflect.Float64 {
+			return ctx.valueOutOfRange()
+		} else if ctx.destType.Kind() == reflect.Float64 {
 			if f, err := strconv.ParseFloat(v.String(), 64); err == nil {
 				return reflect.ValueOf(f), nil
 			}
-			return valueOutOfRange(destFieldName, sourceFieldName, destType, value)
+			return ctx.valueOutOfRange()
 		}
 
 		// to ints
-		if t, ok := sourceType.(*NumberType); ok && t.scale == 0 {
+		if t, ok := ctx.sourceType.(*NumberType); ok && t.scale == 0 {
 			var (
 				i   int64
 				err error
 			)
-			switch destType.Kind() {
+			switch ctx.destType.Kind() {
 			case reflect.Int:
 				if i, err = strconv.ParseInt(v.String(), 0, 0); err == nil {
 					return reflect.ValueOf(int(i)), nil
@@ -276,21 +292,21 @@ func convert(destFieldName, sourceFieldName string, destType reflect.Type, sourc
 				}
 			}
 			if err != nil {
-				return valueOutOfRange(destFieldName, sourceFieldName, destType, value)
+				return ctx.valueOutOfRange()
 			}
 		}
 
 		// to uints
-		if t, ok := sourceType.(*NumberType); ok && t.scale == 0 {
+		if t, ok := ctx.sourceType.(*NumberType); ok && t.scale == 0 {
 			if v.value < 0 {
-				return valueOutOfRange(destFieldName, sourceFieldName, destType, value)
+				return ctx.valueOutOfRange()
 			}
 
 			var (
 				i   uint64
 				err error
 			)
-			switch destType.Kind() {
+			switch ctx.destType.Kind() {
 			case reflect.Uint:
 				if i, err = strconv.ParseUint(v.String(), 0, 0); err == nil {
 					return reflect.ValueOf(uint(i)), nil
@@ -313,16 +329,20 @@ func convert(destFieldName, sourceFieldName string, destType reflect.Type, sourc
 				}
 			}
 			if err != nil {
-				return valueOutOfRange(destFieldName, sourceFieldName, destType, value)
+				return ctx.valueOutOfRange()
 			}
 		}
 	default:
-		panic(fmt.Sprintf("unexpected destType=%v, value=%v", destType, value))
+		panic(fmt.Sprintf("unexpected destType=%v, value=%v", ctx.destType, value))
 	}
 
-	return reflect.Value{}, fmt.Errorf("field %s to struct field %s: cannot convert %s to %s", sourceFieldName, destFieldName, value.Type(), destType)
+	return ctx.cannotConvert()
 }
 
-func valueOutOfRange(destFieldName, sourceFieldName string, destType reflect.Type, value Value) (reflect.Value, error) {
-	return reflect.Value{}, fmt.Errorf("field %s to struct field %s: cannot convert %s to %s, value out of range", sourceFieldName, destFieldName, value.Type(), destType)
+func (ctx convertCtx) cannotConvert() (reflect.Value, error) {
+	return reflect.Value{}, fmt.Errorf("field %s to struct field %s: cannot convert %s to %s", ctx.sourceFieldName, ctx.destFieldName, ctx.sourceType, ctx.destType)
+}
+
+func (ctx convertCtx) valueOutOfRange() (reflect.Value, error) {
+	return reflect.Value{}, fmt.Errorf("field %s to struct field %s: cannot convert %s to %s, value out of range", ctx.sourceFieldName, ctx.destFieldName, ctx.sourceType, ctx.destType)
 }

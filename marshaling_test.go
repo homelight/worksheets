@@ -371,7 +371,13 @@ func (s *Zuite) TestStructScan_convert() {
 		// {MustNewValue("18_446_744_073_709_551_615"), int64Typ, uint64(18446744073709551615)},
 	}
 	for _, ex := range cases {
-		actual, err := convert("Dest", "source", ex.dest, ex.source.Type(), ex.source)
+		ctx := convertCtx{
+			sourceFieldName: "source",
+			sourceType:      ex.source.Type(),
+			destFieldName:   "Dest",
+			destType:        ex.dest,
+		}
+		actual, err := convert(ctx, ex.source)
 		require.NoError(s.T(), err)
 		assert.Equal(s.T(), ex.expected, actual.Interface())
 	}
@@ -420,8 +426,13 @@ func (s *Zuite) TestStructScan_convertErrors() {
 		// {MustNewValue("18_446_744_073_709_551_616"), int64Typ, "number[0] to int64, value out of range"},
 	}
 	for _, ex := range cases {
-		require.Equal(s.T(), reflect.Int, intTyp.Kind())
-		_, err := convert("Dest", "source", ex.dest, ex.source.Type(), ex.source)
+		ctx := convertCtx{
+			sourceFieldName: "source",
+			sourceType:      ex.source.Type(),
+			destFieldName:   "Dest",
+			destType:        ex.dest,
+		}
+		_, err := convert(ctx, ex.source)
 		assert.EqualError(s.T(), err, "field source to struct field Dest: cannot convert "+ex.expected)
 	}
 }
