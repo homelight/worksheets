@@ -684,13 +684,18 @@ func (ws *Worksheet) handleDependentUpdates(field *Field, oldValue, newValue Val
 }
 
 func extractChildWs(value Value) []*Worksheet {
-	if childWs, ok := value.(*Worksheet); ok {
-		return []*Worksheet{childWs}
+	switch v := value.(type) {
+	case *Worksheet:
+		return []*Worksheet{v}
+	case *Slice:
+		var result []*Worksheet
+		for _, element := range v.elements {
+			result = append(result, extractChildWs(element.value)...)
+		}
+		return result
+	default:
+		return nil
 	}
-	if _, ok := value.(*Slice); ok {
-		panic("slices-of-slices are not supported yet")
-	}
-	return nil
 }
 
 type change struct {

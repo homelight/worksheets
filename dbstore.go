@@ -409,7 +409,7 @@ func (p *persister) save(ws *Worksheet) error {
 
 	// cascade updates to children and parents
 	for _, value := range ws.data {
-		for _, childWs := range worksheetsToCascade(value) {
+		for _, childWs := range extractChildWs(value) {
 			if err := p.saveOrUpdate(childWs); err != nil {
 				return err
 			}
@@ -537,7 +537,7 @@ func (p *persister) update(ws *Worksheet) error {
 
 	// cascade updates to children and parents
 	for _, value := range ws.data {
-		for _, childWs := range worksheetsToCascade(value) {
+		for _, childWs := range extractChildWs(value) {
 			if err := p.saveOrUpdate(childWs); err != nil {
 				return err
 			}
@@ -787,21 +787,6 @@ func ughconvert(ids []int) []interface{} {
 		convert[i] = ids[i]
 	}
 	return convert
-}
-
-func worksheetsToCascade(value Value) []*Worksheet {
-	switch v := value.(type) {
-	case *Worksheet:
-		return []*Worksheet{v}
-	case *Slice:
-		var result []*Worksheet
-		for _, element := range v.elements {
-			result = append(result, worksheetsToCascade(element.value)...)
-		}
-		return result
-	default:
-		return nil
-	}
 }
 
 func isSpecificUniqueConstraintErr(err error, uniqueConstraintName string) bool {
