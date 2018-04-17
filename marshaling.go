@@ -73,49 +73,49 @@ func (m *marshaler) marshal(ws *Worksheet) {
 		b.WriteRune('"')
 		b.WriteString(ws.def.fieldsByIndex[index].name)
 		b.WriteString(`":`)
-		m.marshalValue(&b, value)
+		value.jsonMarshalValue(m, &b)
 	}
 	b.WriteRune('}')
 	m.graph[ws.Id()] = b.Bytes()
 }
 
-func (m *marshaler) marshalValue(b *bytes.Buffer, value Value) {
-	switch v := value.(type) {
-	case *Undefined:
-		b.WriteString("null")
+func (value *Undefined) jsonMarshalValue(m *marshaler, b *bytes.Buffer) {
+	b.WriteString("null")
+}
 
-	case *Text:
-		b.WriteString(strconv.Quote(v.value))
+func (value *Text) jsonMarshalValue(m *marshaler, b *bytes.Buffer) {
+	b.WriteString(strconv.Quote(value.value))
+}
 
-	case *Number:
-		b.WriteRune('"')
-		b.WriteString(value.String())
-		b.WriteRune('"')
+func (value *Number) jsonMarshalValue(m *marshaler, b *bytes.Buffer) {
+	b.WriteRune('"')
+	b.WriteString(value.String())
+	b.WriteRune('"')
+}
 
-	case *Bool:
-		b.WriteString(strconv.FormatBool(v.value))
+func (value *Bool) jsonMarshalValue(m *marshaler, b *bytes.Buffer) {
+	b.WriteString(strconv.FormatBool(value.value))
+}
 
-	case *Slice:
-		b.WriteRune('[')
-		for i := range v.elements {
-			if i != 0 {
-				b.WriteRune(',')
-			}
-			m.marshalValue(b, v.elements[i].value)
+func (value *Slice) jsonMarshalValue(m *marshaler, b *bytes.Buffer) {
+	b.WriteRune('[')
+	for i := range value.elements {
+		if i != 0 {
+			b.WriteRune(',')
 		}
-		b.WriteRune(']')
-
-	case *Worksheet:
-		// 1. We write the ID.
-		b.WriteRune('"')
-		b.WriteString(v.Id())
-		b.WriteRune('"')
-		// 2. We ensure this ws is included in the overall marshall.
-		m.marshal(v)
-
-	default:
-		panic(fmt.Sprintf("unexpected %v of %T", value, value))
+		value.elements[i].value.jsonMarshalValue(m, b)
 	}
+	b.WriteRune(']')
+}
+
+func (value *Worksheet) jsonMarshalValue(m *marshaler, b *bytes.Buffer) {
+	// 1. We write the ID.
+	b.WriteRune('"')
+	b.WriteString(value.Id())
+	b.WriteRune('"')
+
+	// 2. We ensure this ws is included in the overall marshall.
+	m.marshal(value)
 }
 
 // WorksheetConverter is an interface used by StructScan.

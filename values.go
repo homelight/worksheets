@@ -48,6 +48,7 @@ type Value interface {
 	String() string
 
 	dbWriteValue() string
+	jsonMarshalValue(m *marshaler, b *bytes.Buffer)
 }
 
 var _ []Value = []Value{
