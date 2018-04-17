@@ -50,7 +50,7 @@ type Value interface {
 
 var _ []Value = []Value{
 	// Assert that all literals are Value.
-	&Undefined{},
+	vUndefined,
 	&Number{},
 	&Text{},
 	&Bool{},
