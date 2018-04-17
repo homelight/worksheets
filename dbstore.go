@@ -263,7 +263,7 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 
 		// load, and potentially defer hydration of value
 		if valueRec.Value != nil {
-			value, err := l.readValue(field.typ, valueRec.Value)
+			value, err := l.dbReadValue(field.typ, valueRec.Value)
 			if err != nil {
 				return nil, err
 			}
@@ -297,7 +297,7 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 		}
 		for _, sliceElementsRec := range sliceElementsRecs {
 			slice := slicesToHydrate[sliceElementsRec.SliceId]
-			value, err := l.readValue(slice.typ.elementType, sliceElementsRec.Value)
+			value, err := l.dbReadValue(slice.typ.elementType, sliceElementsRec.Value)
 			if err != nil {
 				return nil, err
 			}
@@ -328,46 +328,59 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 	return ws, nil
 }
 
-func (l *loader) readValue(typ Type, optValue *string) (Value, error) {
+func (l *loader) dbReadValue(typ Type, optValue *string) (Value, error) {
 	if optValue == nil {
-		return &Undefined{}, nil
+		return vUndefined, nil
 	}
+	return typ.dbReadValue(l, *optValue)
+}
 
-	value := *optValue
-	switch t := typ.(type) {
-	case *TextType:
-		return NewText(value), nil
-	case *SliceType:
-		if !strings.HasPrefix(value, "[:") {
-			return nil, fmt.Errorf("unreadable value for slice %s", value)
-		}
-		parts := strings.Split(value, ":")
-		if len(parts) != 3 {
-			return nil, fmt.Errorf("unreadable value for slice %s", value)
-		}
-		lastRank, err := strconv.Atoi(parts[1])
-		if err != nil {
-			return nil, fmt.Errorf("unreadable value for slice %s", value)
-		}
-		slice := newSliceWithIdAndLastRank(t, parts[2], lastRank)
-		l.slicesToHydrate[slice.id] = slice
-		return slice, nil
-	case *Definition:
-		if !strings.HasPrefix(value, "*:") {
-			return nil, fmt.Errorf("unreadable value for ref %s", value)
-		}
-		parts := strings.Split(value, ":")
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("unreadable value for ref %s", value)
-		}
-		value, err := l.loadWorksheet(parts[1])
-		if err != nil {
-			return nil, fmt.Errorf("unable to load referenced worksheet %s: %s", parts[1], err)
-		}
-		return value, nil
-	default:
-		return NewValue(value)
+func (typ *UndefinedType) dbReadValue(l *loader, value string) (Value, error) {
+	panic("should never be called")
+}
+
+func (typ *TextType) dbReadValue(l *loader, value string) (Value, error) {
+	return NewText(value), nil
+}
+
+func (typ *BoolType) dbReadValue(l *loader, value string) (Value, error) {
+	return NewValue(value)
+}
+
+func (typ *NumberType) dbReadValue(l *loader, value string) (Value, error) {
+	return NewValue(value)
+}
+
+func (typ *SliceType) dbReadValue(l *loader, value string) (Value, error) {
+	if !strings.HasPrefix(value, "[:") {
+		return nil, fmt.Errorf("unreadable value for slice %s", value)
 	}
+	parts := strings.Split(value, ":")
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("unreadable value for slice %s", value)
+	}
+	lastRank, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("unreadable value for slice %s", value)
+	}
+	slice := newSliceWithIdAndLastRank(typ, parts[2], lastRank)
+	l.slicesToHydrate[slice.id] = slice
+	return slice, nil
+}
+
+func (typ *Definition) dbReadValue(l *loader, value string) (Value, error) {
+	if !strings.HasPrefix(value, "*:") {
+		return nil, fmt.Errorf("unreadable value for ref %s", value)
+	}
+	parts := strings.Split(value, ":")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("unreadable value for ref %s", value)
+	}
+	ws, err := l.loadWorksheet(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("unable to load referenced worksheet %s: %s", parts[1], err)
+	}
+	return ws, nil
 }
 
 func (l *loader) nextSlicesToHydrate() map[string]*Slice {
