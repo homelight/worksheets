@@ -15,6 +15,7 @@ package worksheets
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -49,6 +50,7 @@ type Value interface {
 
 	dbWriteValue() string
 	jsonMarshalValue(m *marshaler, b *bytes.Buffer)
+	structScanConvert(ctx convertCtx) (reflect.Value, error)
 }
 
 var _ []Value = []Value{

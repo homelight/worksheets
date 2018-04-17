@@ -233,116 +233,138 @@ func convert(ctx convertCtx, value Value) (reflect.Value, error) {
 		return locus, nil
 	}
 
-	switch v := value.(type) {
-	case *Text:
-		if ctx.destType.Kind() == reflect.String {
-			return reflect.ValueOf(v.value), nil
-		}
-	case *Bool:
-		if ctx.destType.Kind() == reflect.Bool {
-			return reflect.ValueOf(v.value), nil
-		} else if ctx.destType.Kind() == reflect.String {
-			return reflect.ValueOf(v.String()), nil
-		}
-	case *Number:
-		// to string
-		if ctx.destType.Kind() == reflect.String {
-			return reflect.ValueOf(v.String()), nil
-		}
+	return value.structScanConvert(ctx)
+}
 
-		// to floats
-		if ctx.destType.Kind() == reflect.Float32 {
-			if f, err := strconv.ParseFloat(v.String(), 32); err == nil {
-				return reflect.ValueOf(float32(f)), nil
+func (value *Undefined) structScanConvert(ctx convertCtx) (reflect.Value, error) {
+	panic("should never be called")
+}
+
+func (value *Text) structScanConvert(ctx convertCtx) (reflect.Value, error) {
+	if ctx.destType.Kind() == reflect.String {
+		return reflect.ValueOf(value.value), nil
+	}
+	return ctx.cannotConvert()
+}
+
+func (value *Bool) structScanConvert(ctx convertCtx) (reflect.Value, error) {
+	if ctx.destType.Kind() == reflect.Bool {
+		return reflect.ValueOf(value.value), nil
+	} else if ctx.destType.Kind() == reflect.String {
+		return reflect.ValueOf(value.String()), nil
+	}
+	return ctx.cannotConvert()
+}
+
+func (value *Number) structScanConvert(ctx convertCtx) (reflect.Value, error) {
+	// to string
+	if ctx.destType.Kind() == reflect.String {
+		return reflect.ValueOf(value.String()), nil
+	}
+
+	// to floats
+	if ctx.destType.Kind() == reflect.Float32 {
+		if f, err := strconv.ParseFloat(value.String(), 32); err == nil {
+			return reflect.ValueOf(float32(f)), nil
+		}
+		return ctx.valueOutOfRange()
+	} else if ctx.destType.Kind() == reflect.Float64 {
+		if f, err := strconv.ParseFloat(value.String(), 64); err == nil {
+			return reflect.ValueOf(f), nil
+		}
+		return ctx.valueOutOfRange()
+	}
+
+	// to ints
+	if t, ok := ctx.sourceType.(*NumberType); ok && t.scale == 0 {
+		var (
+			i   int64
+			err error
+		)
+		switch ctx.destType.Kind() {
+		case reflect.Int:
+			if i, err = strconv.ParseInt(value.String(), 0, 0); err == nil {
+				return reflect.ValueOf(int(i)), nil
 			}
+		case reflect.Int8:
+			if i, err = strconv.ParseInt(value.String(), 0, 8); err == nil {
+				return reflect.ValueOf(int8(i)), nil
+			}
+		case reflect.Int16:
+			if i, err = strconv.ParseInt(value.String(), 0, 16); err == nil {
+				return reflect.ValueOf(int16(i)), nil
+			}
+		case reflect.Int32:
+			if i, err = strconv.ParseInt(value.String(), 0, 32); err == nil {
+				return reflect.ValueOf(int32(i)), nil
+			}
+		case reflect.Int64:
+			if i, err := strconv.ParseInt(value.String(), 0, 64); err == nil {
+				return reflect.ValueOf(int64(i)), nil
+			}
+		}
+		if err != nil {
 			return ctx.valueOutOfRange()
-		} else if ctx.destType.Kind() == reflect.Float64 {
-			if f, err := strconv.ParseFloat(v.String(), 64); err == nil {
-				return reflect.ValueOf(f), nil
-			}
+		}
+	}
+
+	// to uints
+	if t, ok := ctx.sourceType.(*NumberType); ok && t.scale == 0 {
+		if value.value < 0 {
 			return ctx.valueOutOfRange()
 		}
 
-		// to ints
-		if t, ok := ctx.sourceType.(*NumberType); ok && t.scale == 0 {
-			var (
-				i   int64
-				err error
-			)
-			switch ctx.destType.Kind() {
-			case reflect.Int:
-				if i, err = strconv.ParseInt(v.String(), 0, 0); err == nil {
-					return reflect.ValueOf(int(i)), nil
-				}
-			case reflect.Int8:
-				if i, err = strconv.ParseInt(v.String(), 0, 8); err == nil {
-					return reflect.ValueOf(int8(i)), nil
-				}
-			case reflect.Int16:
-				if i, err = strconv.ParseInt(v.String(), 0, 16); err == nil {
-					return reflect.ValueOf(int16(i)), nil
-				}
-			case reflect.Int32:
-				if i, err = strconv.ParseInt(v.String(), 0, 32); err == nil {
-					return reflect.ValueOf(int32(i)), nil
-				}
-			case reflect.Int64:
-				if i, err := strconv.ParseInt(v.String(), 0, 64); err == nil {
-					return reflect.ValueOf(int64(i)), nil
-				}
+		var (
+			i   uint64
+			err error
+		)
+		switch ctx.destType.Kind() {
+		case reflect.Uint:
+			if i, err = strconv.ParseUint(value.String(), 0, 0); err == nil {
+				return reflect.ValueOf(uint(i)), nil
 			}
-			if err != nil {
-				return ctx.valueOutOfRange()
+		case reflect.Uint8:
+			if i, err = strconv.ParseUint(value.String(), 0, 8); err == nil {
+				return reflect.ValueOf(uint8(i)), nil
+			}
+		case reflect.Uint16:
+			if i, err = strconv.ParseUint(value.String(), 0, 16); err == nil {
+				return reflect.ValueOf(uint16(i)), nil
+			}
+		case reflect.Uint32:
+			if i, err = strconv.ParseUint(value.String(), 0, 32); err == nil {
+				return reflect.ValueOf(uint32(i)), nil
+			}
+		case reflect.Uint64:
+			if i, err := strconv.ParseUint(value.String(), 0, 64); err == nil {
+				return reflect.ValueOf(uint64(i)), nil
 			}
 		}
-
-		// to uints
-		if t, ok := ctx.sourceType.(*NumberType); ok && t.scale == 0 {
-			if v.value < 0 {
-				return ctx.valueOutOfRange()
-			}
-
-			var (
-				i   uint64
-				err error
-			)
-			switch ctx.destType.Kind() {
-			case reflect.Uint:
-				if i, err = strconv.ParseUint(v.String(), 0, 0); err == nil {
-					return reflect.ValueOf(uint(i)), nil
-				}
-			case reflect.Uint8:
-				if i, err = strconv.ParseUint(v.String(), 0, 8); err == nil {
-					return reflect.ValueOf(uint8(i)), nil
-				}
-			case reflect.Uint16:
-				if i, err = strconv.ParseUint(v.String(), 0, 16); err == nil {
-					return reflect.ValueOf(uint16(i)), nil
-				}
-			case reflect.Uint32:
-				if i, err = strconv.ParseUint(v.String(), 0, 32); err == nil {
-					return reflect.ValueOf(uint32(i)), nil
-				}
-			case reflect.Uint64:
-				if i, err := strconv.ParseUint(v.String(), 0, 64); err == nil {
-					return reflect.ValueOf(uint64(i)), nil
-				}
-			}
-			if err != nil {
-				return ctx.valueOutOfRange()
-			}
+		if err != nil {
+			return ctx.valueOutOfRange()
 		}
-	default:
-		panic(fmt.Sprintf("unexpected destType=%v, value=%v", ctx.destType, value))
 	}
 
 	return ctx.cannotConvert()
 }
 
-func (ctx convertCtx) cannotConvert() (reflect.Value, error) {
-	return reflect.Value{}, fmt.Errorf("field %s to struct field %s: cannot convert %s to %s", ctx.sourceFieldName, ctx.destFieldName, ctx.sourceType, ctx.destType)
+func (value *Worksheet) structScanConvert(ctx convertCtx) (reflect.Value, error) {
+	return ctx.cannotConvert("not supported yet")
+}
+
+func (value *Slice) structScanConvert(ctx convertCtx) (reflect.Value, error) {
+	return ctx.cannotConvert("not supported yet")
 }
 
 func (ctx convertCtx) valueOutOfRange() (reflect.Value, error) {
-	return reflect.Value{}, fmt.Errorf("field %s to struct field %s: cannot convert %s to %s, value out of range", ctx.sourceFieldName, ctx.destFieldName, ctx.sourceType, ctx.destType)
+	return ctx.cannotConvert("value out of range")
+}
+
+func (ctx convertCtx) cannotConvert(msg ...string) (reflect.Value, error) {
+	prefix := fmt.Sprintf("field %s to struct field %s: cannot convert %s to %s", ctx.sourceFieldName, ctx.destFieldName, ctx.sourceType, ctx.destType)
+	if len(msg) == 0 {
+		return reflect.Value{}, fmt.Errorf(prefix)
+	} else {
+		return reflect.Value{}, fmt.Errorf("%s, %s", prefix, msg[0])
+	}
 }
