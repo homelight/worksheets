@@ -46,6 +46,8 @@ type Value interface {
 
 	// String returns a string representation of the value.
 	String() string
+
+	dbWriteValue() string
 }
 
 var _ []Value = []Value{

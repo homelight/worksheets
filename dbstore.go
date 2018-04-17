@@ -477,7 +477,7 @@ func (p *persister) save(ws *Worksheet) error {
 			Index:       index,
 			FromVersion: ws.Version(),
 			ToVersion:   math.MaxInt32,
-			Value:       p.writeValue(value),
+			Value:       dbWriteValue(value),
 		})
 
 		if slice, ok := value.(*Slice); ok {
@@ -507,7 +507,7 @@ func (p *persister) save(ws *Worksheet) error {
 					Rank:        element.rank,
 					FromVersion: ws.Version(),
 					ToVersion:   math.MaxInt32,
-					Value:       p.writeValue(element.value),
+					Value:       dbWriteValue(element.value),
 				})
 			}
 		}
@@ -680,7 +680,7 @@ func (p *persister) update(ws *Worksheet) error {
 			Index:       index,
 			FromVersion: newVersion,
 			ToVersion:   math.MaxInt32,
-			Value:       p.writeValue(change.after),
+			Value:       dbWriteValue(change.after),
 		})
 	}
 	if _, err := insert.Exec(); err != nil {
@@ -713,7 +713,7 @@ func (p *persister) update(ws *Worksheet) error {
 				FromVersion: newVersion,
 				ToVersion:   math.MaxInt32,
 				Rank:        add.rank,
-				Value:       p.writeValue(add.value),
+				Value:       dbWriteValue(add.value),
 			})
 		}
 		if _, err := insert.Exec(); err != nil {
@@ -767,23 +767,37 @@ func (p *persister) update(ws *Worksheet) error {
 	return nil
 }
 
-func (p *persister) writeValue(value Value) *string {
+func dbWriteValue(value Value) *string {
 	if _, ok := value.(*Undefined); ok {
 		return nil
 	}
 
-	var result string
-	switch v := value.(type) {
-	case *Text:
-		result = v.value
-	case *Slice:
-		result = fmt.Sprintf("[:%d:%s", v.lastRank, v.id)
-	case *Worksheet:
-		result = fmt.Sprintf("*:%s", v.Id())
-	default:
-		result = value.String()
-	}
+	result := value.dbWriteValue()
 	return &result
+}
+
+func (value *Undefined) dbWriteValue() string {
+	panic("should never be called")
+}
+
+func (value *Text) dbWriteValue() string {
+	return value.value
+}
+
+func (value *Number) dbWriteValue() string {
+	return value.String()
+}
+
+func (value *Bool) dbWriteValue() string {
+	return value.String()
+}
+
+func (value *Slice) dbWriteValue() string {
+	return fmt.Sprintf("[:%d:%s", value.lastRank, value.id)
+}
+
+func (value *Worksheet) dbWriteValue() string {
+	return fmt.Sprintf("*:%s", value.Id())
 }
 
 func inClause(column string, num int) string {
