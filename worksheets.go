@@ -204,6 +204,10 @@ func (s tSelector) Select(elemType Type) ([]*Field, bool) {
 	return nil, false
 }
 
+// resolveRefTypes resolves type references, e.g. `some_name`, to the actual
+// type definition for these references. During parsing, empty instances of
+// `Definition` are used, which are here replaced with the actual proper
+// definition from the `defs` map.
 func resolveRefTypes(niceFieldName string, defs map[string]*Definition, locus interface{}) error {
 	switch locus.(type) {
 	case *Field:
