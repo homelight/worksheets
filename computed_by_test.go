@@ -15,7 +15,6 @@ package worksheets
 import (
 	"fmt"
 	"math"
-	"strconv"
 	"strings"
 
 	"github.com/helloeave/dat/sqlx-runner"
@@ -160,7 +159,10 @@ func (sa sayAlice) Args() []string {
 	return sa
 }
 
-func (sa sayAlice) Compute(...Value) Value {
+func (sa sayAlice) Compute(values ...Value) Value {
+	if _, ok := values[0].(*Undefined); ok {
+		return vUndefined
+	}
 	return NewText("Alice")
 }
 
@@ -178,13 +180,13 @@ func (fn fullName) Compute(values ...Value) Value {
 	case *Text:
 		firstName = t.value
 	case *Undefined:
-		firstName = ""
+		return vUndefined
 	}
 	switch t := values[1].(type) {
 	case *Text:
 		lastName = t.value
 	case *Undefined:
-		lastName = ""
+		return vUndefined
 	}
 	return NewText(fmt.Sprintf("%s %s", firstName, lastName))
 }
@@ -198,10 +200,11 @@ func (fn age) Args() []string {
 }
 
 func (fn age) Compute(values ...Value) Value {
-	// TODO(pascal): we need to figure out how to make Values useful, e.g. having an AsString()
+	if _, ok := values[0].(*Undefined); ok {
+		return vUndefined
+	}
 	birthYear := values[0].(*Number).value
-	value, _ := NewValue(strconv.FormatInt(2018-birthYear, 10))
-	return value
+	return NewNumberFromInt64(2018 - birthYear)
 }
 
 type bio []string
@@ -453,7 +456,7 @@ func (s *Zuite) TestComputedBy_crossWsThroughSliceParentPointers() {
 func (s *Zuite) TestComputedBy_crossWsThroughSliceExample() {
 	parent := defsCrossWsThroughSlice.MustNewWorksheet("parent")
 
-	require.Equal(s.T(), "undefined", parent.MustGet("sum_child_amount").String())
+	require.Equal(s.T(), "0", parent.MustGet("sum_child_amount").String())
 
 	child1 := defsCrossWsThroughSlice.MustNewWorksheet("child")
 	child1.MustSet("amount", MustNewValue("1.11"))
@@ -905,4 +908,17 @@ func (s *DbZuite) TestComputedBy_crossWs_updateOfChildCarriesToParent() {
 			Value:       `8.88`,
 		},
 	}, snap.valuesRecs)
+}
+
+func (s *Zuite) TestComputedBy_computedByOnNewInstance() {
+	defs := MustNewDefinitions(strings.NewReader(`
+	worksheet sum_should_be_zeron_on_new {
+		1:nums []number[0]
+		2:sum number[0] computed_by {
+			return sum(nums)
+		}
+	}`))
+
+	ws := defs.MustNewWorksheet("sum_should_be_zeron_on_new")
+	require.Equal(s.T(), NewNumberFromInt(0), ws.MustGet("sum"))
 }

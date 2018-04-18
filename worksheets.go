@@ -300,6 +300,17 @@ func (defs *Definitions) NewWorksheet(name string) (*Worksheet, error) {
 		panic(fmt.Sprintf("unexpected %s", err))
 	}
 
+	// computedBy
+	for _, field := range ws.def.fieldsByIndex {
+		if field.computedBy != nil {
+			value, err := field.computedBy.compute(ws)
+			if err != nil {
+				return nil, err
+			}
+			ws.set(field, value)
+		}
+	}
+
 	// validate
 	if err := ws.validate(); err != nil {
 		panic(fmt.Sprintf("unexpected %s", err))
@@ -526,12 +537,9 @@ func (ws *Worksheet) getSlice(name string) (*Field, *Slice, error) {
 		return nil, nil, err
 	}
 
-	if _, ok := field.typ.(*SliceType); !ok {
+	_, ok := field.typ.(*SliceType)
+	if !ok {
 		return field, nil, fmt.Errorf("GetSlice on non-slice field %s, use Get", name)
-	}
-
-	if _, ok := value.(*Undefined); ok {
-		return field, nil, nil
 	}
 
 	return field, value.(*Slice), nil
@@ -563,7 +571,11 @@ func (ws *Worksheet) get(name string) (*Field, Value, error) {
 	// is a value set for this field?
 	value, ok := ws.data[index]
 	if !ok {
-		return field, vUndefined, nil
+		if sliceType, ok := field.typ.(*SliceType); ok {
+			return field, newSlice(sliceType), nil
+		} else {
+			return field, vUndefined, nil
+		}
 	}
 
 	return field, value, nil

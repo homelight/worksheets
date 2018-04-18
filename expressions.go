@@ -83,10 +83,9 @@ func (e tSelector) selectors() []tSelector {
 }
 
 func (e tSelector) compute(ws *Worksheet) (Value, error) {
-	// TODO(pascal): raw get for internal use?
-	value, ok := ws.data[ws.def.fieldsByName[e[0]].index]
-	if !ok {
-		value = vUndefined
+	_, value, err := ws.get(e[0])
+	if err != nil {
+		return nil, err
 	}
 
 	// base case
@@ -343,6 +342,8 @@ var functions = map[string]struct {
 			return nil, err
 		}
 		switch v := arg.(type) {
+		case *Undefined:
+			return vUndefined, nil
 		case *Slice:
 			numType, ok := v.typ.elementType.(*NumberType)
 			if !ok {
