@@ -23,6 +23,8 @@ type Type interface {
 
 	// String returns a string representation of the type.
 	String() string
+
+	dbReadValue(l *loader, value string) (Value, error)
 }
 
 // Assert that all type literals are Type.

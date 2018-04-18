@@ -382,7 +382,7 @@ var functions = map[string]struct {
 		}
 
 		if _, ok := arg1.(*Undefined); ok {
-			return &Undefined{}, nil
+			return vUndefined, nil
 		}
 		conditions, ok := arg1.(*Slice)
 		if !ok {
@@ -404,10 +404,10 @@ var functions = map[string]struct {
 						sum = sum.Plus(num)
 					}
 				} else {
-					return &Undefined{}, nil
+					return vUndefined, nil
 				}
 			} else {
-				return &Undefined{}, nil
+				return vUndefined, nil
 			}
 		}
 		return sum, nil

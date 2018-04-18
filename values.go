@@ -15,6 +15,7 @@ package worksheets
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,11 +47,15 @@ type Value interface {
 
 	// String returns a string representation of the value.
 	String() string
+
+	dbWriteValue() string
+	jsonMarshalValue(m *marshaler, b *bytes.Buffer)
+	structScanConvert(ctx convertCtx) (reflect.Value, error)
 }
 
 var _ []Value = []Value{
 	// Assert that all literals are Value.
-	&Undefined{},
+	vUndefined,
 	&Number{},
 	&Text{},
 	&Bool{},

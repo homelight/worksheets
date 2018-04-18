@@ -263,7 +263,7 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 
 		// load, and potentially defer hydration of value
 		if valueRec.Value != nil {
-			value, err := l.readValue(field.typ, valueRec.Value)
+			value, err := l.dbReadValue(field.typ, valueRec.Value)
 			if err != nil {
 				return nil, err
 			}
@@ -297,7 +297,7 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 		}
 		for _, sliceElementsRec := range sliceElementsRecs {
 			slice := slicesToHydrate[sliceElementsRec.SliceId]
-			value, err := l.readValue(slice.typ.elementType, sliceElementsRec.Value)
+			value, err := l.dbReadValue(slice.typ.elementType, sliceElementsRec.Value)
 			if err != nil {
 				return nil, err
 			}
@@ -328,46 +328,59 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 	return ws, nil
 }
 
-func (l *loader) readValue(typ Type, optValue *string) (Value, error) {
+func (l *loader) dbReadValue(typ Type, optValue *string) (Value, error) {
 	if optValue == nil {
-		return &Undefined{}, nil
+		return vUndefined, nil
 	}
+	return typ.dbReadValue(l, *optValue)
+}
 
-	value := *optValue
-	switch t := typ.(type) {
-	case *TextType:
-		return NewText(value), nil
-	case *SliceType:
-		if !strings.HasPrefix(value, "[:") {
-			return nil, fmt.Errorf("unreadable value for slice %s", value)
-		}
-		parts := strings.Split(value, ":")
-		if len(parts) != 3 {
-			return nil, fmt.Errorf("unreadable value for slice %s", value)
-		}
-		lastRank, err := strconv.Atoi(parts[1])
-		if err != nil {
-			return nil, fmt.Errorf("unreadable value for slice %s", value)
-		}
-		slice := newSliceWithIdAndLastRank(t, parts[2], lastRank)
-		l.slicesToHydrate[slice.id] = slice
-		return slice, nil
-	case *Definition:
-		if !strings.HasPrefix(value, "*:") {
-			return nil, fmt.Errorf("unreadable value for ref %s", value)
-		}
-		parts := strings.Split(value, ":")
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("unreadable value for ref %s", value)
-		}
-		value, err := l.loadWorksheet(parts[1])
-		if err != nil {
-			return nil, fmt.Errorf("unable to load referenced worksheet %s: %s", parts[1], err)
-		}
-		return value, nil
-	default:
-		return NewValue(value)
+func (typ *UndefinedType) dbReadValue(l *loader, value string) (Value, error) {
+	panic("should never be called")
+}
+
+func (typ *TextType) dbReadValue(l *loader, value string) (Value, error) {
+	return NewText(value), nil
+}
+
+func (typ *BoolType) dbReadValue(l *loader, value string) (Value, error) {
+	return NewValue(value)
+}
+
+func (typ *NumberType) dbReadValue(l *loader, value string) (Value, error) {
+	return NewValue(value)
+}
+
+func (typ *SliceType) dbReadValue(l *loader, value string) (Value, error) {
+	if !strings.HasPrefix(value, "[:") {
+		return nil, fmt.Errorf("unreadable value for slice %s", value)
 	}
+	parts := strings.Split(value, ":")
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("unreadable value for slice %s", value)
+	}
+	lastRank, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("unreadable value for slice %s", value)
+	}
+	slice := newSliceWithIdAndLastRank(typ, parts[2], lastRank)
+	l.slicesToHydrate[slice.id] = slice
+	return slice, nil
+}
+
+func (typ *Definition) dbReadValue(l *loader, value string) (Value, error) {
+	if !strings.HasPrefix(value, "*:") {
+		return nil, fmt.Errorf("unreadable value for ref %s", value)
+	}
+	parts := strings.Split(value, ":")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("unreadable value for ref %s", value)
+	}
+	ws, err := l.loadWorksheet(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("unable to load referenced worksheet %s: %s", parts[1], err)
+	}
+	return ws, nil
 }
 
 func (l *loader) nextSlicesToHydrate() map[string]*Slice {
@@ -409,7 +422,7 @@ func (p *persister) save(ws *Worksheet) error {
 
 	// cascade updates to children and parents
 	for _, value := range ws.data {
-		for _, childWs := range worksheetsToCascade(value) {
+		for _, childWs := range extractChildWs(value) {
 			if err := p.saveOrUpdate(childWs); err != nil {
 				return err
 			}
@@ -464,7 +477,7 @@ func (p *persister) save(ws *Worksheet) error {
 			Index:       index,
 			FromVersion: ws.Version(),
 			ToVersion:   math.MaxInt32,
-			Value:       p.writeValue(value),
+			Value:       dbWriteValue(value),
 		})
 
 		if slice, ok := value.(*Slice); ok {
@@ -494,7 +507,7 @@ func (p *persister) save(ws *Worksheet) error {
 					Rank:        element.rank,
 					FromVersion: ws.Version(),
 					ToVersion:   math.MaxInt32,
-					Value:       p.writeValue(element.value),
+					Value:       dbWriteValue(element.value),
 				})
 			}
 		}
@@ -537,7 +550,7 @@ func (p *persister) update(ws *Worksheet) error {
 
 	// cascade updates to children and parents
 	for _, value := range ws.data {
-		for _, childWs := range worksheetsToCascade(value) {
+		for _, childWs := range extractChildWs(value) {
 			if err := p.saveOrUpdate(childWs); err != nil {
 				return err
 			}
@@ -667,7 +680,7 @@ func (p *persister) update(ws *Worksheet) error {
 			Index:       index,
 			FromVersion: newVersion,
 			ToVersion:   math.MaxInt32,
-			Value:       p.writeValue(change.after),
+			Value:       dbWriteValue(change.after),
 		})
 	}
 	if _, err := insert.Exec(); err != nil {
@@ -700,7 +713,7 @@ func (p *persister) update(ws *Worksheet) error {
 				FromVersion: newVersion,
 				ToVersion:   math.MaxInt32,
 				Rank:        add.rank,
-				Value:       p.writeValue(add.value),
+				Value:       dbWriteValue(add.value),
 			})
 		}
 		if _, err := insert.Exec(); err != nil {
@@ -754,23 +767,37 @@ func (p *persister) update(ws *Worksheet) error {
 	return nil
 }
 
-func (p *persister) writeValue(value Value) *string {
+func dbWriteValue(value Value) *string {
 	if _, ok := value.(*Undefined); ok {
 		return nil
 	}
 
-	var result string
-	switch v := value.(type) {
-	case *Text:
-		result = v.value
-	case *Slice:
-		result = fmt.Sprintf("[:%d:%s", v.lastRank, v.id)
-	case *Worksheet:
-		result = fmt.Sprintf("*:%s", v.Id())
-	default:
-		result = value.String()
-	}
+	result := value.dbWriteValue()
 	return &result
+}
+
+func (value *Undefined) dbWriteValue() string {
+	panic("should never be called")
+}
+
+func (value *Text) dbWriteValue() string {
+	return value.value
+}
+
+func (value *Number) dbWriteValue() string {
+	return value.String()
+}
+
+func (value *Bool) dbWriteValue() string {
+	return value.String()
+}
+
+func (value *Slice) dbWriteValue() string {
+	return fmt.Sprintf("[:%d:%s", value.lastRank, value.id)
+}
+
+func (value *Worksheet) dbWriteValue() string {
+	return fmt.Sprintf("*:%s", value.Id())
 }
 
 func inClause(column string, num int) string {
@@ -787,21 +814,6 @@ func ughconvert(ids []int) []interface{} {
 		convert[i] = ids[i]
 	}
 	return convert
-}
-
-func worksheetsToCascade(value Value) []*Worksheet {
-	switch v := value.(type) {
-	case *Worksheet:
-		return []*Worksheet{v}
-	case *Slice:
-		var result []*Worksheet
-		for _, element := range v.elements {
-			result = append(result, worksheetsToCascade(element.value)...)
-		}
-		return result
-	default:
-		return nil
-	}
 }
 
 func isSpecificUniqueConstraintErr(err error, uniqueConstraintName string) bool {
