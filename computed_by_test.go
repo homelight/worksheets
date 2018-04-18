@@ -912,13 +912,13 @@ func (s *DbZuite) TestComputedBy_crossWs_updateOfChildCarriesToParent() {
 
 func (s *Zuite) TestComputedBy_computedByOnNewInstance() {
 	defs := MustNewDefinitions(strings.NewReader(`
-	worksheet sum_should_be_zeron_on_new {
+	worksheet sum_should_be_zero_on_new {
 		1:nums []number[0]
 		2:sum number[0] computed_by {
 			return sum(nums)
 		}
 	}`))
 
-	ws := defs.MustNewWorksheet("sum_should_be_zeron_on_new")
+	ws := defs.MustNewWorksheet("sum_should_be_zero_on_new")
 	require.Equal(s.T(), NewNumberFromInt(0), ws.MustGet("sum"))
 }
