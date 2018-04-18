@@ -130,6 +130,10 @@ func NewNumberFromInt(num int) *Number {
 	return &Number{int64(num), &NumberType{0}}
 }
 
+func NewNumberFromInt64(num int64) *Number {
+	return &Number{num, &NumberType{0}}
+}
+
 func NewNumberFromFloat64(num float64) *Number {
 	return MustNewValue(strconv.FormatFloat(num, 'f', -1, 64)).(*Number)
 }
