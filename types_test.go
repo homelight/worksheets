@@ -19,50 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func (s *Zuite) TestTypeAssignableTo() {
-	cases := []struct {
-		left, right Type
-	}{
-		{&UndefinedType{}, &TextType{}},
-		{&UndefinedType{}, &BoolType{}},
-		{&UndefinedType{}, &NumberType{0}},
-		{&UndefinedType{}, &NumberType{1}},
-
-		{&TextType{}, &TextType{}},
-
-		{&BoolType{}, &BoolType{}},
-
-		{&NumberType{0}, &NumberType{0}},
-		{&NumberType{1}, &NumberType{1}},
-	}
-	for _, ex := range cases {
-		require.True(s.T(), ex.left.AssignableTo(ex.right), "%s should be assignable to %s", ex.left, ex.right)
-	}
-}
-
-func (s *Zuite) TestTypeNotAssignableTo() {
-	cases := []struct {
-		left, right Type
-	}{
-		{&TextType{}, &UndefinedType{}},
-		{&BoolType{}, &UndefinedType{}},
-		{&NumberType{0}, &UndefinedType{}},
-		{&NumberType{1}, &UndefinedType{}},
-
-		{&BoolType{}, &TextType{}},
-		{&NumberType{9}, &TextType{}},
-
-		{&TextType{}, &BoolType{}},
-		{&NumberType{9}, &BoolType{}},
-
-		{&TextType{}, &NumberType{1}},
-		{&NumberType{2}, &NumberType{1}},
-	}
-	for _, ex := range cases {
-		assert.False(s.T(), ex.left.AssignableTo(ex.right), "%s should not be assignable to %s", ex.left, ex.right)
-	}
-}
-
 func (s *Zuite) TestTypeString() {
 	cases := map[Type]string{
 		&UndefinedType{}:            "undefined",

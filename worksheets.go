@@ -334,11 +334,6 @@ func (defs *Definitions) NewWorksheet(name string) (*Worksheet, error) {
 		}
 	}
 
-	// validate
-	if err := ws.validate(); err != nil {
-		panic(fmt.Sprintf("unexpected %s", err))
-	}
-
 	return ws, nil
 }
 
@@ -362,29 +357,6 @@ func (def *Definition) newUninitializedWorksheet() *Worksheet {
 		data:    make(map[int]Value),
 		parents: make(map[string]map[int]map[string]*Worksheet),
 	}
-}
-
-func (ws *Worksheet) validate() error {
-	// ensure we have an id and a version
-	if _, ok := ws.data[indexId]; !ok {
-		return fmt.Errorf("missing id")
-	}
-	if _, ok := ws.data[indexVersion]; !ok {
-		return fmt.Errorf("missing version")
-	}
-
-	// ensure all values are of the proper type
-	for index, value := range ws.data {
-		field, ok := ws.def.fieldsByIndex[index]
-		if !ok {
-			return fmt.Errorf("value present for unknown field index %d", index)
-		}
-		if ok := value.Type().AssignableTo(field.typ); !ok {
-			return fmt.Errorf("value present with unassignable type for field index %d", index)
-		}
-	}
-
-	return nil
 }
 
 func (ws *Worksheet) Id() string {
@@ -474,9 +446,9 @@ func (ws *Worksheet) set(field *Field, value Value) error {
 		return nil
 	}
 
-	// type check
-	if ok := value.Type().AssignableTo(field.typ); !ok {
-		return fmt.Errorf("cannot assign value of type %s to field of type %s", value.Type(), field.typ)
+	// assignability check
+	if err := canAssignTo("assign", value, field.typ); err != nil {
+		return err
 	}
 
 	// store
@@ -720,6 +692,82 @@ func (ws *Worksheet) handleDependentUpdates(field *Field, oldValue, newValue Val
 	}
 
 	return nil
+}
+
+func canAssignTo(op string, value Value, typ Type) error {
+	valueTyp := value.Type()
+	if !value.assignableTo(typ) {
+		var (
+			valueStr                 string
+			valueAsText, valueIsText = value.(*Text)
+			_, typIsEnum             = typ.(*EnumType)
+		)
+		if valueIsText && typIsEnum {
+			// We allow the value to leak into the error message in the special
+			// case of assigning a text to an enum.
+			valueStr = valueAsText.value
+		} else {
+			valueStr = fmt.Sprintf("value of type %s", valueTyp)
+		}
+		switch op {
+		case "assign":
+			return fmt.Errorf("cannot %s %s to %s", op, valueStr, typ)
+		case "append":
+			return fmt.Errorf("cannot %s %s to []%s", op, valueStr, typ)
+		default:
+			panic("unexpected")
+		}
+	}
+
+	return nil
+}
+
+func (value *Undefined) assignableTo(_ Type) bool {
+	return true
+}
+
+func (value *Text) assignableTo(u Type) bool {
+	if _, ok := u.(*TextType); ok {
+		return true
+	}
+
+	if enumTyp, ok := u.(*EnumType); ok {
+		return enumTyp.elements[value.value]
+	}
+
+	return false
+}
+
+func (value *Bool) assignableTo(u Type) bool {
+	_, ok := u.(*BoolType)
+	return ok
+}
+
+func (value *Number) assignableTo(u Type) bool {
+	uNum, ok := u.(*NumberType)
+	return ok && value.typ.scale <= uNum.scale
+}
+
+func (value *Slice) assignableTo(u Type) bool {
+	other, ok := u.(*SliceType)
+	if !ok {
+		return false
+	}
+
+	// See note on Value#assignableTo about dynamic checks, the loop below
+	// is the largest runtime cost caused by lack of automatic boxing.
+	for _, element := range value.elements {
+		if !element.value.assignableTo(other.elementType) {
+			return false
+		}
+	}
+	return true
+}
+
+func (value *Worksheet) assignableTo(u Type) bool {
+	// Since we do type resolution, pointer equality suffices to
+	// guarantee assignability.
+	return value.def == u
 }
 
 func extractChildWs(value Value) []*Worksheet {
