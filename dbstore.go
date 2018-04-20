@@ -383,6 +383,10 @@ func (typ *Definition) dbReadValue(l *loader, value string) (Value, error) {
 	return ws, nil
 }
 
+func (typ *EnumType) dbReadValue(l *loader, value string) (Value, error) {
+	panic("implement me")
+}
+
 func (l *loader) nextSlicesToHydrate() map[string]*Slice {
 	slicesToHydrate := l.slicesToHydrate
 	l.slicesToHydrate = make(map[string]*Slice)

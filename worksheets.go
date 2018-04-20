@@ -20,13 +20,10 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-// Definitions encapsulate one or many worksheet definitions, and is the
-// overall entry point into the worksheet framework.
-//
-// TODO(pascal) make sure Definitions are concurrent access safe!
+// Definitions groups all definitions for a workbook, which may consists of
+// multiple worksheet definitions, custom types, etc.
 type Definitions struct {
-	// defs holds all worksheet definitions
-	defs map[string]*Definition
+	defs map[string]NamedType
 }
 
 // parentsRefs records and organizes references to all parents of a worksheet,
@@ -117,11 +114,18 @@ func MustNewDefinitions(reader io.Reader, opts ...Options) *Definitions {
 // models from them.
 func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 	p := newParser(reader)
-	defs, err := p.parseWorksheets()
+	allDefs, err := p.parseDefinitions()
 	if err != nil {
 		return nil, err
-	} else if p.next() != "" || len(defs) == 0 {
-		return nil, fmt.Errorf("expecting type")
+	}
+
+	defs := make(map[string]NamedType)
+	for _, def := range allDefs {
+		name := def.Name()
+		if _, exists := defs[name]; exists {
+			return nil, fmt.Errorf("multiple types %s", name)
+		}
+		defs[name] = def
 	}
 
 	err = processOptions(defs, opts...)
@@ -129,7 +133,11 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 		return nil, err
 	}
 
-	for _, def := range defs {
+	for _, typ := range defs {
+		def, ok := typ.(*Definition)
+		if !ok {
+			continue
+		}
 		for _, field := range def.fieldsByIndex {
 			// Any unresolved externals?
 			if _, ok := field.computedBy.(*tExternal); ok {
@@ -144,7 +152,11 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 	}
 
 	// Resolve computed_by & constrained_by dependencies
-	for _, def := range defs {
+	for _, typ := range defs {
+		def, ok := typ.(*Definition)
+		if !ok {
+			continue
+		}
 		for _, field := range def.fieldsByIndex {
 			fieldTrigger := field.computedBy
 			if fieldTrigger == nil {
@@ -176,7 +188,7 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 	}
 
 	return &Definitions{
-		defs: defs,
+		defs,
 	}, nil
 }
 
@@ -208,14 +220,14 @@ func (s tSelector) Select(elemType Type) ([]*Field, bool) {
 // type definition for these references. During parsing, empty instances of
 // `Definition` are used, which are here replaced with the actual proper
 // definition from the `defs` map.
-func resolveRefTypes(niceFieldName string, defs map[string]*Definition, locus interface{}) error {
+func resolveRefTypes(niceFieldName string, defs map[string]NamedType, locus interface{}) error {
 	switch locus.(type) {
 	case *Field:
 		field := locus.(*Field)
 		if refTyp, ok := field.typ.(*Definition); ok {
 			refDef, ok := defs[refTyp.name]
 			if !ok {
-				return fmt.Errorf("%s: unknown worksheet %s referenced", niceFieldName, refTyp.name)
+				return fmt.Errorf("%s: unknown type %s", niceFieldName, refTyp.name)
 			}
 			field.typ = refDef
 		}
@@ -227,7 +239,7 @@ func resolveRefTypes(niceFieldName string, defs map[string]*Definition, locus in
 		if refTyp, ok := sliceType.elementType.(*Definition); ok {
 			refDef, ok := defs[refTyp.name]
 			if !ok {
-				return fmt.Errorf("%s: unknown worksheet %s referenced", niceFieldName, refTyp.name)
+				return fmt.Errorf("%s: unknown type %s", niceFieldName, refTyp.name)
 			}
 			sliceType.elementType = refDef
 		}
@@ -237,7 +249,7 @@ func resolveRefTypes(niceFieldName string, defs map[string]*Definition, locus in
 	return nil
 }
 
-func processOptions(defs map[string]*Definition, opts ...Options) error {
+func processOptions(defs map[string]NamedType, opts ...Options) error {
 	if len(opts) == 0 {
 		return nil
 	} else if len(opts) != 1 {
@@ -247,9 +259,16 @@ func processOptions(defs map[string]*Definition, opts ...Options) error {
 	opt := opts[0]
 
 	for name, plugins := range opt.Plugins {
-		def, ok := defs[name]
+		// When we add constrained types, we'd want to be able to use plugins
+		// to define their constraints, and will need to generalize this
+		// code.
+		typ, ok := defs[name]
 		if !ok {
-			return fmt.Errorf("plugins: unknown worksheet(%s)", name)
+			return fmt.Errorf("plugins: unknown worksheet %s", name)
+		}
+		def, ok := typ.(*Definition)
+		if !ok {
+			return fmt.Errorf("plugins: unknown worksheet %s", name)
 		}
 		err := attachPluginsToFields(def, plugins)
 		if err != nil {
@@ -324,7 +343,11 @@ func (defs *Definitions) NewWorksheet(name string) (*Worksheet, error) {
 }
 
 func (defs *Definitions) newUninitializedWorksheet(name string) (*Worksheet, error) {
-	def, ok := defs.defs[name]
+	typ, ok := defs.defs[name]
+	if !ok {
+		return nil, fmt.Errorf("unknown worksheet %s", name)
+	}
+	def, ok := typ.(*Definition)
 	if !ok {
 		return nil, fmt.Errorf("unknown worksheet %s", name)
 	}

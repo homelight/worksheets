@@ -44,7 +44,7 @@ func (s *Zuite) TestComputedBy_externalComputedBy() {
 					},
 				},
 			},
-			"plugins: unknown worksheet(not_so_simple)",
+			"plugins: unknown worksheet not_so_simple",
 		},
 		{
 			`type simple worksheet {}`,
