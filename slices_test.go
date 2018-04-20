@@ -21,7 +21,7 @@ import (
 )
 
 func (s *Zuite) TestSliceExample() {
-	ws := defs.MustNewWorksheet("with_slice")
+	ws := s.defs.MustNewWorksheet("with_slice")
 
 	require.False(s.T(), ws.MustIsSet("names"))
 	require.Len(s.T(), ws.MustGetSlice("names"), 0)
@@ -47,32 +47,32 @@ func (s *Zuite) TestSliceExample() {
 }
 
 func (s *Zuite) TestSliceErrors_getOnSliceFailsEvenIfUndefined() {
-	ws := defs.MustNewWorksheet("with_slice")
+	ws := s.defs.MustNewWorksheet("with_slice")
 	_, err := ws.Get("names")
 	require.EqualError(s.T(), err, "Get on slice field names, use GetSlice")
 }
 
 func (s *Zuite) TestSliceErrors_setOnSliceFailsEvenIfUndefined() {
-	ws := defs.MustNewWorksheet("with_slice")
+	ws := s.defs.MustNewWorksheet("with_slice")
 	err := ws.Set("names", alice)
 	require.EqualError(s.T(), err, "Set on slice field names, use Append, or Del")
 }
 
 func (s *Zuite) TestSliceErrors_unsetOnSliceFailsEvenIfUndefined() {
-	ws := defs.MustNewWorksheet("with_slice")
+	ws := s.defs.MustNewWorksheet("with_slice")
 	err := ws.Unset("names")
 	require.EqualError(s.T(), err, "Unset on slice field names, must use Del")
 }
 
 func (s *Zuite) TestSliceErrors_appendOfNonAssignableValue() {
-	ws := defs.MustNewWorksheet("with_slice")
+	ws := s.defs.MustNewWorksheet("with_slice")
 	err := ws.Append("names", NewBool(true))
 	require.EqualError(s.T(), err, "cannot append bool to []text")
 }
 
 func (s *Zuite) TestSliceErrors_delOutOfBound() {
 	var err error
-	ws := defs.MustNewWorksheet("with_slice")
+	ws := s.defs.MustNewWorksheet("with_slice")
 
 	// no slice
 	err = ws.Del("names", 0)
@@ -89,19 +89,19 @@ func (s *Zuite) TestSliceErrors_delOutOfBound() {
 }
 
 func (s *Zuite) TestSliceErrors_getSliceOnNonSliceFailsEvenIfUndefined() {
-	ws := defs.MustNewWorksheet("simple")
+	ws := s.defs.MustNewWorksheet("simple")
 	_, err := ws.GetSlice("name")
 	require.EqualError(s.T(), err, "GetSlice on non-slice field name, use Get")
 }
 
 func (s *Zuite) TestSliceErrors_appendOnNonSliceFailsEvenIfUndefined() {
-	ws := defs.MustNewWorksheet("simple")
+	ws := s.defs.MustNewWorksheet("simple")
 	err := ws.Append("name", alice)
 	require.EqualError(s.T(), err, "Append on non-slice field name")
 }
 
 func (s *Zuite) TestSliceErrors_delOnNonSliceFailsEvenIfUndefined() {
-	ws := defs.MustNewWorksheet("simple")
+	ws := s.defs.MustNewWorksheet("simple")
 	err := ws.Del("name", 0)
 	require.EqualError(s.T(), err, "Del on non-slice field name")
 }
@@ -187,7 +187,7 @@ func (s *Zuite) TestSliceOps() {
 }
 
 func (s *DbZuite) TestSliceSave() {
-	ws := defs.MustNewWorksheet("with_slice")
+	ws := s.defs.MustNewWorksheet("with_slice")
 	ws.MustAppend("names", alice)
 
 	// We're reaching into the data store to get the slice id in order to write
@@ -256,7 +256,7 @@ func (s *DbZuite) TestSliceLoad() {
 		theSliceId string
 	)
 	s.MustRunTransaction(func(tx *runner.Tx) error {
-		ws := defs.MustNewWorksheet("with_slice")
+		ws := s.defs.MustNewWorksheet("with_slice")
 		ws.MustAppend("names", alice)
 		ws.MustAppend("names", carol)
 		ws.MustAppend("names", bob)
@@ -293,7 +293,7 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 		theSliceId string
 	)
 	s.MustRunTransaction(func(tx *runner.Tx) error {
-		ws := defs.MustNewWorksheet("with_slice")
+		ws := s.defs.MustNewWorksheet("with_slice")
 		wsId = ws.Id()
 		ws.MustAppend("names", alice)
 		ws.MustAppend("names", bob)
@@ -426,9 +426,9 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 
 	// Initial state.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
-		ws := defs.MustNewWorksheet("with_slice_of_refs")
-		simple1 := defs.MustNewWorksheet("simple")
-		simple2 := defs.MustNewWorksheet("simple")
+		ws := s.defs.MustNewWorksheet("with_slice_of_refs")
+		simple1 := s.defs.MustNewWorksheet("simple")
+		simple2 := s.defs.MustNewWorksheet("simple")
 
 		// We forcibly set worksheets' identifiers to have a known ordering when
 		// comparing the db state.
@@ -591,7 +591,7 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 func (s *DbZuite) TestSliceUpdate_appendUndefinedAndEnsureItLoadsCorrectly() {
 	var wsId string
 	s.MustRunTransaction(func(tx *runner.Tx) error {
-		ws := defs.MustNewWorksheet("with_slice")
+		ws := s.defs.MustNewWorksheet("with_slice")
 		wsId = ws.Id()
 		ws.MustAppend("names", NewUndefined())
 
@@ -635,7 +635,7 @@ func (s *DbZuite) TestSliceUpdate_appendUndefinedAndEnsureItLoadsCorrectly() {
 func (s *DbZuite) TestSliceUpdate_appendOntoUndefinedSlice() {
 	var wsId string
 	s.MustRunTransaction(func(tx *runner.Tx) error {
-		ws := defs.MustNewWorksheet("with_slice")
+		ws := s.defs.MustNewWorksheet("with_slice")
 		wsId = ws.Id()
 
 		session := s.store.Open(tx)

@@ -17,7 +17,7 @@ import (
 )
 
 func (s *Zuite) TestValueString() {
-	ws := defs.MustNewWorksheet("simple")
+	ws := s.defs.MustNewWorksheet("simple")
 	ws.MustSet("name", alice)
 	ws.MustSet("age", MustNewValue("73"))
 

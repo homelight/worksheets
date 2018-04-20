@@ -13,23 +13,20 @@
 package worksheets
 
 import (
-	"strings"
-
 	"github.com/stretchr/testify/require"
 )
 
-var cloneDefs = MustNewDefinitions(strings.NewReader(`
+var cloneDefs = `
 worksheet dup_me {
 	1: value   text
 	2: v_slice []number[0]
 	3: r_slice []dup_me
 	4: ref1    dup_me
 	5: ref2    dup_me
-}
-`))
+}`
 
 func (s *Zuite) TestClone_simple() {
-	ws := cloneDefs.MustNewWorksheet("dup_me")
+	ws := s.cloneDefs.MustNewWorksheet("dup_me")
 	ws.MustSet("value", NewText("Mary had a little lamb"))
 	ws.data[indexVersion] = MustNewValue("666")
 
@@ -47,8 +44,8 @@ func (s *Zuite) TestClone_simple() {
 }
 
 func (s *Zuite) TestClone_withOneWsRef() {
-	ws1 := cloneDefs.MustNewWorksheet("dup_me")
-	ws2 := cloneDefs.MustNewWorksheet("dup_me")
+	ws1 := s.cloneDefs.MustNewWorksheet("dup_me")
+	ws2 := s.cloneDefs.MustNewWorksheet("dup_me")
 	ws1.MustSet("ref1", ws2)
 
 	dup1 := ws1.Clone()
@@ -84,8 +81,8 @@ func (s *Zuite) TestClone_withOneWsRef() {
 }
 
 func (s *Zuite) TestClone_withTwoWsRefToSameWs() {
-	ws1 := cloneDefs.MustNewWorksheet("dup_me")
-	ws2 := cloneDefs.MustNewWorksheet("dup_me")
+	ws1 := s.cloneDefs.MustNewWorksheet("dup_me")
+	ws2 := s.cloneDefs.MustNewWorksheet("dup_me")
 	ws1.MustSet("ref1", ws2)
 	ws1.MustSet("ref2", ws2)
 
@@ -131,7 +128,7 @@ func (s *Zuite) TestClone_withTwoWsRefToSameWs() {
 }
 
 func (s *Zuite) TestClone_withSliceOfValues() {
-	ws := cloneDefs.MustNewWorksheet("dup_me")
+	ws := s.cloneDefs.MustNewWorksheet("dup_me")
 	ws.MustAppend("v_slice", MustNewValue("2"))
 	ws.MustAppend("v_slice", MustNewValue("3"))
 	ws.MustAppend("v_slice", MustNewValue("3"))
@@ -170,10 +167,10 @@ func (s *Zuite) TestClone_withSliceOfValues() {
 }
 
 func (s *Zuite) TestClone_withSliceOfRefs() {
-	ws := cloneDefs.MustNewWorksheet("dup_me")
-	child1 := cloneDefs.MustNewWorksheet("dup_me")
-	child2 := cloneDefs.MustNewWorksheet("dup_me")
-	child3 := cloneDefs.MustNewWorksheet("dup_me")
+	ws := s.cloneDefs.MustNewWorksheet("dup_me")
+	child1 := s.cloneDefs.MustNewWorksheet("dup_me")
+	child2 := s.cloneDefs.MustNewWorksheet("dup_me")
+	child3 := s.cloneDefs.MustNewWorksheet("dup_me")
 	ws.MustAppend("r_slice", child1)
 	ws.MustAppend("r_slice", child2)
 	ws.MustAppend("r_slice", child3)

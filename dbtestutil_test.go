@@ -25,11 +25,15 @@ import (
 
 type DbZuite struct {
 	suite.Suite
+	allDefs
 	db    *runner.DB
 	store *DbStore
 }
 
 func (s *DbZuite) SetupSuite() {
+	// init
+	s.allDefs = newAllDefs()
+
 	// db
 	dbUrl := "postgres://ws_user:@localhost/ws_test?sslmode=disable"
 	db, err := sql.Open("postgres", dbUrl)
@@ -39,7 +43,7 @@ func (s *DbZuite) SetupSuite() {
 	s.db = runner.NewDB(db, "postgres")
 
 	// store
-	s.store = NewStore(defs)
+	s.store = NewStore(s.defs)
 }
 
 func (s *DbZuite) SetupTest() {
