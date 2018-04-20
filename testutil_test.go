@@ -81,6 +81,7 @@ type allDefs struct {
 	defsForSelectors        *Definitions
 	defsCrossWs             *Definitions
 	defsCrossWsThroughSlice *Definitions
+	enumsDefs               *Definitions
 }
 
 func newAllDefs() allDefs {
@@ -99,6 +100,7 @@ func newAllDefs() allDefs {
 	s.defsForSelectors, _ = NewDefinitions(strings.NewReader(defsForSelectors))
 	s.defsCrossWs, _ = NewDefinitions(strings.NewReader(defsCrossWs))
 	s.defsCrossWsThroughSlice, _ = NewDefinitions(strings.NewReader(defsCrossWsThroughSlice), defsCrossWsThroughSliceOptions)
+	s.enumsDefs, _ = NewDefinitions(strings.NewReader(enumsDefs))
 
 	return s
 }

@@ -67,7 +67,7 @@ func (s *Zuite) TestSliceErrors_unsetOnSliceFailsEvenIfUndefined() {
 func (s *Zuite) TestSliceErrors_appendOfNonAssignableValue() {
 	ws := s.defs.MustNewWorksheet("with_slice")
 	err := ws.Append("names", NewBool(true))
-	require.EqualError(s.T(), err, "cannot append bool to []text")
+	require.EqualError(s.T(), err, "cannot append value of type bool to []text")
 }
 
 func (s *Zuite) TestSliceErrors_delOutOfBound() {

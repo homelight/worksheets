@@ -51,6 +51,16 @@ type Value interface {
 	dbWriteValue() string
 	jsonMarshalValue(m *marshaler, b *bytes.Buffer)
 	structScanConvert(ctx convertCtx) (reflect.Value, error)
+
+	// assignableTo returns whether this value is assignable to type typ.
+	//
+	// For simplicity, we are not implementing automatic boxing right now
+	// (e.g. text "foo" boxed to enum(some_enum, "foo")), and as a result
+	// assignability checks must be dynamically calculated. For instance
+	// []text may or may not be assignable to []some_enum depending on the
+	// values contained in the slice. This has runtime impact, which we are
+	// comfortable paying right now.
+	assignableTo(typ Type) bool
 }
 
 var _ []Value = []Value{
@@ -408,22 +418,23 @@ func (slice *Slice) Elements() []Value {
 	return values
 }
 
-func (value *Slice) doAppend(element Value) (*Slice, error) {
-	if !element.Type().AssignableTo(value.typ.elementType) {
-		return nil, fmt.Errorf("cannot append %s to %s", element.Type(), value.Type())
+func (slice *Slice) doAppend(value Value) (*Slice, error) {
+	// assignability check
+	if err := canAssignTo("append", value, slice.typ.elementType); err != nil {
+		return nil, err
 	}
 
-	nextRank := value.lastRank + 1
-	slice := &Slice{
-		id:       value.id,
-		typ:      value.typ,
+	// append
+	nextRank := slice.lastRank + 1
+	return &Slice{
+		id:       slice.id,
+		typ:      slice.typ,
 		lastRank: nextRank,
-		elements: append(value.elements, sliceElement{
+		elements: append(slice.elements, sliceElement{
 			rank:  nextRank,
-			value: element,
+			value: value,
 		}),
-	}
-	return slice, nil
+	}, nil
 }
 
 func (value *Slice) doDel(index int) (*Slice, error) {

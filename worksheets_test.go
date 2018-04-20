@@ -93,7 +93,13 @@ func (s *Zuite) TestNewDefinitionsErrors() {
 			89:refs_here [][]some_other_worksheet
 		}`: `refs_to_worksheet.refs_here: unknown type some_other_worksheet`,
 
-		// ref to enum
+		`type refs_to_enum worksheet {
+			89:refs_here some_enum
+		}`: `refs_to_enum.refs_here: unknown type some_enum`,
+
+		`type refs_to_enum worksheet {
+			89:refs_here []some_enum
+		}`: `refs_to_enum.refs_here: unknown type some_enum`,
 
 		`type constrained_and_computed worksheet {
 			1:age number[0]

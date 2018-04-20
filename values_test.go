@@ -418,3 +418,55 @@ func (s *Zuite) TestNumber_Div() {
 			ex.left, ex.right, ex.round.mode, ex.round.scale, ex.expected)
 	}
 }
+
+func (s *Zuite) TestValue_assignableTo() {
+	cases := []struct {
+		value Value
+		typ   Type
+	}{
+		{vUndefined, &TextType{}},
+		{vUndefined, &BoolType{}},
+		{vUndefined, &NumberType{0}},
+		{vUndefined, &NumberType{1}},
+
+		{NewText(""), &TextType{}},
+		{NewText("a"), &EnumType{"", map[string]bool{"a": true}}},
+
+		{NewBool(true), &BoolType{}},
+
+		{NewNumberFromInt(5), &NumberType{0}},
+		{NewNumberFromFloat64(0.5), &NumberType{1}},
+	}
+	for _, ex := range cases {
+		assert.True(s.T(), ex.value.assignableTo(ex.typ),
+			"%s should be assignable to %s", ex.value, ex.typ)
+	}
+}
+
+func (s *Zuite) TestValue_notAssignableTo() {
+	cases := []struct {
+		value Value
+		typ   Type
+	}{
+		{NewText(""), &UndefinedType{}},
+		{NewBool(true), &UndefinedType{}},
+		{NewNumberFromInt(5), &UndefinedType{}},
+		{NewNumberFromFloat64(0.5), &UndefinedType{}},
+
+		{NewBool(true), &TextType{}},
+		{NewNumberFromFloat64(0.5), &TextType{}},
+
+		{NewText(""), &BoolType{}},
+		{NewNumberFromFloat64(0.5), &BoolType{}},
+
+		{NewText(""), &NumberType{1}},
+		{NewNumberFromFloat64(0.55), &NumberType{1}},
+
+		{NewNumberFromFloat64(5), &EnumType{"", map[string]bool{"a": true}}},
+		{NewText("b"), &EnumType{"", map[string]bool{"a": true}}},
+	}
+	for _, ex := range cases {
+		assert.False(s.T(), ex.value.assignableTo(ex.typ),
+			"%s should not be assignable to %s", ex.value, ex.typ)
+	}
+}
