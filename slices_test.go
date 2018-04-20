@@ -186,7 +186,7 @@ func (s *Zuite) TestSliceOps() {
 	require.Equal(s.T(), sliceElement{3, bob}, slice6.elements[0])
 }
 
-func (s *DbZuite) TestSliceSave() {
+func (s *Zuite) TestSliceSave() {
 	ws := s.defs.MustNewWorksheet("with_slice")
 	ws.MustAppend("names", alice)
 
@@ -250,7 +250,7 @@ func (s *DbZuite) TestSliceSave() {
 	require.Empty(s.T(), ws.diff())
 }
 
-func (s *DbZuite) TestSliceLoad() {
+func (s *Zuite) TestSliceLoad() {
 	var (
 		wsId       string
 		theSliceId string
@@ -287,7 +287,7 @@ func (s *DbZuite) TestSliceLoad() {
 	require.Equal(s.T(), &SliceType{&TextType{}}, slice.typ)
 }
 
-func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
+func (s *Zuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 	var (
 		wsId       string
 		theSliceId string
@@ -416,7 +416,7 @@ func (s *DbZuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 	}, snap.sliceElementsRecs)
 }
 
-func (s *DbZuite) TestSliceOfRefs_saveLoad() {
+func (s *Zuite) TestSliceOfRefs_saveLoad() {
 	var (
 		wsId      = "d55cba7e-d08f-43df-bcd7-f48c2ecf6da7"
 		wsSliceId string
@@ -588,7 +588,7 @@ func (s *DbZuite) TestSliceOfRefs_saveLoad() {
 	require.Equal(s.T(), `"Bob"`, simple2.MustGet("name").String())
 }
 
-func (s *DbZuite) TestSliceUpdate_appendUndefinedAndEnsureItLoadsCorrectly() {
+func (s *Zuite) TestSliceUpdate_appendUndefinedAndEnsureItLoadsCorrectly() {
 	var wsId string
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		ws := s.defs.MustNewWorksheet("with_slice")
@@ -632,7 +632,7 @@ func (s *DbZuite) TestSliceUpdate_appendUndefinedAndEnsureItLoadsCorrectly() {
 	}, fresh.MustGetSlice("names"))
 }
 
-func (s *DbZuite) TestSliceUpdate_appendOntoUndefinedSlice() {
+func (s *Zuite) TestSliceUpdate_appendOntoUndefinedSlice() {
 	var wsId string
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		ws := s.defs.MustNewWorksheet("with_slice")

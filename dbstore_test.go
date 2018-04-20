@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func (s *DbZuite) TestDbExample() {
+func (s *Zuite) TestDbExample() {
 	ws := s.store.defs.MustNewWorksheet("simple")
 	ws.MustSet("name", NewText("Alice"))
 
@@ -46,7 +46,7 @@ func (s *DbZuite) TestDbExample() {
 	require.Equal(s.T(), `"Alice"`, wsFromStore.MustGet("name").String())
 }
 
-func (s *DbZuite) TestSave() {
+func (s *Zuite) TestSave() {
 	ws, err := s.store.defs.NewWorksheet("simple")
 	require.NoError(s.T(), err)
 
@@ -127,7 +127,7 @@ func (s *DbZuite) TestSave() {
 	}, editTouchedWs)
 }
 
-func (s *DbZuite) TestUpdate() {
+func (s *Zuite) TestUpdate() {
 	ws, err := s.store.defs.NewWorksheet("simple")
 	require.NoError(s.T(), err)
 
@@ -244,7 +244,7 @@ func (s *DbZuite) TestUpdate() {
 	}, updateTouchedWs)
 }
 
-func (s *DbZuite) TestUpdateUndefinedField() {
+func (s *Zuite) TestUpdateUndefinedField() {
 	ws, err := s.store.defs.NewWorksheet("simple")
 	require.NoError(s.T(), err)
 
@@ -267,7 +267,7 @@ func (s *DbZuite) TestUpdateUndefinedField() {
 	})
 }
 
-func (s *DbZuite) TestProperlyLoadUndefinedField() {
+func (s *Zuite) TestProperlyLoadUndefinedField() {
 	var wsId string
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		ws := s.defs.MustNewWorksheet("simple")
@@ -353,7 +353,7 @@ func (s *DbZuite) TestProperlyLoadUndefinedField() {
 	}, snap.valuesRecs)
 }
 
-func (s *DbZuite) TestUpdateOnUpdateDoesNothing() {
+func (s *Zuite) TestUpdateOnUpdateDoesNothing() {
 	ws := s.store.defs.MustNewWorksheet("simple")
 	ws.MustSet("name", alice)
 
@@ -385,7 +385,7 @@ func (s *DbZuite) TestUpdateOnUpdateDoesNothing() {
 	require.Equal(s.T(), 2, ws.Version())
 }
 
-func (s *DbZuite) TestUpdateDetectsConcurrentModifications_onWorksheetVersion() {
+func (s *Zuite) TestUpdateDetectsConcurrentModifications_onWorksheetVersion() {
 	ws := s.store.defs.MustNewWorksheet("simple")
 	ws.MustSet("name", alice)
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -410,7 +410,7 @@ func (s *DbZuite) TestUpdateDetectsConcurrentModifications_onWorksheetVersion() 
 	require.EqualError(s.T(), errFromUpdate, "concurrent update detected")
 }
 
-func (s *DbZuite) TestUpdateDetectsConcurrentModifications_onEditRecordAlreadyPresent() {
+func (s *Zuite) TestUpdateDetectsConcurrentModifications_onEditRecordAlreadyPresent() {
 	ws := s.store.defs.MustNewWorksheet("simple")
 	ws.MustSet("name", alice)
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -442,7 +442,7 @@ func (s *DbZuite) TestUpdateDetectsConcurrentModifications_onEditRecordAlreadyPr
 	require.Regexp(s.T(), `^concurrent update detected \(.*\)$`, errFromUpdate)
 }
 
-func (s *DbZuite) TestSignoffPattern() {
+func (s *Zuite) TestSignoffPattern() {
 	defs := MustNewDefinitions(strings.NewReader(`type needs_sign_off worksheet {
 		1:signoff_at number[0]
 		2:is_signedoff bool computed_by {
