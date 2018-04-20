@@ -80,11 +80,21 @@ type allDefs struct {
 
 func newAllDefs() allDefs {
 	var s allDefs
-	s.defs = MustNewDefinitions(strings.NewReader(defs))
-	s.cloneDefs = MustNewDefinitions(strings.NewReader(cloneDefs))
-	s.defsForSelectors = MustNewDefinitions(strings.NewReader(defsForSelectors))
-	s.defsCrossWs = MustNewDefinitions(strings.NewReader(defsCrossWs))
-	s.defsCrossWsThroughSlice = MustNewDefinitions(strings.NewReader(defsCrossWsThroughSlice), defsCrossWsThroughSliceOptions)
+
+	// When initializing, we purposefully ignore errors to make it easier to work
+	// on specific parts of the parser by running single tests:
+	// - If we're running a single test which does not depend on these
+	//   definitions, we shouldn't fail early, so as to provide feedback to the
+	//   programmer on the test being ran (rather than whether full parsing works).
+	// - And since the suite itself will fail if any of these are nil, we are not
+	//   changing the test suite outcome by ignoring errors, simply shifting where
+	//   and how these errors are reported.
+	s.defs, _ = NewDefinitions(strings.NewReader(defs))
+	s.cloneDefs, _ = NewDefinitions(strings.NewReader(cloneDefs))
+	s.defsForSelectors, _ = NewDefinitions(strings.NewReader(defsForSelectors))
+	s.defsCrossWs, _ = NewDefinitions(strings.NewReader(defsCrossWs))
+	s.defsCrossWsThroughSlice, _ = NewDefinitions(strings.NewReader(defsCrossWsThroughSlice), defsCrossWsThroughSliceOptions)
+
 	return s
 }
 
