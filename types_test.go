@@ -71,6 +71,7 @@ func (s *Zuite) TestTypeString() {
 		&NumberType{1}:              "number[1]",
 		&SliceType{&BoolType{}}:     "[]bool",
 		&Definition{name: "simple"}: "simple",
+		&EnumType{name: "simple"}:   "simple",
 	}
 	for typ, expected := range cases {
 		assert.Equal(s.T(), expected, typ.String(), expected)
@@ -91,19 +92,19 @@ func (s *Zuite) TestWorksheetDefinition_Fields() {
 			index: 1,
 			name:  "name",
 			typ:   &TextType{},
-			def:   defs.defs["simple"],
+			def:   defs.defs["simple"].(*Definition),
 		},
 		{
 			index: -2,
 			name:  "id",
 			typ:   &TextType{},
-			def:   defs.defs["simple"],
+			def:   defs.defs["simple"].(*Definition),
 		},
 		{
 			index: -1,
 			name:  "version",
 			typ:   &NumberType{},
-			def:   defs.defs["simple"],
+			def:   defs.defs["simple"].(*Definition),
 		},
 	}
 	for _, field := range expectedFields {

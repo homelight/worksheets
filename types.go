@@ -27,14 +27,28 @@ type Type interface {
 	dbReadValue(l *loader, value string) (Value, error)
 }
 
-// Assert that all type literals are Type.
+// NamedType represents types which are uniquely identified by their names, such
+// worksheet types, or enums.
+type NamedType interface {
+	Type
+
+	// Name returns the name of the named type.
+	Name() string
+}
+
+// Assert that all types (which are not 'named') implement the Type interface.
 var _ []Type = []Type{
 	&UndefinedType{},
 	&TextType{},
 	&BoolType{},
 	&NumberType{},
 	&SliceType{},
+}
+
+// Assert that named types implement the NamedType.
+var _ []NamedType = []NamedType{
 	&Definition{},
+	&EnumType{},
 }
 
 type UndefinedType struct{}
@@ -109,6 +123,10 @@ func (def *Definition) AssignableTo(u Type) bool {
 	return def == u
 }
 
+func (def *Definition) Name() string {
+	return def.name
+}
+
 func (def *Definition) String() string {
 	return def.name
 }
@@ -123,4 +141,21 @@ func (def *Definition) Fields() []*Field {
 		fields = append(fields, field)
 	}
 	return fields
+}
+
+type EnumType struct {
+	name     string
+	elements map[string]bool
+}
+
+func (typ *EnumType) AssignableTo(u Type) bool {
+	return false
+}
+
+func (typ *EnumType) Name() string {
+	return typ.name
+}
+
+func (typ *EnumType) String() string {
+	return typ.name
 }

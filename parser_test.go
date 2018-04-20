@@ -22,12 +22,12 @@ import (
 
 func (s *Zuite) TestParser_parseWorksheet() {
 	cases := map[string]func(*Definition){
-		`type simple worksheet {}`: func(ws *Definition) {
+		`{}`: func(ws *Definition) {
 			require.Equal(s.T(), "simple", ws.name)
 			require.Equal(s.T(), 2+0, len(ws.fieldsByName))
 			require.Equal(s.T(), 2+0, len(ws.fieldsByIndex))
 		},
-		`type simple worksheet {42:full_name text}`: func(ws *Definition) {
+		`{42:full_name text}`: func(ws *Definition) {
 			require.Equal(s.T(), "simple", ws.name)
 			require.Equal(s.T(), 2+1, len(ws.fieldsByName))
 			require.Equal(s.T(), 2+1, len(ws.fieldsByIndex))
@@ -39,7 +39,7 @@ func (s *Zuite) TestParser_parseWorksheet() {
 			require.Equal(s.T(), ws.fieldsByName["full_name"], field)
 			require.Equal(s.T(), ws.fieldsByIndex[42], field)
 		},
-		` type simple worksheet {42:full_name text 45:happy bool}`: func(ws *Definition) {
+		`{42:full_name text 45:happy bool}`: func(ws *Definition) {
 			require.Equal(s.T(), "simple", ws.name)
 			require.Equal(s.T(), 2+2, len(ws.fieldsByName))
 			require.Equal(s.T(), 2+2, len(ws.fieldsByIndex))
@@ -61,9 +61,47 @@ func (s *Zuite) TestParser_parseWorksheet() {
 	}
 	for input, checks := range cases {
 		p := newParser(strings.NewReader(input))
-		ws, err := p.parseWorksheet()
+		ws, err := p.parseWorksheet("simple")
 		require.NoError(s.T(), err)
 		checks(ws)
+	}
+}
+
+func (s *Zuite) TestParser_parseEnum() {
+	cases := map[string][]string{
+		`{}`:               nil,
+		`{foo,}`:           []string{"foo"},
+		`{foo,bar,}`:       []string{"foo", "bar"},
+		`{one,two,three,}`: []string{"one", "two", "three"},
+	}
+	for input, elements := range cases {
+		var expected map[string]bool
+		if len(elements) != 0 {
+			expected = make(map[string]bool)
+		}
+		for _, element := range elements {
+			expected[element] = true
+		}
+
+		p := newParser(strings.NewReader(input))
+		enum, err := p.parseEnum("simple")
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), "simple", enum.name)
+		require.Equal(s.T(), expected, enum.elements)
+		require.True(s.T(), p.isEof(), input)
+	}
+}
+
+func (s *Zuite) TestParser_parseEnumErrors() {
+	cases := map[string]string{
+		`{`:     "expected name, found <eof>",
+		`{foo}`: "expected ,, found }",
+		`{5}`:   "expected name, found 5",
+	}
+	for input, expected := range cases {
+		p := newParser(strings.NewReader(input))
+		_, err := p.parseEnum("simple")
+		require.EqualError(s.T(), err, expected)
 	}
 }
 
@@ -327,7 +365,7 @@ func (s *Zuite) TestParser_parseLiteral() {
 	}
 }
 
-func (s *Zuite) TestParser_parseType() {
+func (s *Zuite) TestParser_parseTypeLiteral() {
 	cases := map[string]Type{
 		`undefined`:     &UndefinedType{},
 		`text`:          &TextType{},
@@ -340,13 +378,13 @@ func (s *Zuite) TestParser_parseType() {
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))
-		actual, err := p.parseType()
+		actual, err := p.parseTypeLiteral()
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), expected, actual)
 	}
 }
 
-func (s *Zuite) TestParser_parseTypeErrors() {
+func (s *Zuite) TestParser_parseTypeLiteralErrors() {
 	cases := map[string]string{
 		`number[-7]`: `expected index, found -`,
 		`number[33]`: `scale cannot be greater than 32`,
@@ -354,7 +392,7 @@ func (s *Zuite) TestParser_parseTypeErrors() {
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))
-		_, err := p.parseType()
+		_, err := p.parseTypeLiteral()
 		assert.EqualError(s.T(), err, expected, input)
 	}
 }

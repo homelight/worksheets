@@ -49,28 +49,14 @@ func (s *Zuite) TestExample() {
 	require.False(s.T(), isSet)
 }
 
-func (s *Zuite) TestNewDefinitionsGood() {
-	cases := []string{
-		`type simple worksheet {
-			65535:index_at_max bool
-		}`,
-	}
-	for _, ex := range cases {
-		_, err := NewDefinitions(strings.NewReader(ex))
-		assert.NoError(s.T(), err, ex)
-	}
-}
-
 func (s *Zuite) TestNewDefinitionsErrors() {
 	cases := map[string]string{
 		// crap input
-		``:                `expecting type`,
-		` `:               `expecting type`,
-		`some text`:       `expecting type`,
-		`not a worksheet`: `expecting type`,
-		`work sheet`:      `expecting type`,
+		`some text`:       `syntax error: non-type declaration`,
+		`not a worksheet`: `syntax error: non-type declaration`,
+		`work sheet`:      `syntax error: non-type declaration`,
 		`type {`:          `expected name, found {`,
-		`type simple {`:   `expected worksheet, found {`,
+		`type simple {`:   `expected worksheet, or enum`,
 
 		// worksheet semantics
 		`type simple worksheet {
@@ -97,15 +83,17 @@ func (s *Zuite) TestNewDefinitionsErrors() {
 
 		`type ref_to_worksheet worksheet {
 			89:ref_here some_other_worksheet
-		}`: `ref_to_worksheet.ref_here: unknown worksheet some_other_worksheet referenced`,
+		}`: `ref_to_worksheet.ref_here: unknown type some_other_worksheet`,
 
 		`type refs_to_worksheet worksheet {
 			89:refs_here []some_other_worksheet
-		}`: `refs_to_worksheet.refs_here: unknown worksheet some_other_worksheet referenced`,
+		}`: `refs_to_worksheet.refs_here: unknown type some_other_worksheet`,
 
 		`type refs_to_worksheet worksheet {
 			89:refs_here [][]some_other_worksheet
-		}`: `refs_to_worksheet.refs_here: unknown worksheet some_other_worksheet referenced`,
+		}`: `refs_to_worksheet.refs_here: unknown type some_other_worksheet`,
+
+		// ref to enum
 
 		`type constrained_and_computed worksheet {
 			1:age number[0]
@@ -124,11 +112,49 @@ func (s *Zuite) TestNewDefinitionsErrors() {
 		`type constrained_no_arg worksheet {
 			69:some_field text constrained_by { return true }
 		}`: `constrained_no_arg.some_field has no dependencies`,
+
+		`
+		type name_reused worksheet {}
+		type name_reused worksheet {}
+		`: `multiple types name_reused`,
+
+		`
+		type name_reused enum {}
+		type name_reused worksheet {}
+		`: `multiple types name_reused`,
+
+		`
+		type name_reused enum {}
+		type name_reused enum {}
+		`: `multiple types name_reused`,
 	}
 	for input, msg := range cases {
 		_, err := NewDefinitions(strings.NewReader(input))
-		assert.EqualError(s.T(), err, msg, input+" expecting "+msg)
+		assert.EqualErrorf(s.T(), err, msg, "'%s' expecting: %s ", input, msg)
 	}
+}
+
+func (s *Zuite) TestWorksheetNew_empty() {
+	defs, err := NewDefinitions(strings.NewReader(``))
+	require.NoError(s.T(), err)
+	require.Empty(s.T(), defs.defs)
+}
+
+func (s *Zuite) TestWorksheetNew_fieldAtMaxIndex() {
+	defs, err := NewDefinitions(strings.NewReader(`
+		type simple worksheet {
+			65535:index_at_max bool
+		}
+		`))
+	require.NoError(s.T(), err)
+	require.Len(s.T(), defs.defs, 1)
+	def, ok := defs.defs["simple"]
+	require.True(s.T(), ok)
+	simple := def.(*Definition)
+	require.Len(s.T(), simple.fieldsByIndex, 3)
+	require.NotNil(s.T(), simple.fieldsByIndex[65535])
+	require.Len(s.T(), simple.fieldsByName, 3)
+	require.NotNil(s.T(), simple.fieldsByName["index_at_max"])
 }
 
 func (s *Zuite) TestWorksheetNew_multipleDefs() {
@@ -140,14 +166,6 @@ func (s *Zuite) TestWorksheetNew_multipleDefs() {
 	for _, wsName := range []string{"one", "two"} {
 		_, ok := defs.defs[wsName]
 		require.True(s.T(), ok)
-	}
-}
-
-func (s *Zuite) TestWorksheetNew_multipleDefsSameName() {
-	wsDefs := `type simple worksheet {1:name text} type simple worksheet {1:occupation text}`
-	_, err := NewDefinitions(strings.NewReader(wsDefs))
-	if assert.Error(s.T(), err) {
-		require.Equal(s.T(), "multiple worksheets with name simple", err.Error())
 	}
 }
 
@@ -164,7 +182,7 @@ func (s *Zuite) TestWorksheetNew_origEmpty() {
 	require.Empty(s.T(), ws.orig)
 }
 
-func (s *Zuite) TestWorksheetNew_refTypesMustBeResolved() {
+func (s *Zuite) TestWorksheetNew_resolveRefTypes() {
 	defs := MustNewDefinitions(strings.NewReader(`
 		type simple worksheet {
 			1:me     simple
@@ -173,30 +191,38 @@ func (s *Zuite) TestWorksheetNew_refTypesMustBeResolved() {
 			4:not_me even_simpler
 		}
 
+		type simple_enum enum {
+		}
+
 		type even_simpler worksheet {
 			5:not_it simple
+			6:enum_field simple_enum
 		}
 
 		type refs_in_slices worksheet {
 			6:many_simples  []simple
 			7:many_simplers [][]even_simpler
+			8:many_enums    []simple_enum
 		}`))
 	var (
-		simpleDef       = defs.defs["simple"]
-		evenSimplerDef  = defs.defs["even_simpler"]
-		refsInSlicesDef = defs.defs["refs_in_slices"]
+		simpleDef       = defs.defs["simple"].(*Definition)
+		simpleEnumDef   = defs.defs["simple_enum"].(*EnumType)
+		evenSimplerDef  = defs.defs["even_simpler"].(*Definition)
+		refsInSlicesDef = defs.defs["refs_in_slices"].(*Definition)
 	)
 
 	// refs
 	cases := []struct {
 		parent *Definition
 		field  string
-		child  *Definition
+		child  NamedType
 	}{
 		{simpleDef, "me", simpleDef},
 		{simpleDef, "myself", simpleDef},
 		{simpleDef, "and_i", simpleDef},
 		{simpleDef, "not_me", evenSimplerDef},
+
+		{evenSimplerDef, "enum_field", simpleEnumDef},
 
 		{evenSimplerDef, "not_it", simpleDef},
 	}
@@ -213,6 +239,9 @@ func (s *Zuite) TestWorksheetNew_refTypesMustBeResolved() {
 	manySimplersTyp := refsInSlicesDef.fieldsByName["many_simplers"].typ.(*SliceType)
 	manySimplersElemTyp := manySimplersTyp.elementType.(*SliceType)
 	assert.True(s.T(), manySimplersElemTyp.elementType == evenSimplerDef)
+
+	manyEnumsTyp := refsInSlicesDef.fieldsByName["many_enums"].typ.(*SliceType)
+	assert.True(s.T(), manyEnumsTyp.elementType == simpleEnumDef)
 }
 
 func (s *Zuite) TestWorksheetGet_undefinedIfNoValue() {

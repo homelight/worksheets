@@ -70,6 +70,7 @@ var (
 	pRound              = newTokenPattern("round", "round")
 	pReturn             = newTokenPattern("return", "return")
 	pType               = newTokenPattern("type", "type")
+	pEnum               = newTokenPattern("enum", "enum")
 	pUp                 = newTokenPattern(string(ModeUp), string(ModeUp))
 	pDown               = newTokenPattern(string(ModeDown), string(ModeDown))
 	pHalf               = newTokenPattern(string(ModeHalf), string(ModeHalf))
@@ -84,25 +85,59 @@ var (
 	pNumberWithDot        = newTokenPattern("number", "\\.[0-9]*(\\%)?")
 )
 
-func (p *parser) parseWorksheets() (map[string]*Definition, error) {
-	wsDefs := make(map[string]*Definition)
+func (p *parser) parseDefinitions() ([]NamedType, error) {
+	var defs []NamedType
 
-	for p.peek(pType) {
-		def, err := p.parseWorksheet()
+	for {
+		// type
+		if !p.peek(pType) {
+			if !p.isEof() {
+				return nil, fmt.Errorf("syntax error: non-type declaration")
+			}
+			return defs, nil
+		}
+		p.next()
+
+		// name
+		name, err := p.nextAndCheck(pName)
 		if err != nil {
 			return nil, err
 		}
-		if _, exists := wsDefs[def.name]; exists {
-			return nil, fmt.Errorf("multiple worksheets with name %s", def.name)
-		}
-		wsDefs[def.name] = def
-	}
 
-	return wsDefs, nil
+		// worksheet, enum
+		choice, ok := p.peekWithChoice([]*tokenPattern{
+			pWorksheet,
+			pEnum,
+		}, []string{
+			"worksheet",
+			"enum",
+		})
+		if !ok {
+			return nil, fmt.Errorf("expected worksheet, or enum")
+		}
+		p.next()
+
+		// def
+		var def NamedType
+		switch choice {
+		case "worksheet":
+			def, err = p.parseWorksheet(name)
+			if err != nil {
+				return nil, err
+			}
+		case "enum":
+			def, err = p.parseEnum(name)
+			if err != nil {
+				return nil, err
+			}
+		}
+		defs = append(defs, def)
+	}
 }
 
-func (p *parser) parseWorksheet() (*Definition, error) {
+func (p *parser) parseWorksheet(name string) (*Definition, error) {
 	ws := Definition{
+		name:          name,
 		fieldsByName:  make(map[string]*Field),
 		fieldsByIndex: make(map[int]*Field),
 	}
@@ -121,23 +156,7 @@ func (p *parser) parseWorksheet() (*Definition, error) {
 		panic(fmt.Sprintf("unexpected %s", err))
 	}
 
-	_, err := p.nextAndCheck(pType)
-	if err != nil {
-		return nil, err
-	}
-
-	name, err := p.nextAndCheck(pName)
-	if err != nil {
-		return nil, err
-	}
-	ws.name = name
-
-	_, err = p.nextAndCheck(pWorksheet)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = p.nextAndCheck(pLacco)
+	_, err := p.nextAndCheck(pLacco)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +203,7 @@ func (p *parser) parseField() (*Field, error) {
 		return nil, err
 	}
 
-	typ, err := p.parseType()
+	typ, err := p.parseTypeLiteral()
 	if err != nil {
 		return nil, err
 	}
@@ -231,6 +250,39 @@ func (p *parser) parseField() (*Field, error) {
 
 	return f, nil
 
+}
+
+func (p *parser) parseEnum(name string) (*EnumType, error) {
+	_, err := p.nextAndCheck(pLacco)
+	if err != nil {
+		return nil, err
+	}
+
+	var elements map[string]bool
+	for p.peek(pName) {
+		name := p.next()
+
+		_, err = p.nextAndCheck(pComma)
+		if err != nil {
+			return nil, err
+		}
+
+		if elements == nil {
+			elements = make(map[string]bool)
+		}
+		elements[name] = true
+	}
+
+	if !p.peek(pRacco) {
+		_, err = p.nextAndCheck(pName)
+		if err == nil {
+			panic("unexpected")
+		}
+		return nil, err
+	}
+	p.next()
+
+	return &EnumType{name, elements}, nil
 }
 
 // parseStatement
@@ -571,7 +623,7 @@ func (p *parser) parseRound() (*tRound, error) {
 	return &tRound{RoundingMode(mode), scale}, nil
 }
 
-func (p *parser) parseType() (Type, error) {
+func (p *parser) parseTypeLiteral() (Type, error) {
 	choice, ok := p.peekWithChoice([]*tokenPattern{
 		pName,
 		pLbracket,
@@ -622,7 +674,7 @@ func (p *parser) parseType() (Type, error) {
 			return nil, err
 		}
 
-		elementType, err := p.parseType()
+		elementType, err := p.parseTypeLiteral()
 		if err != nil {
 			return nil, err
 		}
@@ -745,6 +797,9 @@ func (p *parser) nextAndCheck(expected *tokenPattern) (string, error) {
 
 	var err error
 	if !expected.re.MatchString(token) {
+		if token == "" {
+			token = "<eof>"
+		}
 		err = fmt.Errorf("expected %s, found %s", expected.name, token)
 	}
 
@@ -790,6 +845,15 @@ func (p *parser) next() string {
 		p.toks = p.toks[:len(p.toks)-1]
 		return token
 	}
+}
+
+func (p *parser) isEof() bool {
+	token := p.next()
+	if token == "" {
+		return true
+	}
+	p.toks = append(p.toks, token)
+	return false
 }
 
 func (p *parser) peek(maybe *tokenPattern) bool {
