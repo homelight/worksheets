@@ -443,7 +443,7 @@ func (s *DbZuite) TestUpdateDetectsConcurrentModifications_onEditRecordAlreadyPr
 }
 
 func (s *DbZuite) TestSignoffPattern() {
-	defs := MustNewDefinitions(strings.NewReader(`worksheet needs_sign_off {
+	defs := MustNewDefinitions(strings.NewReader(`type needs_sign_off worksheet {
 		1:signoff_at number[0]
 		2:is_signedoff bool computed_by {
 			return signoff_at + 1 == version

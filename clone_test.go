@@ -17,7 +17,7 @@ import (
 )
 
 var cloneDefs = `
-worksheet dup_me {
+type dup_me worksheet {
 	1: value   text
 	2: v_slice []number[0]
 	3: r_slice []dup_me

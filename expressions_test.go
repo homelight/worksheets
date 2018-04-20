@@ -17,11 +17,11 @@ import (
 )
 
 var defsForSelectors = `
-worksheet child {
+type child worksheet {
 	1:name text
 }
 
-worksheet parent {
+type parent worksheet {
 	2:ref_to_child     child
 	3:refs_to_children []child
 }`
