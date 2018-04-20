@@ -1,5 +1,5 @@
 /* comments are cool */
-worksheet some_expressions {
+type some_expressions worksheet {
 	1:num number[2]
 	2:num_plus_two number[2] computed_by {
 		return num + 2 round down 2
