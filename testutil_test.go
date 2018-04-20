@@ -27,7 +27,7 @@ var (
 )
 
 // definitions
-var defs = MustNewDefinitions(strings.NewReader(`
+var defs = `
 worksheet simple {
 	83:name text
 	91:age  number[0]
@@ -64,14 +64,37 @@ worksheet with_refs {
 
 worksheet with_refs_and_cycles {
 	404:point_to_me with_refs_and_cycles
-}`))
+}`
 
 func forciblySetId(ws *Worksheet, id string) {
 	ws.data[indexId] = NewText(id)
 }
 
+type allDefs struct {
+	defs                    *Definitions
+	cloneDefs               *Definitions
+	defsForSelectors        *Definitions
+	defsCrossWs             *Definitions
+	defsCrossWsThroughSlice *Definitions
+}
+
+func newAllDefs() allDefs {
+	var s allDefs
+	s.defs = MustNewDefinitions(strings.NewReader(defs))
+	s.cloneDefs = MustNewDefinitions(strings.NewReader(cloneDefs))
+	s.defsForSelectors = MustNewDefinitions(strings.NewReader(defsForSelectors))
+	s.defsCrossWs = MustNewDefinitions(strings.NewReader(defsCrossWs))
+	s.defsCrossWsThroughSlice = MustNewDefinitions(strings.NewReader(defsCrossWsThroughSlice), defsCrossWsThroughSliceOptions)
+	return s
+}
+
 type Zuite struct {
 	suite.Suite
+	allDefs
+}
+
+func (s *Zuite) SetupSuite() {
+	s.allDefs = newAllDefs()
 }
 
 func TestRunAllTheTests(t *testing.T) {

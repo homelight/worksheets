@@ -13,12 +13,10 @@
 package worksheets
 
 import (
-	"strings"
-
 	"github.com/stretchr/testify/require"
 )
 
-var defsForSelectors = MustNewDefinitions(strings.NewReader(`
+var defsForSelectors = `
 worksheet child {
 	1:name text
 }
@@ -26,11 +24,11 @@ worksheet child {
 worksheet parent {
 	2:ref_to_child     child
 	3:refs_to_children []child
-}`))
+}`
 
 func (s *Zuite) TestSelectors() {
 	// single field
-	child := defsForSelectors.MustNewWorksheet("child")
+	child := s.defsForSelectors.MustNewWorksheet("child")
 	child.MustSet("name", alice)
 	{
 		actual, err := tSelector([]string{"name"}).compute(child)
@@ -39,7 +37,7 @@ func (s *Zuite) TestSelectors() {
 	}
 
 	// path to field
-	parent := defsForSelectors.MustNewWorksheet("parent")
+	parent := s.defsForSelectors.MustNewWorksheet("parent")
 	parent.MustSet("ref_to_child", child)
 	{
 		actual, err := tSelector([]string{"ref_to_child", "name"}).compute(parent)
@@ -60,8 +58,8 @@ func (s *Zuite) TestSelectors() {
 }
 
 func (s *Zuite) TestSelectorSliceTypes() {
-	child := defsForSelectors.MustNewWorksheet("child")
-	parent := defsForSelectors.MustNewWorksheet("parent")
+	child := s.defsForSelectors.MustNewWorksheet("child")
+	parent := s.defsForSelectors.MustNewWorksheet("parent")
 	parent.MustAppend("refs_to_children", child)
 	// even with an undefined value, slice type should match field def type
 	{

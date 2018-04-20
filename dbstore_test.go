@@ -270,7 +270,7 @@ func (s *DbZuite) TestUpdateUndefinedField() {
 func (s *DbZuite) TestProperlyLoadUndefinedField() {
 	var wsId string
 	s.MustRunTransaction(func(tx *runner.Tx) error {
-		ws := defs.MustNewWorksheet("simple")
+		ws := s.defs.MustNewWorksheet("simple")
 		wsId = ws.Id()
 		ws.MustSet("age", MustNewValue("123456"))
 

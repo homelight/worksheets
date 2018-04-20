@@ -22,7 +22,7 @@ import (
 )
 
 func (s *Zuite) TestMarshaling_simple() {
-	ws := defs.MustNewWorksheet("all_types")
+	ws := s.defs.MustNewWorksheet("all_types")
 	forciblySetId(ws, "the-id")
 	ws.MustSet("text", NewText(`some text with " and stuff`))
 	ws.MustSet("bool", NewBool(true))
@@ -44,7 +44,7 @@ func (s *Zuite) TestMarshaling_simple() {
 }
 
 func (s *Zuite) TestMarshaling_sliceOfText() {
-	ws := defs.MustNewWorksheet("all_types")
+	ws := s.defs.MustNewWorksheet("all_types")
 	forciblySetId(ws, "the-id")
 	ws.MustAppend("slice_t", alice)
 	ws.MustAppend("slice_t", bob)
@@ -60,7 +60,7 @@ func (s *Zuite) TestMarshaling_sliceOfText() {
 }
 
 func (s *Zuite) TestMarshaling_sliceWithUndefined() {
-	ws := defs.MustNewWorksheet("all_types")
+	ws := s.defs.MustNewWorksheet("all_types")
 	forciblySetId(ws, "the-id")
 	ws.MustAppend("slice_t", vUndefined)
 	ws.MustAppend("slice_t", bob)
@@ -76,10 +76,10 @@ func (s *Zuite) TestMarshaling_sliceWithUndefined() {
 }
 
 func (s *Zuite) TestMarshaling_wsRef() {
-	parent := defs.MustNewWorksheet("all_types")
+	parent := s.defs.MustNewWorksheet("all_types")
 	forciblySetId(parent, "the-parent")
 
-	child := defs.MustNewWorksheet("all_types")
+	child := s.defs.MustNewWorksheet("all_types")
 	forciblySetId(child, "the-child")
 
 	parent.MustSet("ws", child)
@@ -100,7 +100,7 @@ func (s *Zuite) TestMarshaling_wsRef() {
 }
 
 func (s *Zuite) TestMarshaling_wsRefToItself() {
-	parent := defs.MustNewWorksheet("all_types")
+	parent := s.defs.MustNewWorksheet("all_types")
 	forciblySetId(parent, "the-parent-and-child")
 
 	parent.MustSet("ws", parent)
@@ -116,13 +116,13 @@ func (s *Zuite) TestMarshaling_wsRefToItself() {
 }
 
 func (s *Zuite) TestMarshaling_sliceOfRefs() {
-	parent := defs.MustNewWorksheet("all_types")
+	parent := s.defs.MustNewWorksheet("all_types")
 	forciblySetId(parent, "the-parent")
 
-	child1 := defs.MustNewWorksheet("all_types")
+	child1 := s.defs.MustNewWorksheet("all_types")
 	forciblySetId(child1, "the-child1")
 
-	child2 := defs.MustNewWorksheet("all_types")
+	child2 := s.defs.MustNewWorksheet("all_types")
 	forciblySetId(child2, "the-child2")
 
 	parent.MustAppend("slice_ws", child1)
@@ -148,7 +148,7 @@ func (s *Zuite) TestMarshaling_sliceOfRefs() {
 }
 
 func (s *Zuite) TestMarshaling_sliceOfRefsToItself() {
-	parent := defs.MustNewWorksheet("all_types")
+	parent := s.defs.MustNewWorksheet("all_types")
 	forciblySetId(parent, "the-parent")
 
 	parent.MustAppend("slice_ws", parent)
@@ -177,13 +177,13 @@ func (s *Zuite) requireSameJson(expected string, actual []byte) {
 }
 
 func (s *Zuite) TestStructScan_onlyStarStruct() {
-	ws := defs.MustNewWorksheet("all_types")
+	ws := s.defs.MustNewWorksheet("all_types")
 	err := ws.StructScan("")
 	require.EqualError(s.T(), err, "dest must be a *struct")
 }
 
 func (s *Zuite) TestStructScan_emptyTagName() {
-	ws := defs.MustNewWorksheet("all_types")
+	ws := s.defs.MustNewWorksheet("all_types")
 
 	var data struct {
 		Text string `ws:""`
@@ -193,7 +193,7 @@ func (s *Zuite) TestStructScan_emptyTagName() {
 }
 
 func (s *Zuite) TestStructScan_notOptionalWithValue() {
-	ws := defs.MustNewWorksheet("all_types")
+	ws := s.defs.MustNewWorksheet("all_types")
 	ws.MustSet("text", NewText("hello, world!"))
 
 	var data struct {
@@ -205,7 +205,7 @@ func (s *Zuite) TestStructScan_notOptionalWithValue() {
 }
 
 func (s *Zuite) TestStructScan_notOptionalYetUndefined() {
-	ws := defs.MustNewWorksheet("all_types")
+	ws := s.defs.MustNewWorksheet("all_types")
 
 	var data struct {
 		Text string `ws:"text"`
@@ -215,7 +215,7 @@ func (s *Zuite) TestStructScan_notOptionalYetUndefined() {
 }
 
 func (s *Zuite) TestStructScan_optionalWithUndefined() {
-	ws := defs.MustNewWorksheet("all_types")
+	ws := s.defs.MustNewWorksheet("all_types")
 
 	var data struct {
 		Text *string `ws:"text"`
@@ -229,7 +229,7 @@ func (s *Zuite) TestStructScan_optionalWithUndefined() {
 }
 
 func (s *Zuite) TestStructScan_optionalWithValue() {
-	ws := defs.MustNewWorksheet("all_types")
+	ws := s.defs.MustNewWorksheet("all_types")
 	ws.MustSet("text", NewText("hello, world!"))
 
 	var data struct {
@@ -242,7 +242,7 @@ func (s *Zuite) TestStructScan_optionalWithValue() {
 }
 
 func (s *Zuite) TestStructScan_skipFieldsWithNoTag() {
-	ws := defs.MustNewWorksheet("all_types")
+	ws := s.defs.MustNewWorksheet("all_types")
 	ws.MustSet("text", NewText("hello, world!"))
 
 	var data struct {
@@ -257,7 +257,7 @@ func (s *Zuite) TestStructScan_skipFieldsWithNoTag() {
 }
 
 func (s *Zuite) TestStructScan_slicesNotSupported() {
-	ws := defs.MustNewWorksheet("all_types")
+	ws := s.defs.MustNewWorksheet("all_types")
 
 	var data struct {
 		Texts []string `ws:"slice_t"`
@@ -272,7 +272,7 @@ type allTypesStruct struct {
 }
 
 func (s *Zuite) TestStructScan_refsNotSupported() {
-	ws := defs.MustNewWorksheet("all_types")
+	ws := s.defs.MustNewWorksheet("all_types")
 
 	var parent allTypesStruct
 	err := ws.StructScan(&parent)
@@ -295,7 +295,7 @@ func (sp *special) WorksheetConvert(value Value) error {
 }
 
 func (s *Zuite) TestStructScan_worksheetConverter() {
-	ws := defs.MustNewWorksheet("all_types")
+	ws := s.defs.MustNewWorksheet("all_types")
 	ws.MustSet("text", NewText("world!"))
 
 	var data struct {
@@ -310,7 +310,7 @@ func (s *Zuite) TestStructScan_worksheetConverter() {
 }
 
 func (s *Zuite) TestStructScan_worksheetConverterWithUndefined() {
-	ws := defs.MustNewWorksheet("all_types")
+	ws := s.defs.MustNewWorksheet("all_types")
 
 	var data struct {
 		SpecialPtr *special `ws:"text"`

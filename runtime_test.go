@@ -162,7 +162,7 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 	}
 	for input, output := range cases {
 		// fixture
-		ws := defs.MustNewWorksheet("all_types")
+		ws := s.defs.MustNewWorksheet("all_types")
 		ws.MustSet("text", alice)
 		ws.MustAppend("slice_t", alice)
 		ws.MustAppend("slice_t", bob)
@@ -208,7 +208,7 @@ func (s *Zuite) TestRuntime_parseAndEvalExprExpectingFailure() {
 	}
 	for input, output := range cases {
 		// fixture
-		ws := defs.MustNewWorksheet("all_types")
+		ws := s.defs.MustNewWorksheet("all_types")
 
 		// test
 		p := newParser(strings.NewReader(input))

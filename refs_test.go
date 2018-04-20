@@ -21,24 +21,24 @@ import (
 )
 
 func (s *Zuite) TestRefsExample() {
-	ws := defs.MustNewWorksheet("with_refs")
+	ws := s.defs.MustNewWorksheet("with_refs")
 
 	require.False(s.T(), ws.MustIsSet("simple"))
 
-	simple := defs.MustNewWorksheet("simple")
+	simple := s.defs.MustNewWorksheet("simple")
 	ws.MustSet("simple", simple)
 }
 
 func (s *Zuite) TestRefsErrors_setWithWrongWorksheet() {
-	ws := defs.MustNewWorksheet("with_refs")
+	ws := s.defs.MustNewWorksheet("with_refs")
 	err := ws.Set("simple", ws)
 	require.EqualError(s.T(), err, "cannot assign value of type with_refs to field of type simple")
 }
 
 func (s *DbZuite) TestRefsSave_noDataInRefWorksheet() {
 	var (
-		ws     = defs.MustNewWorksheet("with_refs")
-		simple = defs.MustNewWorksheet("simple")
+		ws     = s.defs.MustNewWorksheet("with_refs")
+		simple = s.defs.MustNewWorksheet("simple")
 
 		wsId     = "d55cba7e-d08f-43df-bcd7-f48c2ecf6da7"
 		simpleId = "e310c9b6-fc48-4b29-8a66-eeafa9a8ec16"
@@ -115,8 +115,8 @@ func (s *DbZuite) TestRefsSave_noDataInRefWorksheet() {
 
 func (s *DbZuite) TestRefsSave_withDataInRefWorksheet() {
 	var (
-		ws     = defs.MustNewWorksheet("with_refs")
-		simple = defs.MustNewWorksheet("simple")
+		ws     = s.defs.MustNewWorksheet("with_refs")
+		simple = s.defs.MustNewWorksheet("simple")
 
 		wsId     = "d55cba7e-d08f-43df-bcd7-f48c2ecf6da7"
 		simpleId = "e310c9b6-fc48-4b29-8a66-eeafa9a8ec16"
@@ -209,8 +209,8 @@ func (s *DbZuite) TestRefsSave_withDataInRefWorksheet() {
 
 func (s *DbZuite) TestRefsSave_refWorksheetAlreadySaved() {
 	var (
-		ws     = defs.MustNewWorksheet("with_refs")
-		simple = defs.MustNewWorksheet("simple")
+		ws     = s.defs.MustNewWorksheet("with_refs")
+		simple = s.defs.MustNewWorksheet("simple")
 
 		wsId     = "d55cba7e-d08f-43df-bcd7-f48c2ecf6da7"
 		simpleId = "e310c9b6-fc48-4b29-8a66-eeafa9a8ec16"
@@ -289,8 +289,8 @@ func (s *DbZuite) TestRefsSave_refWorksheetAlreadySaved() {
 
 func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 	var (
-		ws     = defs.MustNewWorksheet("with_refs")
-		simple = defs.MustNewWorksheet("simple")
+		ws     = s.defs.MustNewWorksheet("with_refs")
+		simple = s.defs.MustNewWorksheet("simple")
 
 		wsId     = "d55cba7e-d08f-43df-bcd7-f48c2ecf6da7"
 		simpleId = "e310c9b6-fc48-4b29-8a66-eeafa9a8ec16"
@@ -399,7 +399,7 @@ func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 }
 
 func (s *DbZuite) TestRefsSave_withCycles() {
-	ws := defs.MustNewWorksheet("with_refs_and_cycles")
+	ws := s.defs.MustNewWorksheet("with_refs_and_cycles")
 	ws.MustSet("point_to_me", ws)
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -453,8 +453,8 @@ func (s *DbZuite) TestRefsLoad_noCycles() {
 	)
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
-		ws := defs.MustNewWorksheet("with_refs")
-		simple := defs.MustNewWorksheet("simple")
+		ws := s.defs.MustNewWorksheet("with_refs")
+		simple := s.defs.MustNewWorksheet("simple")
 
 		// We forcibly set both worksheets' identifiers to have a known ordering
 		// when comparing the db state.
@@ -492,7 +492,7 @@ func (s *DbZuite) TestRefsLoad_withCycles() {
 	var wsId string
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
-		ws := defs.MustNewWorksheet("with_refs_and_cycles")
+		ws := s.defs.MustNewWorksheet("with_refs_and_cycles")
 		wsId = ws.Id()
 		ws.MustSet("point_to_me", ws)
 
@@ -518,8 +518,8 @@ func (s *DbZuite) TestRefsLoad_withCycles() {
 
 func (s *DbZuite) TestRefsUpdate_updateParentNoChangeInChild() {
 	var (
-		ws       = defs.MustNewWorksheet("with_refs")
-		simple   = defs.MustNewWorksheet("simple")
+		ws       = s.defs.MustNewWorksheet("with_refs")
+		simple   = s.defs.MustNewWorksheet("simple")
 		wsId     = "d55cba7e-d08f-43df-bcd7-f48c2ecf6da7"
 		simpleId = "e310c9b6-fc48-4b29-8a66-eeafa9a8ec16"
 	)
@@ -636,8 +636,8 @@ func (s *DbZuite) TestRefsUpdate_updateParentNoChangeInChild() {
 
 func (s *DbZuite) TestRefsUpdate_updateParentWithChangesInChild() {
 	var (
-		ws       = defs.MustNewWorksheet("with_refs")
-		simple   = defs.MustNewWorksheet("simple")
+		ws       = s.defs.MustNewWorksheet("with_refs")
+		simple   = s.defs.MustNewWorksheet("simple")
 		wsId     = "d55cba7e-d08f-43df-bcd7-f48c2ecf6da7"
 		simpleId = "e310c9b6-fc48-4b29-8a66-eeafa9a8ec16"
 	)
@@ -769,8 +769,8 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChangesInChild() {
 
 func (s *DbZuite) TestRefsUpdate_updateParentWithChildRequiringToBeSaved() {
 	var (
-		ws       = defs.MustNewWorksheet("with_refs")
-		simple   = defs.MustNewWorksheet("simple")
+		ws       = s.defs.MustNewWorksheet("with_refs")
+		simple   = s.defs.MustNewWorksheet("simple")
 		wsId     = "d55cba7e-d08f-43df-bcd7-f48c2ecf6da7"
 		simpleId = "e310c9b6-fc48-4b29-8a66-eeafa9a8ec16"
 	)

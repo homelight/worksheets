@@ -327,7 +327,7 @@ func (s *Zuite) TestComputedBy_cyclicEditsIfNoIdentCheck() {
 	require.Equal(s.T(), "undefined", ws.MustGet("b").String(), "b")
 }
 
-var defsCrossWs = MustNewDefinitions(strings.NewReader(`
+var defsCrossWs = `
 worksheet parent {
 	1:child_amount number[2] computed_by {
 		return child.amount
@@ -337,11 +337,11 @@ worksheet parent {
 
 worksheet child {
 	5:amount number[2]
-}`))
+}`
 
 func (s *Zuite) TestComputedBy_simpleCrossWsParentPointers() {
-	parent := defsCrossWs.MustNewWorksheet("parent")
-	child := defsCrossWs.MustNewWorksheet("child")
+	parent := s.defsCrossWs.MustNewWorksheet("parent")
+	child := s.defsCrossWs.MustNewWorksheet("child")
 	forciblySetId(parent, "parent-id")
 
 	require.Len(s.T(), child.parents, 0)
@@ -361,9 +361,9 @@ func (s *Zuite) TestComputedBy_simpleCrossWsParentPointers() {
 }
 
 func (s *Zuite) TestComputedBy_simpleCrossWsExample() {
-	parent := defsCrossWs.MustNewWorksheet("parent")
+	parent := s.defsCrossWs.MustNewWorksheet("parent")
 
-	child := defsCrossWs.MustNewWorksheet("child")
+	child := s.defsCrossWs.MustNewWorksheet("child")
 	child.MustSet("amount", MustNewValue("1.11"))
 	parent.MustSet("child", child)
 	require.Equal(s.T(), "1.11", parent.MustGet("child_amount").String())
@@ -397,7 +397,7 @@ func (p sumPlugin) Compute(values ...Value) Value {
 	return sum
 }
 
-var defsCrossWsThroughSlice = MustNewDefinitions(strings.NewReader(`
+var defsCrossWsThroughSlice = `
 worksheet parent {
 	10:sum_child_amount number[2] computed_by {
 		external
@@ -407,18 +407,20 @@ worksheet parent {
 
 worksheet child {
 	50:amount number[2]
-}`), Options{
+}`
+
+var defsCrossWsThroughSliceOptions = Options{
 	Plugins: map[string]map[string]ComputedBy{
 		"parent": {
 			"sum_child_amount": sumPlugin("children.amount"),
 		},
 	},
-})
+}
 
 func (s *Zuite) TestComputedBy_crossWsThroughSliceParentPointers() {
-	parent := defsCrossWsThroughSlice.MustNewWorksheet("parent")
-	child1 := defsCrossWsThroughSlice.MustNewWorksheet("child")
-	child2 := defsCrossWsThroughSlice.MustNewWorksheet("child")
+	parent := s.defsCrossWsThroughSlice.MustNewWorksheet("parent")
+	child1 := s.defsCrossWsThroughSlice.MustNewWorksheet("child")
+	child2 := s.defsCrossWsThroughSlice.MustNewWorksheet("child")
 	forciblySetId(parent, "parent-id")
 
 	require.Len(s.T(), child1.parents, 0)
@@ -454,16 +456,16 @@ func (s *Zuite) TestComputedBy_crossWsThroughSliceParentPointers() {
 }
 
 func (s *Zuite) TestComputedBy_crossWsThroughSliceExample() {
-	parent := defsCrossWsThroughSlice.MustNewWorksheet("parent")
+	parent := s.defsCrossWsThroughSlice.MustNewWorksheet("parent")
 
 	require.Equal(s.T(), "0", parent.MustGet("sum_child_amount").String())
 
-	child1 := defsCrossWsThroughSlice.MustNewWorksheet("child")
+	child1 := s.defsCrossWsThroughSlice.MustNewWorksheet("child")
 	child1.MustSet("amount", MustNewValue("1.11"))
 	parent.MustAppend("children", child1)
 	require.Equal(s.T(), "1.11", parent.MustGet("sum_child_amount").String())
 
-	child2 := defsCrossWsThroughSlice.MustNewWorksheet("child")
+	child2 := s.defsCrossWsThroughSlice.MustNewWorksheet("child")
 	child2.MustSet("amount", MustNewValue("2.22"))
 	parent.MustAppend("children", child2)
 	require.Equal(s.T(), "3.33", parent.MustGet("sum_child_amount").String())
@@ -476,7 +478,7 @@ func (s *Zuite) TestComputedBy_crossWsThroughSliceExample() {
 }
 
 func (s *DbZuite) TestComputedBy_crossWs_parentsRefsPersistence() {
-	store := NewStore(defsCrossWs)
+	store := NewStore(s.defsCrossWs)
 
 	// We create a parent, pointing to a child.
 	var (
@@ -484,9 +486,9 @@ func (s *DbZuite) TestComputedBy_crossWs_parentsRefsPersistence() {
 		childId  = "bbbbbbbb-9be5-41e4-9b56-787f52f5a198"
 	)
 	s.MustRunTransaction(func(tx *runner.Tx) error {
-		parent := defsCrossWs.MustNewWorksheet("parent")
+		parent := s.defsCrossWs.MustNewWorksheet("parent")
 		forciblySetId(parent, parentId)
-		child := defsCrossWs.MustNewWorksheet("child")
+		child := s.defsCrossWs.MustNewWorksheet("child")
 		forciblySetId(child, childId)
 		child.MustSet("amount", MustNewValue("6.66"))
 		parent.MustSet("child", child)
@@ -543,7 +545,7 @@ func (s *DbZuite) TestComputedBy_crossWs_parentsRefsPersistence() {
 }
 
 func (s *DbZuite) TestComputedBy_crossWs_twoParentsOneChildRefsPersistence() {
-	store := NewStore(defsCrossWs)
+	store := NewStore(s.defsCrossWs)
 
 	// We create two parents, pointing to the same child.
 	var (
@@ -552,11 +554,11 @@ func (s *DbZuite) TestComputedBy_crossWs_twoParentsOneChildRefsPersistence() {
 		childId   = "cccccccc-9be5-41e4-9b56-787f52f5a198"
 	)
 	s.MustRunTransaction(func(tx *runner.Tx) error {
-		parent1 := defsCrossWs.MustNewWorksheet("parent")
+		parent1 := s.defsCrossWs.MustNewWorksheet("parent")
 		forciblySetId(parent1, parent1Id)
-		parent2 := defsCrossWs.MustNewWorksheet("parent")
+		parent2 := s.defsCrossWs.MustNewWorksheet("parent")
 		forciblySetId(parent2, parent2Id)
-		child := defsCrossWs.MustNewWorksheet("child")
+		child := s.defsCrossWs.MustNewWorksheet("child")
 		forciblySetId(child, childId)
 		child.MustSet("amount", MustNewValue("6.66"))
 		parent1.MustSet("child", child)
@@ -611,7 +613,7 @@ func (s *DbZuite) TestComputedBy_crossWs_twoParentsOneChildRefsPersistence() {
 
 func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
 	var (
-		store    = NewStore(defsCrossWsThroughSlice)
+		store    = NewStore(s.defsCrossWsThroughSlice)
 		parentId = "aaaaaaaa-9be5-41e4-9b56-787f52f5a198"
 		child1Id = "bbbbbbbb-9be5-41e4-9b56-787f52f5a198"
 		child2Id = "cccccccc-9be5-41e4-9b56-787f52f5a198"
@@ -619,9 +621,9 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
 
 	// We create a parent, pointing to a child through a slice.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
-		parent := defsCrossWsThroughSlice.MustNewWorksheet("parent")
+		parent := s.defsCrossWsThroughSlice.MustNewWorksheet("parent")
 		forciblySetId(parent, parentId)
-		child1 := defsCrossWsThroughSlice.MustNewWorksheet("child")
+		child1 := s.defsCrossWsThroughSlice.MustNewWorksheet("child")
 		forciblySetId(child1, child1Id)
 		child1.MustSet("amount", MustNewValue("6.66"))
 		parent.MustAppend("children", child1)
@@ -648,7 +650,7 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
 		if err != nil {
 			return err
 		}
-		child2 := defsCrossWsThroughSlice.MustNewWorksheet("child")
+		child2 := s.defsCrossWsThroughSlice.MustNewWorksheet("child")
 		forciblySetId(child2, child2Id)
 		child2.MustSet("amount", MustNewValue("7.77"))
 		parent.MustAppend("children", child2)
@@ -696,17 +698,17 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
 
 func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence2() {
 	var (
-		store    = NewStore(defsCrossWsThroughSlice)
+		store    = NewStore(s.defsCrossWsThroughSlice)
 		parentId = "aaaaaaaa-9be5-41e4-9b56-787f52f5a198"
 		childId  = "bbbbbbbb-9be5-41e4-9b56-787f52f5a198"
 	)
 
 	// We create a parent ws, and a child ws, but we do not connect them yet.
 	s.MustRunTransaction(func(tx *runner.Tx) error {
-		parent := defsCrossWsThroughSlice.MustNewWorksheet("parent")
+		parent := s.defsCrossWsThroughSlice.MustNewWorksheet("parent")
 		forciblySetId(parent, parentId)
 
-		child := defsCrossWsThroughSlice.MustNewWorksheet("child")
+		child := s.defsCrossWsThroughSlice.MustNewWorksheet("child")
 		forciblySetId(child, childId)
 		child.MustSet("amount", MustNewValue("6.66"))
 
@@ -751,7 +753,7 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence2() {
 
 func (s *DbZuite) TestComputedBy_crossWs_updateOfChildCarriesToParent() {
 	var (
-		store    = NewStore(defsCrossWsThroughSlice)
+		store    = NewStore(s.defsCrossWsThroughSlice)
 		parentId = "aaaaaaaa-9be5-41e4-9b56-787f52f5a198"
 		child1Id = "bbbbbbbb-9be5-41e4-9b56-787f52f5a198"
 		child2Id = "cccccccc-9be5-41e4-9b56-787f52f5a198"
@@ -760,9 +762,9 @@ func (s *DbZuite) TestComputedBy_crossWs_updateOfChildCarriesToParent() {
 	// We create a parent, pointing to two children through a slice.
 	var childrenSliceId string
 	s.MustRunTransaction(func(tx *runner.Tx) error {
-		parent := defsCrossWsThroughSlice.MustNewWorksheet("parent")
-		child1 := defsCrossWsThroughSlice.MustNewWorksheet("child")
-		child2 := defsCrossWsThroughSlice.MustNewWorksheet("child")
+		parent := s.defsCrossWsThroughSlice.MustNewWorksheet("parent")
+		child1 := s.defsCrossWsThroughSlice.MustNewWorksheet("child")
+		child2 := s.defsCrossWsThroughSlice.MustNewWorksheet("child")
 		forciblySetId(parent, parentId)
 		forciblySetId(child1, child1Id)
 		forciblySetId(child2, child2Id)
