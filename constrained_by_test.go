@@ -21,7 +21,7 @@ import (
 )
 
 func (s *Zuite) TestWorksheet_constrainedBy() {
-	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {
+	defs, err := NewDefinitions(strings.NewReader(`type simple worksheet {
 		1:name text constrained_by { return name == "Alex" || name == "Wilson" }
 	}`))
 	require.NoError(s.T(), err)
@@ -40,7 +40,7 @@ func (s *Zuite) TestWorksheet_constrainedBy() {
 }
 
 func (s *Zuite) TestWorksheet_constrainedByNonBoolExpression() {
-	defs, err := NewDefinitions(strings.NewReader(`worksheet constrained_non_bool_constrained_expression {
+	defs, err := NewDefinitions(strings.NewReader(`type constrained_non_bool_constrained_expression worksheet {
 			69:some_field number[0] constrained_by { return some_field + 2 }
 	}`))
 	require.NoError(s.T(), err)
@@ -162,7 +162,7 @@ func (s *Zuite) TestWorksheet_constrainedByAndComputedBy() {
 	// a worksheet to calculate a constrived math problem, where you have 100 ft of fence
 	// and have to build a right triangle shaped enclosure that's at least 200 square feet in area.
 	// The constrained fields check both area and perimeter
-	defs, err := NewDefinitions(strings.NewReader(`worksheet constrained_and_computed {
+	defs, err := NewDefinitions(strings.NewReader(`type constrained_and_computed worksheet {
 			50:field_a number[0] constrained_by { external }
 			99:field_b number[0] constrained_by { external }
 			12:field_c number[2] computed_by { external }

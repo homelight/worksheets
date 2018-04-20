@@ -121,7 +121,7 @@ func NewDefinitions(reader io.Reader, opts ...Options) (*Definitions, error) {
 	if err != nil {
 		return nil, err
 	} else if p.next() != "" || len(defs) == 0 {
-		return nil, fmt.Errorf("expecting worksheet")
+		return nil, fmt.Errorf("expecting type")
 	}
 
 	err = processOptions(defs, opts...)

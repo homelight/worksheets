@@ -78,7 +78,7 @@ func (s *Zuite) TestTypeString() {
 }
 
 func (s *Zuite) TestWorksheetDefinition_Fields() {
-	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
+	defs, err := NewDefinitions(strings.NewReader(`type simple worksheet {1:name text}`))
 	require.NoError(s.T(), err)
 
 	ws := defs.MustNewWorksheet("simple")

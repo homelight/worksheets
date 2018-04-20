@@ -69,6 +69,7 @@ var (
 	pFalse              = newTokenPattern("false", "false")
 	pRound              = newTokenPattern("round", "round")
 	pReturn             = newTokenPattern("return", "return")
+	pType               = newTokenPattern("type", "type")
 	pUp                 = newTokenPattern(string(ModeUp), string(ModeUp))
 	pDown               = newTokenPattern(string(ModeDown), string(ModeDown))
 	pHalf               = newTokenPattern(string(ModeHalf), string(ModeHalf))
@@ -86,7 +87,7 @@ var (
 func (p *parser) parseWorksheets() (map[string]*Definition, error) {
 	wsDefs := make(map[string]*Definition)
 
-	for p.peek(pWorksheet) {
+	for p.peek(pType) {
 		def, err := p.parseWorksheet()
 		if err != nil {
 			return nil, err
@@ -120,7 +121,7 @@ func (p *parser) parseWorksheet() (*Definition, error) {
 		panic(fmt.Sprintf("unexpected %s", err))
 	}
 
-	_, err := p.nextAndCheck(pWorksheet)
+	_, err := p.nextAndCheck(pType)
 	if err != nil {
 		return nil, err
 	}
@@ -130,6 +131,11 @@ func (p *parser) parseWorksheet() (*Definition, error) {
 		return nil, err
 	}
 	ws.name = name
+
+	_, err = p.nextAndCheck(pWorksheet)
+	if err != nil {
+		return nil, err
+	}
 
 	_, err = p.nextAndCheck(pLacco)
 	if err != nil {

@@ -21,7 +21,7 @@ import (
 )
 
 func (s *Zuite) TestExample() {
-	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
+	defs, err := NewDefinitions(strings.NewReader(`type simple worksheet {1:name text}`))
 	require.NoError(s.T(), err)
 
 	ws := defs.MustNewWorksheet("simple")
@@ -51,7 +51,7 @@ func (s *Zuite) TestExample() {
 
 func (s *Zuite) TestNewDefinitionsGood() {
 	cases := []string{
-		`worksheet simple {
+		`type simple worksheet {
 			65535:index_at_max bool
 		}`,
 	}
@@ -64,62 +64,64 @@ func (s *Zuite) TestNewDefinitionsGood() {
 func (s *Zuite) TestNewDefinitionsErrors() {
 	cases := map[string]string{
 		// crap input
-		``:                `expecting worksheet`,
-		` `:               `expecting worksheet`,
-		`some text`:       `expecting worksheet`,
-		`not a worksheet`: `expecting worksheet`,
-		`work sheet`:      `expecting worksheet`,
+		``:                `expecting type`,
+		` `:               `expecting type`,
+		`some text`:       `expecting type`,
+		`not a worksheet`: `expecting type`,
+		`work sheet`:      `expecting type`,
+		`type {`:          `expected name, found {`,
+		`type simple {`:   `expected worksheet, found {`,
 
 		// worksheet semantics
-		`worksheet simple {
+		`type simple worksheet {
 			65536:index_too_large bool
 		}`: `simple.index_too_large: index cannot be greater than 65535`,
 
-		`worksheet simple {
+		`type simple worksheet {
 			9999999999999999999999999999999999999999999999999:index_too_large bool
 		}`: `simple.index_too_large: index cannot be greater than 65535`,
 
-		`worksheet simple {
+		`type simple worksheet {
 			0:no_can_do_with_zero bool
 		}`: `simple.no_can_do_with_zero: index cannot be zero`,
 
-		`worksheet simple {
+		`type simple worksheet {
 			42:full_name text
 			42:happy bool
 		}`: `simple.happy: index 42 cannot be reused`,
 
-		`worksheet simple {
+		`type simple worksheet {
 			42:same_name text
 			43:same_name text
 		}`: `simple.same_name: name same_name cannot be reused`,
 
-		`worksheet ref_to_worksheet {
+		`type ref_to_worksheet worksheet {
 			89:ref_here some_other_worksheet
 		}`: `ref_to_worksheet.ref_here: unknown worksheet some_other_worksheet referenced`,
 
-		`worksheet refs_to_worksheet {
+		`type refs_to_worksheet worksheet {
 			89:refs_here []some_other_worksheet
 		}`: `refs_to_worksheet.refs_here: unknown worksheet some_other_worksheet referenced`,
 
-		`worksheet refs_to_worksheet {
+		`type refs_to_worksheet worksheet {
 			89:refs_here [][]some_other_worksheet
 		}`: `refs_to_worksheet.refs_here: unknown worksheet some_other_worksheet referenced`,
 
-		`worksheet constrained_and_computed {
+		`type constrained_and_computed worksheet {
 			1:age number[0]
 			69:some_field text constrained_by { return true } computed_by { return age + 2 }
 		}`: `expected index, found computed_by`,
 
-		`worksheet computed_and_constrained {
+		`type computed_and_constrained worksheet {
 			1:age number[0]
 			69:some_field text computed_by { return age + 2 } constrained_by { return true }
 		}`: `expected index, found constrained_by`,
 
-		`worksheet constrained_invalid_arg {
+		`type constrained_invalid_arg worksheet {
 			69:some_field text constrained_by { return not_a_field == "Alex" }
 		}`: `constrained_invalid_arg.some_field references unknown arg not_a_field`,
 
-		`worksheet constrained_no_arg {
+		`type constrained_no_arg worksheet {
 			69:some_field text constrained_by { return true }
 		}`: `constrained_no_arg.some_field has no dependencies`,
 	}
@@ -130,7 +132,7 @@ func (s *Zuite) TestNewDefinitionsErrors() {
 }
 
 func (s *Zuite) TestWorksheetNew_multipleDefs() {
-	wsDefs := `worksheet one {1:name text} worksheet two {1:occupation text}`
+	wsDefs := `type one worksheet {1:name text} type two worksheet {1:occupation text}`
 	defs, err := NewDefinitions(strings.NewReader(wsDefs))
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), 2, len(defs.defs))
@@ -142,7 +144,7 @@ func (s *Zuite) TestWorksheetNew_multipleDefs() {
 }
 
 func (s *Zuite) TestWorksheetNew_multipleDefsSameName() {
-	wsDefs := `worksheet simple {1:name text} worksheet simple {1:occupation text}`
+	wsDefs := `type simple worksheet {1:name text} type simple worksheet {1:occupation text}`
 	_, err := NewDefinitions(strings.NewReader(wsDefs))
 	if assert.Error(s.T(), err) {
 		require.Equal(s.T(), "multiple worksheets with name simple", err.Error())
@@ -150,7 +152,7 @@ func (s *Zuite) TestWorksheetNew_multipleDefsSameName() {
 }
 
 func (s *Zuite) TestWorksheetNew_origEmpty() {
-	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
+	defs, err := NewDefinitions(strings.NewReader(`type simple worksheet {1:name text}`))
 	require.NoError(s.T(), err)
 
 	ws, err := defs.NewWorksheet("simple")
@@ -164,18 +166,18 @@ func (s *Zuite) TestWorksheetNew_origEmpty() {
 
 func (s *Zuite) TestWorksheetNew_refTypesMustBeResolved() {
 	defs := MustNewDefinitions(strings.NewReader(`
-		worksheet simple {
+		type simple worksheet {
 			1:me     simple
 			2:myself simple
 			3:and_i  simple
 			4:not_me even_simpler
 		}
 
-		worksheet even_simpler {
+		type even_simpler worksheet {
 			5:not_it simple
 		}
 
-		worksheet refs_in_slices {
+		type refs_in_slices worksheet {
 			6:many_simples  []simple
 			7:many_simplers [][]even_simpler
 		}`))
@@ -214,7 +216,7 @@ func (s *Zuite) TestWorksheetNew_refTypesMustBeResolved() {
 }
 
 func (s *Zuite) TestWorksheetGet_undefinedIfNoValue() {
-	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
+	defs, err := NewDefinitions(strings.NewReader(`type simple worksheet {1:name text}`))
 	require.NoError(s.T(), err)
 
 	ws, err := defs.NewWorksheet("simple")
@@ -225,7 +227,7 @@ func (s *Zuite) TestWorksheetGet_undefinedIfNoValue() {
 }
 
 func (s *Zuite) TestWorksheet_idAndVersion() {
-	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
+	defs, err := NewDefinitions(strings.NewReader(`type simple worksheet {1:name text}`))
 	require.NoError(s.T(), err)
 
 	ws, err := defs.NewWorksheet("simple")
@@ -241,7 +243,7 @@ func (s *Zuite) TestWorksheet_idAndVersion() {
 }
 
 func (s *Zuite) TestWorksheet_diff() {
-	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {1:name text}`))
+	defs, err := NewDefinitions(strings.NewReader(`type simple worksheet {1:name text}`))
 	require.NoError(s.T(), err)
 
 	ws, err := defs.NewWorksheet("simple")

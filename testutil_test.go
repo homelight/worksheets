@@ -28,12 +28,12 @@ var (
 
 // definitions
 var defs = `
-worksheet simple {
+type simple worksheet {
 	83:name text
 	91:age  number[0]
 }
 
-worksheet all_types {
+type all_types worksheet {
 	 1:text      text
 	 2:bool      bool
 	 3:num_0     number[0]
@@ -49,20 +49,20 @@ worksheet all_types {
 	 8:slice_ws  []all_types
 }
 
-worksheet with_slice {
+type with_slice worksheet {
 	42:names []text
 }
 
-worksheet with_slice_of_refs {
+type with_slice_of_refs worksheet {
 	42:many_simples []simple
 }
 
-worksheet with_refs {
+type with_refs worksheet {
 	46:some_flag bool
 	87:simple simple
 }
 
-worksheet with_refs_and_cycles {
+type with_refs_and_cycles worksheet {
 	404:point_to_me with_refs_and_cycles
 }`
 

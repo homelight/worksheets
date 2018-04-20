@@ -29,14 +29,14 @@ func (s *Zuite) TestComputedBy_externalComputedBy() {
 		expectedErr string
 	}{
 		{
-			`worksheet simple {
+			`type simple worksheet {
 				1:hello_name text computed_by { external }
 			}`,
 			nil,
 			"simple.hello_name: missing plugin for external computed_by",
 		},
 		{
-			`worksheet simple {}`,
+			`type simple worksheet {}`,
 			&Options{
 				Plugins: map[string]map[string]ComputedBy{
 					"not_so_simple": map[string]ComputedBy{
@@ -47,7 +47,7 @@ func (s *Zuite) TestComputedBy_externalComputedBy() {
 			"plugins: unknown worksheet(not_so_simple)",
 		},
 		{
-			`worksheet simple {}`,
+			`type simple worksheet {}`,
 			&Options{
 				Plugins: map[string]map[string]ComputedBy{
 					"simple": map[string]ComputedBy{
@@ -58,7 +58,7 @@ func (s *Zuite) TestComputedBy_externalComputedBy() {
 			"plugins: unknown field simple.unknown_name",
 		},
 		{
-			`worksheet simple {
+			`type simple worksheet {
 				1:name text
 			}`,
 			&Options{
@@ -71,7 +71,7 @@ func (s *Zuite) TestComputedBy_externalComputedBy() {
 			"plugins: field simple.name not externally defined",
 		},
 		{
-			`worksheet simple {
+			`type simple worksheet {
 				1:name text computed_by { external }
 				2:age number[0]
 			}`,
@@ -85,7 +85,7 @@ func (s *Zuite) TestComputedBy_externalComputedBy() {
 			"simple.name has no dependencies",
 		},
 		{
-			`worksheet simple {
+			`type simple worksheet {
 				1:name text computed_by { external }
 				2:age number[0]
 			}`,
@@ -99,11 +99,11 @@ func (s *Zuite) TestComputedBy_externalComputedBy() {
 			"simple.name references unknown arg agee",
 		},
 		{
-			`worksheet parent {
+			`type parent worksheet {
 				1:child child
 				2:name text computed_by { external }
 			}
-			worksheet child {
+			type child worksheet {
 				3:field text
 			}`,
 			&Options{
@@ -137,7 +137,7 @@ func (s *Zuite) TestComputedBy_externalComputedByPlugin() {
 			},
 		},
 	}
-	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {
+	defs, err := NewDefinitions(strings.NewReader(`type simple worksheet {
 		1:name text computed_by { external }
 		2:age number[0]
 	}`), opt)
@@ -248,7 +248,7 @@ func (s *Zuite) TestComputedBy_externalGood() {
 			},
 		},
 	}
-	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {
+	defs, err := NewDefinitions(strings.NewReader(`type simple worksheet {
 		1:name text computed_by { external }
 		2:age number[0]
 	}`), opt)
@@ -272,7 +272,7 @@ func (s *Zuite) TestComputedBy_externalGoodComplicated() {
 			},
 		},
 	}
-	defs, err := NewDefinitions(strings.NewReader(`worksheet complicated {
+	defs, err := NewDefinitions(strings.NewReader(`type complicated worksheet {
 		1:first_name text
 		2:last_name text
 		3:full_name text computed_by { external }
@@ -295,7 +295,7 @@ func (s *Zuite) TestComputedBy_externalGoodComplicated() {
 }
 
 func (s *Zuite) TestComputedBy_simpleExpressionsInWorksheet() {
-	defs, err := NewDefinitions(strings.NewReader(`worksheet simple {
+	defs, err := NewDefinitions(strings.NewReader(`type simple worksheet {
 		1:age number[0]
 		2:age_plus_two number[0] computed_by { return age + 2 }
 	}`))
@@ -308,7 +308,7 @@ func (s *Zuite) TestComputedBy_simpleExpressionsInWorksheet() {
 }
 
 func (s *Zuite) TestComputedBy_cyclicEditsIfNoIdentCheck() {
-	defs, err := NewDefinitions(strings.NewReader(`worksheet cyclic_edits {
+	defs, err := NewDefinitions(strings.NewReader(`type cyclic_edits worksheet {
 		1:right bool
 		2:a bool computed_by {
 			return b || right
@@ -328,14 +328,14 @@ func (s *Zuite) TestComputedBy_cyclicEditsIfNoIdentCheck() {
 }
 
 var defsCrossWs = `
-worksheet parent {
+type parent worksheet {
 	1:child_amount number[2] computed_by {
 		return child.amount
 	}
 	2:child child
 }
 
-worksheet child {
+type child worksheet {
 	5:amount number[2]
 }`
 
@@ -398,14 +398,14 @@ func (p sumPlugin) Compute(values ...Value) Value {
 }
 
 var defsCrossWsThroughSlice = `
-worksheet parent {
+type parent worksheet {
 	10:sum_child_amount number[2] computed_by {
 		external
 	}
 	20:children []child
 }
 
-worksheet child {
+type child worksheet {
 	50:amount number[2]
 }`
 
@@ -914,7 +914,7 @@ func (s *DbZuite) TestComputedBy_crossWs_updateOfChildCarriesToParent() {
 
 func (s *Zuite) TestComputedBy_computedByOnNewInstance() {
 	defs := MustNewDefinitions(strings.NewReader(`
-	worksheet sum_should_be_zero_on_new {
+	type sum_should_be_zero_on_new worksheet {
 		1:nums []number[0]
 		2:sum number[0] computed_by {
 			return sum(nums)
