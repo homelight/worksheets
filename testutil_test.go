@@ -13,9 +13,14 @@
 package worksheets
 
 import (
+	"database/sql"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/helloeave/dat/sqlx-runner"
+	_ "github.com/lib/pq"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -101,12 +106,189 @@ func newAllDefs() allDefs {
 type Zuite struct {
 	suite.Suite
 	allDefs
+	db    *runner.DB
+	store *DbStore
 }
 
 func (s *Zuite) SetupSuite() {
+	// init
 	s.allDefs = newAllDefs()
+
+	// db
+	dbUrl := "postgres://ws_user:@localhost/ws_test?sslmode=disable"
+	db, err := sql.Open("postgres", dbUrl)
+	if err != nil {
+		panic(err)
+	}
+	s.db = runner.NewDB(db, "postgres")
+
+	// store
+	s.store = NewStore(s.defs)
+}
+
+func (s *Zuite) SetupTest() {
+	for table := range tableToEntities {
+		_, err := s.db.Exec(fmt.Sprintf("truncate %s", table))
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
+func (s *Zuite) TearDownSuite() {
+	err := s.db.DB.Close()
+	if err != nil {
+		panic(err)
+	}
 }
 
 func TestRunAllTheTests(t *testing.T) {
 	suite.Run(t, new(Zuite))
+}
+
+func (s *Zuite) RunTransaction(fn func(tx *runner.Tx) error) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.AutoRollback()
+
+	err = fn(tx)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (s *Zuite) MustRunTransaction(fn func(tx *runner.Tx) error) {
+	err := s.RunTransaction(fn)
+	require.NoError(s.T(), err)
+}
+
+type fakeClock struct {
+	now int64
+}
+
+// Assert that fakeClock implements the clock interface.
+var _ clock = &fakeClock{}
+
+func (fc *fakeClock) nowAsUnixNano() int64 {
+	return fc.now
+}
+
+type rValueForTesting struct {
+	WorksheetId string
+	Index       int
+	FromVersion int
+	ToVersion   int
+	Value       string
+	IsUndefined bool
+}
+
+type rSliceElementForTesting struct {
+	SliceId     string
+	Rank        int
+	FromVersion int
+	ToVersion   int
+	Value       string
+	IsUndefined bool
+}
+
+type dbState struct {
+	wsRecs            []rWorksheet
+	editRecs          []rEdit
+	valuesRecs        []rValueForTesting
+	parentsRecs       []rParent
+	sliceElementsRecs []rSliceElementForTesting
+}
+
+func (s *Zuite) snapshotDbState() *dbState {
+	var (
+		err                 error
+		wsRecs              []rWorksheet
+		editRecs            []rEdit
+		dbValuesRecs        []rValue
+		parentsRecs         []rParent
+		dbSliceElementsRecs []rSliceElement
+	)
+
+	err = s.db.
+		Select("*").
+		From("worksheets").
+		OrderBy("id").
+		QueryStructs(&wsRecs)
+	require.NoError(s.T(), err)
+
+	err = s.db.
+		Select("*").
+		From("worksheet_edits").
+		OrderBy("worksheet_id, to_version").
+		QueryStructs(&editRecs)
+	require.NoError(s.T(), err)
+
+	err = s.db.
+		Select("*").
+		From("worksheet_values").
+		OrderBy("worksheet_id, index, from_version").
+		QueryStructs(&dbValuesRecs)
+	require.NoError(s.T(), err)
+
+	err = s.db.
+		Select("*").
+		From("worksheet_parents").
+		OrderBy("child_id, parent_id, parent_field_index").
+		QueryStructs(&parentsRecs)
+	require.NoError(s.T(), err)
+
+	err = s.db.
+		Select("*").
+		From("worksheet_slice_elements").
+		OrderBy("slice_id, rank, from_version").
+		QueryStructs(&dbSliceElementsRecs)
+	require.NoError(s.T(), err)
+
+	// rValue to rValueForTesting
+	valuesRecs := make([]rValueForTesting, len(dbValuesRecs))
+	for i, dbValueRec := range dbValuesRecs {
+		valuesRecs[i] = rValueForTesting{
+			WorksheetId: dbValueRec.WorksheetId,
+			Index:       dbValueRec.Index,
+			FromVersion: dbValueRec.FromVersion,
+			ToVersion:   dbValueRec.ToVersion,
+		}
+		if dbValueRec.Value != nil {
+			valuesRecs[i].Value = *dbValueRec.Value
+		} else {
+			valuesRecs[i].IsUndefined = true
+		}
+	}
+
+	// rSliceElement to rSliceElementForTesting
+	sliceElementsRecs := make([]rSliceElementForTesting, len(dbSliceElementsRecs))
+	for i, dbSliceElementRec := range dbSliceElementsRecs {
+		sliceElementsRecs[i] = rSliceElementForTesting{
+			SliceId:     dbSliceElementRec.SliceId,
+			Rank:        dbSliceElementRec.Rank,
+			FromVersion: dbSliceElementRec.FromVersion,
+			ToVersion:   dbSliceElementRec.ToVersion,
+		}
+		if dbSliceElementRec.Value != nil {
+			sliceElementsRecs[i].Value = *dbSliceElementRec.Value
+		} else {
+			sliceElementsRecs[i].IsUndefined = true
+		}
+	}
+
+	return &dbState{
+		wsRecs:            wsRecs,
+		editRecs:          editRecs,
+		valuesRecs:        valuesRecs,
+		parentsRecs:       parentsRecs,
+		sliceElementsRecs: sliceElementsRecs,
+	}
+}
+
+func p(v string) *string {
+	return &v
 }

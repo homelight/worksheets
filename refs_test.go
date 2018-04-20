@@ -35,7 +35,7 @@ func (s *Zuite) TestRefsErrors_setWithWrongWorksheet() {
 	require.EqualError(s.T(), err, "cannot assign value of type with_refs to field of type simple")
 }
 
-func (s *DbZuite) TestRefsSave_noDataInRefWorksheet() {
+func (s *Zuite) TestRefsSave_noDataInRefWorksheet() {
 	var (
 		ws     = s.defs.MustNewWorksheet("with_refs")
 		simple = s.defs.MustNewWorksheet("simple")
@@ -113,7 +113,7 @@ func (s *DbZuite) TestRefsSave_noDataInRefWorksheet() {
 	require.Empty(s.T(), ws.diff())
 }
 
-func (s *DbZuite) TestRefsSave_withDataInRefWorksheet() {
+func (s *Zuite) TestRefsSave_withDataInRefWorksheet() {
 	var (
 		ws     = s.defs.MustNewWorksheet("with_refs")
 		simple = s.defs.MustNewWorksheet("simple")
@@ -207,7 +207,7 @@ func (s *DbZuite) TestRefsSave_withDataInRefWorksheet() {
 	require.Empty(s.T(), ws.diff())
 }
 
-func (s *DbZuite) TestRefsSave_refWorksheetAlreadySaved() {
+func (s *Zuite) TestRefsSave_refWorksheetAlreadySaved() {
 	var (
 		ws     = s.defs.MustNewWorksheet("with_refs")
 		simple = s.defs.MustNewWorksheet("simple")
@@ -287,7 +287,7 @@ func (s *DbZuite) TestRefsSave_refWorksheetAlreadySaved() {
 	require.Empty(s.T(), ws.diff())
 }
 
-func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
+func (s *Zuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 	var (
 		ws     = s.defs.MustNewWorksheet("with_refs")
 		simple = s.defs.MustNewWorksheet("simple")
@@ -398,7 +398,7 @@ func (s *DbZuite) TestRefsSave_refWorksheetCascadesAnUpdate() {
 	require.Empty(s.T(), ws.diff())
 }
 
-func (s *DbZuite) TestRefsSave_withCycles() {
+func (s *Zuite) TestRefsSave_withCycles() {
 	ws := s.defs.MustNewWorksheet("with_refs_and_cycles")
 	ws.MustSet("point_to_me", ws)
 
@@ -446,7 +446,7 @@ func (s *DbZuite) TestRefsSave_withCycles() {
 	require.Empty(s.T(), ws.diff())
 }
 
-func (s *DbZuite) TestRefsLoad_noCycles() {
+func (s *Zuite) TestRefsLoad_noCycles() {
 	var (
 		wsId     = "d55cba7e-d08f-43df-bcd7-f48c2ecf6da7"
 		simpleId = "e310c9b6-fc48-4b29-8a66-eeafa9a8ec16"
@@ -488,7 +488,7 @@ func (s *DbZuite) TestRefsLoad_noCycles() {
 	require.Equal(s.T(), `"Bob"`, simple.MustGet("name").String())
 }
 
-func (s *DbZuite) TestRefsLoad_withCycles() {
+func (s *Zuite) TestRefsLoad_withCycles() {
 	var wsId string
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -516,7 +516,7 @@ func (s *DbZuite) TestRefsLoad_withCycles() {
 	require.True(s.T(), fresh == value)
 }
 
-func (s *DbZuite) TestRefsUpdate_updateParentNoChangeInChild() {
+func (s *Zuite) TestRefsUpdate_updateParentNoChangeInChild() {
 	var (
 		ws       = s.defs.MustNewWorksheet("with_refs")
 		simple   = s.defs.MustNewWorksheet("simple")
@@ -634,7 +634,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentNoChangeInChild() {
 	require.Empty(s.T(), ws.diff())
 }
 
-func (s *DbZuite) TestRefsUpdate_updateParentWithChangesInChild() {
+func (s *Zuite) TestRefsUpdate_updateParentWithChangesInChild() {
 	var (
 		ws       = s.defs.MustNewWorksheet("with_refs")
 		simple   = s.defs.MustNewWorksheet("simple")
@@ -767,7 +767,7 @@ func (s *DbZuite) TestRefsUpdate_updateParentWithChangesInChild() {
 	require.Empty(s.T(), ws.diff())
 }
 
-func (s *DbZuite) TestRefsUpdate_updateParentWithChildRequiringToBeSaved() {
+func (s *Zuite) TestRefsUpdate_updateParentWithChildRequiringToBeSaved() {
 	var (
 		ws       = s.defs.MustNewWorksheet("with_refs")
 		simple   = s.defs.MustNewWorksheet("simple")

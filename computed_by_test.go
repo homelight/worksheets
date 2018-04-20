@@ -477,7 +477,7 @@ func (s *Zuite) TestComputedBy_crossWsThroughSliceExample() {
 	require.Equal(s.T(), "0", parent.MustGet("sum_child_amount").String())
 }
 
-func (s *DbZuite) TestComputedBy_crossWs_parentsRefsPersistence() {
+func (s *Zuite) TestComputedBy_crossWs_parentsRefsPersistence() {
 	store := NewStore(s.defsCrossWs)
 
 	// We create a parent, pointing to a child.
@@ -544,7 +544,7 @@ func (s *DbZuite) TestComputedBy_crossWs_parentsRefsPersistence() {
 	require.Empty(s.T(), snap.parentsRecs)
 }
 
-func (s *DbZuite) TestComputedBy_crossWs_twoParentsOneChildRefsPersistence() {
+func (s *Zuite) TestComputedBy_crossWs_twoParentsOneChildRefsPersistence() {
 	store := NewStore(s.defsCrossWs)
 
 	// We create two parents, pointing to the same child.
@@ -611,7 +611,7 @@ func (s *DbZuite) TestComputedBy_crossWs_twoParentsOneChildRefsPersistence() {
 	}, snap.parentsRecs)
 }
 
-func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
+func (s *Zuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
 	var (
 		store    = NewStore(s.defsCrossWsThroughSlice)
 		parentId = "aaaaaaaa-9be5-41e4-9b56-787f52f5a198"
@@ -696,7 +696,7 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
 	}, snap.parentsRecs)
 }
 
-func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence2() {
+func (s *Zuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence2() {
 	var (
 		store    = NewStore(s.defsCrossWsThroughSlice)
 		parentId = "aaaaaaaa-9be5-41e4-9b56-787f52f5a198"
@@ -751,7 +751,7 @@ func (s *DbZuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence2() {
 	}, snap.parentsRecs)
 }
 
-func (s *DbZuite) TestComputedBy_crossWs_updateOfChildCarriesToParent() {
+func (s *Zuite) TestComputedBy_crossWs_updateOfChildCarriesToParent() {
 	var (
 		store    = NewStore(s.defsCrossWsThroughSlice)
 		parentId = "aaaaaaaa-9be5-41e4-9b56-787f52f5a198"
