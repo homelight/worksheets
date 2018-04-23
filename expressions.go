@@ -310,7 +310,16 @@ type fnArgs struct {
 	errs   []error
 }
 
-func newFnArgs(ws *Worksheet, exprs []expression) *fnArgs {
+func newFnArgs(ws *Worksheet, values []Value) *fnArgs {
+	return &fnArgs{
+		ws:     ws,
+		exprs:  make([]expression, len(values)),
+		values: values,
+		errs:   make([]error, len(values)),
+	}
+}
+
+func newLazyFnArgs(ws *Worksheet, exprs []expression) *fnArgs {
 	args := fnArgs{
 		ws:     ws,
 		exprs:  make([]expression, len(exprs)),
@@ -322,7 +331,7 @@ func newFnArgs(ws *Worksheet, exprs []expression) *fnArgs {
 }
 
 func (args *fnArgs) checkArgsNum(nums ...int) error {
-	actual := len(args.exprs)
+	actual := args.num()
 	if len(nums) == 1 {
 		// exact
 		num := nums[0]
@@ -332,17 +341,34 @@ func (args *fnArgs) checkArgsNum(nums ...int) error {
 	} else {
 		// min - max
 		min, max := nums[0], nums[1]
-		if actual < min {
-			return fmt.Errorf("at least %d argument(s) expected but only %d found", min, actual)
-		} else if max < actual {
+		if err := args.checkMinArgsNum(min); err != nil {
+			return err
+		}
+		if max < actual {
 			return fmt.Errorf("at most %d argument(s) expected but %d found", max, actual)
 		}
 	}
 	return nil
 }
 
+func (args *fnArgs) checkMinArgsNum(min int) error {
+	actual := args.num()
+	if actual < min {
+		if actual == 0 {
+			return fmt.Errorf("at least %d argument(s) expected but none found", min)
+		} else {
+			return fmt.Errorf("at least %d argument(s) expected but only %d found", min, actual)
+		}
+	}
+	return nil
+}
+
+func (args *fnArgs) num() int {
+	return len(args.exprs)
+}
+
 func (args *fnArgs) has(index int) bool {
-	return index < len(args.exprs)
+	return index < args.num()
 }
 
 func (args *fnArgs) get(index int) (Value, error) {
@@ -488,6 +514,28 @@ var functions = map[string]func(args *fnArgs) (Value, error){
 			}
 		}
 	},
+	"first_of": rFirstOf,
+}
+
+func rFirstOf(args *fnArgs) (Value, error) {
+	if err := args.checkMinArgsNum(1); err != nil {
+		return nil, err
+	}
+	for i := 0; i < args.num(); i++ {
+		arg, err := args.get(i)
+		if err != nil {
+			return nil, err
+		}
+		switch a := arg.(type) {
+		case *Slice:
+			return rFirstOf(newFnArgs(args.ws, a.Elements()))
+		case *Undefined:
+			continue
+		default:
+			return a, nil
+		}
+	}
+	return vUndefined, nil
 }
 
 func (e *tCall) compute(ws *Worksheet) (Value, error) {
@@ -496,7 +544,7 @@ func (e *tCall) compute(ws *Worksheet) (Value, error) {
 		return nil, fmt.Errorf("unknown function %s", e.name)
 	}
 
-	value, err := fn(newFnArgs(ws, e.args))
+	value, err := fn(newLazyFnArgs(ws, e.args))
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", e.name, err)
 	}
