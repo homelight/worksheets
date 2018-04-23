@@ -141,8 +141,40 @@ func NewNumberFromInt(num int) *Number {
 	return &Number{int64(num), &NumberType{0}}
 }
 
+func NewNumberFromInt8(num int8) *Number {
+	return &Number{int64(num), &NumberType{0}}
+}
+
+func NewNumberFromInt16(num int16) *Number {
+	return &Number{int64(num), &NumberType{0}}
+}
+
+func NewNumberFromInt32(num int32) *Number {
+	return &Number{int64(num), &NumberType{0}}
+}
+
 func NewNumberFromInt64(num int64) *Number {
 	return &Number{num, &NumberType{0}}
+}
+
+func NewNumberFromUint(num uint) *Number {
+	return &Number{int64(num), &NumberType{0}}
+}
+
+func NewNumberFromUint8(num uint8) *Number {
+	return &Number{int64(num), &NumberType{0}}
+}
+
+func NewNumberFromUint16(num uint16) *Number {
+	return &Number{int64(num), &NumberType{0}}
+}
+
+func NewNumberFromUint32(num uint32) *Number {
+	return &Number{int64(num), &NumberType{0}}
+}
+
+func NewNumberFromFloat32(num float32) *Number {
+	return NewNumberFromFloat64(float64(num))
 }
 
 func NewNumberFromFloat64(num float64) *Number {

@@ -258,7 +258,7 @@ func (s *Zuite) TestComputedBy_externalGood() {
 
 	require.False(s.T(), ws.MustIsSet("name"))
 
-	ws.MustSet("age", MustNewValue("73"))
+	ws.MustSet("age", NewNumberFromInt(73))
 	require.Equal(s.T(), `"Alice"`, ws.MustGet("name").String())
 }
 
@@ -288,7 +288,7 @@ func (s *Zuite) TestComputedBy_externalGoodComplicated() {
 
 	ws.MustSet("first_name", NewText("Alice"))
 	ws.MustSet("last_name", NewText("Maters"))
-	ws.MustSet("birth_year", MustNewValue("1945"))
+	ws.MustSet("birth_year", NewNumberFromInt(1945))
 	require.Equal(s.T(), `"Alice Maters"`, ws.MustGet("full_name").String())
 	require.Equal(s.T(), `73`, ws.MustGet("age").String())
 	require.Equal(s.T(), `"Alice Maters, age 73, born in 1945"`, ws.MustGet("bio").String())
@@ -303,7 +303,7 @@ func (s *Zuite) TestComputedBy_simpleExpressionsInWorksheet() {
 
 	ws := defs.MustNewWorksheet("simple")
 
-	ws.MustSet("age", MustNewValue("73"))
+	ws.MustSet("age", NewNumberFromInt(73))
 	require.Equal(s.T(), "75", ws.MustGet("age_plus_two").String())
 }
 
@@ -321,7 +321,7 @@ func (s *Zuite) TestComputedBy_cyclicEditsIfNoIdentCheck() {
 
 	ws := defs.MustNewWorksheet("cyclic_edits")
 
-	ws.MustSet("right", MustNewValue("true"))
+	ws.MustSet("right", NewBool(true))
 	require.Equal(s.T(), "true", ws.MustGet("right").String(), "right")
 	require.Equal(s.T(), "undefined", ws.MustGet("a").String(), "a")
 	require.Equal(s.T(), "undefined", ws.MustGet("b").String(), "b")
@@ -364,11 +364,11 @@ func (s *Zuite) TestComputedBy_simpleCrossWsExample() {
 	parent := s.defsCrossWs.MustNewWorksheet("parent")
 
 	child := s.defsCrossWs.MustNewWorksheet("child")
-	child.MustSet("amount", MustNewValue("1.11"))
+	child.MustSet("amount", NewNumberFromFloat64(1.11))
 	parent.MustSet("child", child)
 	require.Equal(s.T(), "1.11", parent.MustGet("child_amount").String())
 
-	child.MustSet("amount", MustNewValue("2.22"))
+	child.MustSet("amount", NewNumberFromFloat64(2.22))
 	require.Equal(s.T(), "2.22", parent.MustGet("child_amount").String())
 
 	parent.MustUnset("child")
@@ -386,7 +386,7 @@ func (p sumPlugin) Args() []string {
 
 func (p sumPlugin) Compute(values ...Value) Value {
 	slice := values[0].(*Slice)
-	sum := MustNewValue("0").(*Number)
+	sum := NewNumberFromInt(0)
 	for _, elem := range slice.Elements() {
 		if num, ok := elem.(*Number); ok {
 			sum = sum.Plus(num)
@@ -461,12 +461,12 @@ func (s *Zuite) TestComputedBy_crossWsThroughSliceExample() {
 	require.Equal(s.T(), "0", parent.MustGet("sum_child_amount").String())
 
 	child1 := s.defsCrossWsThroughSlice.MustNewWorksheet("child")
-	child1.MustSet("amount", MustNewValue("1.11"))
+	child1.MustSet("amount", NewNumberFromFloat64(1.11))
 	parent.MustAppend("children", child1)
 	require.Equal(s.T(), "1.11", parent.MustGet("sum_child_amount").String())
 
 	child2 := s.defsCrossWsThroughSlice.MustNewWorksheet("child")
-	child2.MustSet("amount", MustNewValue("2.22"))
+	child2.MustSet("amount", NewNumberFromFloat64(2.22))
 	parent.MustAppend("children", child2)
 	require.Equal(s.T(), "3.33", parent.MustGet("sum_child_amount").String())
 
@@ -490,7 +490,7 @@ func (s *Zuite) TestComputedBy_crossWs_parentsRefsPersistence() {
 		forciblySetId(parent, parentId)
 		child := s.defsCrossWs.MustNewWorksheet("child")
 		forciblySetId(child, childId)
-		child.MustSet("amount", MustNewValue("6.66"))
+		child.MustSet("amount", NewNumberFromFloat64(6.66))
 		parent.MustSet("child", child)
 		session := store.Open(tx)
 		_, err := session.Save(parent)
@@ -560,7 +560,7 @@ func (s *Zuite) TestComputedBy_crossWs_twoParentsOneChildRefsPersistence() {
 		forciblySetId(parent2, parent2Id)
 		child := s.defsCrossWs.MustNewWorksheet("child")
 		forciblySetId(child, childId)
-		child.MustSet("amount", MustNewValue("6.66"))
+		child.MustSet("amount", NewNumberFromFloat64(6.66))
 		parent1.MustSet("child", child)
 		parent2.MustSet("child", child)
 
@@ -625,7 +625,7 @@ func (s *Zuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
 		forciblySetId(parent, parentId)
 		child1 := s.defsCrossWsThroughSlice.MustNewWorksheet("child")
 		forciblySetId(child1, child1Id)
-		child1.MustSet("amount", MustNewValue("6.66"))
+		child1.MustSet("amount", NewNumberFromFloat64(6.66))
 		parent.MustAppend("children", child1)
 		session := store.Open(tx)
 		_, err := session.Save(parent)
@@ -652,7 +652,7 @@ func (s *Zuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence1() {
 		}
 		child2 := s.defsCrossWsThroughSlice.MustNewWorksheet("child")
 		forciblySetId(child2, child2Id)
-		child2.MustSet("amount", MustNewValue("7.77"))
+		child2.MustSet("amount", NewNumberFromFloat64(7.77))
 		parent.MustAppend("children", child2)
 		_, err = session.Update(parent)
 		return err
@@ -710,7 +710,7 @@ func (s *Zuite) TestComputedBy_crossWs_parentWithSlicesRefsPersistence2() {
 
 		child := s.defsCrossWsThroughSlice.MustNewWorksheet("child")
 		forciblySetId(child, childId)
-		child.MustSet("amount", MustNewValue("6.66"))
+		child.MustSet("amount", NewNumberFromFloat64(6.66))
 
 		session := store.Open(tx)
 		if _, err := session.Save(parent); err != nil {
@@ -768,8 +768,8 @@ func (s *Zuite) TestComputedBy_crossWs_updateOfChildCarriesToParent() {
 		forciblySetId(parent, parentId)
 		forciblySetId(child1, child1Id)
 		forciblySetId(child2, child2Id)
-		child1.MustSet("amount", MustNewValue("6.66"))
-		child2.MustSet("amount", MustNewValue("7.77"))
+		child1.MustSet("amount", NewNumberFromFloat64(6.66))
+		child2.MustSet("amount", NewNumberFromFloat64(7.77))
 		parent.MustAppend("children", child1)
 		parent.MustAppend("children", child2)
 		childrenSliceId = parent.data[20].(*Slice).id
@@ -786,7 +786,7 @@ func (s *Zuite) TestComputedBy_crossWs_updateOfChildCarriesToParent() {
 		if err != nil {
 			return err
 		}
-		child2.MustSet("amount", MustNewValue("8.88"))
+		child2.MustSet("amount", NewNumberFromFloat64(8.88))
 		_, err = session.Update(child2)
 		return err
 	})

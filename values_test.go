@@ -19,7 +19,7 @@ import (
 func (s *Zuite) TestValueString() {
 	ws := s.defs.MustNewWorksheet("simple")
 	ws.MustSet("name", alice)
-	ws.MustSet("age", MustNewValue("73"))
+	ws.MustSet("age", NewNumberFromInt(73))
 
 	cases := map[Value]string{
 		vUndefined: "undefined",
@@ -60,16 +60,16 @@ func (s *Zuite) TestValueEqual() {
 			NewUndefined(),
 		},
 		{
-			MustNewValue("1"),
-			MustNewValue("1"),
-			MustNewValue("1.0"),
-			MustNewValue("1.000"),
+			&Number{1, &NumberType{0}},
+			&Number{1, &NumberType{0}},
+			&Number{10, &NumberType{1}},
+			&Number{1000, &NumberType{3}},
 		},
 		{
-			MustNewValue("0"),
-			MustNewValue("0"),
-			MustNewValue("-0"),
-			MustNewValue("0.000"),
+			&Number{0, &NumberType{0}},
+			&Number{0, &NumberType{1}},
+			&Number{0, &NumberType{2}},
+			&Number{0, &NumberType{3}},
 		},
 		{
 			NewText("Alice"),
@@ -119,167 +119,176 @@ func (s *Zuite) TestValueEqual() {
 
 func (s *Zuite) TestNumber_Plus() {
 	cases := []struct {
-		left, right, expected *Number
+		left, right *Number
+		expected    string
 	}{
 		{
-			left:     MustNewValue("2").(*Number),
-			right:    MustNewValue("3").(*Number),
-			expected: MustNewValue("5").(*Number),
+			left:     NewNumberFromInt(2),
+			right:    NewNumberFromInt(3),
+			expected: "5",
 		},
 		{
-			left:     MustNewValue("2.0").(*Number),
-			right:    MustNewValue("3").(*Number),
-			expected: MustNewValue("5.0").(*Number),
+			left:     NewNumberFromInt(2).Round(ModeHalf, 1),
+			right:    NewNumberFromInt(3),
+			expected: "5.0",
 		},
 		{
-			left:     MustNewValue("2.0").(*Number),
-			right:    MustNewValue("3.0").(*Number),
-			expected: MustNewValue("5.0").(*Number),
+			left:     NewNumberFromInt(2).Round(ModeHalf, 1),
+			right:    NewNumberFromInt(3).Round(ModeHalf, 1),
+			expected: "5.0",
 		},
 	}
 	for _, ex := range cases {
 		actual := ex.left.Plus(ex.right)
-		assert.Equal(s.T(), ex.expected, actual, "%s + %s", ex.left, ex.right)
+		assert.Equal(s.T(), ex.expected, actual.String(), "%s + %s", ex.left, ex.right)
 
 		actual = ex.right.Plus(ex.left)
-		assert.Equal(s.T(), ex.expected, actual, "%s + %s", ex.right, ex.left)
+		assert.Equal(s.T(), ex.expected, actual.String(), "%s + %s", ex.right, ex.left)
 	}
 }
 
 func (s *Zuite) TestNumber_Minus() {
 	cases := []struct {
-		left, right, expected *Number
+		left, right *Number
+		expected    string
 	}{
 		{
-			left:     MustNewValue("2").(*Number),
-			right:    MustNewValue("3").(*Number),
-			expected: MustNewValue("-1").(*Number),
+			left:     NewNumberFromInt(2),
+			right:    NewNumberFromInt(3),
+			expected: "-1",
 		},
 		{
-			left:     MustNewValue("2.0").(*Number),
-			right:    MustNewValue("3").(*Number),
-			expected: MustNewValue("-1.0").(*Number),
+			left:     NewNumberFromInt(2).Round(ModeHalf, 1),
+			right:    NewNumberFromInt(3),
+			expected: "-1.0",
 		},
 		{
-			left:     MustNewValue("2.0").(*Number),
-			right:    MustNewValue("3.0").(*Number),
-			expected: MustNewValue("-1.0").(*Number),
+			left:     NewNumberFromInt(2).Round(ModeHalf, 1),
+			right:    NewNumberFromInt(3).Round(ModeHalf, 1),
+			expected: "-1.0",
 		},
 	}
 	for _, ex := range cases {
 		actual := ex.left.Minus(ex.right)
-		assert.Equal(s.T(), ex.expected, actual, "%s + %s", ex.left, ex.right)
+		assert.Equal(s.T(), ex.expected, actual.String(), "%s + %s", ex.left, ex.right)
 	}
 }
 
 func (s *Zuite) TestNumber_Mult() {
 	cases := []struct {
-		left, right, expected *Number
+		left, right *Number
+		expected    string
 	}{
 		{
-			left:     MustNewValue("2").(*Number),
-			right:    MustNewValue("3").(*Number),
-			expected: MustNewValue("6").(*Number),
+			left:     NewNumberFromInt(2),
+			right:    NewNumberFromInt(3),
+			expected: "6",
 		},
 		{
-			left:     MustNewValue("2.0").(*Number),
-			right:    MustNewValue("3").(*Number),
-			expected: MustNewValue("6.0").(*Number),
+			left:     NewNumberFromInt(2).Round(ModeHalf, 1),
+			right:    NewNumberFromInt(3),
+			expected: "6.0",
 		},
 		{
-			left:     MustNewValue("2.0").(*Number),
-			right:    MustNewValue("3.0").(*Number),
-			expected: MustNewValue("6.00").(*Number),
+			left:     NewNumberFromInt(2).Round(ModeHalf, 1),
+			right:    NewNumberFromInt(3).Round(ModeHalf, 1),
+			expected: "6.00",
 		},
 	}
 	for _, ex := range cases {
 		actual := ex.left.Mult(ex.right)
-		assert.Equal(s.T(), ex.expected, actual, "%s + %s", ex.left, ex.right)
+		assert.Equal(s.T(), ex.expected, actual.String(), "%s + %s", ex.left, ex.right)
 
 		actual = ex.right.Mult(ex.left)
-		assert.Equal(s.T(), ex.expected, actual, "%s + %s", ex.right, ex.left)
+		assert.Equal(s.T(), ex.expected, actual.String(), "%s + %s", ex.right, ex.left)
 	}
 }
 
 func (s *Zuite) TestNumber_Round() {
 	cases := []struct {
-		value, expected *Number
-		round           *tRound
+		value    *Number
+		round    *tRound
+		expected string
 	}{
 		// down
 		{
-			value:    MustNewValue("2.34").(*Number),
+			value:    NewNumberFromFloat64(2.34),
 			round:    &tRound{"down", 2},
-			expected: MustNewValue("2.34").(*Number),
+			expected: "2.34",
 		},
 		{
-			value:    MustNewValue("2.34").(*Number),
+			value:    NewNumberFromFloat64(2.34),
 			round:    &tRound{"down", 3},
-			expected: MustNewValue("2.340").(*Number),
+			expected: "2.340",
 		},
 		{
-			value:    MustNewValue("2.34").(*Number),
+			value:    NewNumberFromFloat64(2.34),
 			round:    &tRound{"down", 1},
-			expected: MustNewValue("2.3").(*Number),
+			expected: "2.3",
 		},
 
 		// up
 		{
-			value:    MustNewValue("2.34").(*Number),
+			value:    NewNumberFromFloat64(2.34),
 			round:    &tRound{"up", 1},
-			expected: MustNewValue("2.4").(*Number),
+			expected: "2.4",
 		},
 		{
-			value:    MustNewValue("2.00").(*Number),
+			value:    &Number{2, &NumberType{0}},
 			round:    &tRound{"up", 1},
-			expected: MustNewValue("2.0").(*Number),
+			expected: "2.0",
+		},
+		{
+			value:    &Number{200, &NumberType{2}},
+			round:    &tRound{"up", 1},
+			expected: "2.0",
 		},
 
 		// half
 		{
-			value:    MustNewValue("2.34").(*Number),
+			value:    NewNumberFromFloat64(2.34),
 			round:    &tRound{"half", 1},
-			expected: MustNewValue("2.3").(*Number),
+			expected: "2.3",
 		},
 		{
-			value:    MustNewValue("2.35").(*Number),
+			value:    NewNumberFromFloat64(2.35),
 			round:    &tRound{"half", 1},
-			expected: MustNewValue("2.4").(*Number),
+			expected: "2.4",
 		},
 		{
-			value:    MustNewValue("-2.34").(*Number),
+			value:    NewNumberFromFloat64(-2.34),
 			round:    &tRound{"half", 1},
-			expected: MustNewValue("-2.3").(*Number),
+			expected: "-2.3",
 		},
 		{
-			value:    MustNewValue("-2.35").(*Number),
+			value:    NewNumberFromFloat64(-2.35),
 			round:    &tRound{"half", 1},
-			expected: MustNewValue("-2.4").(*Number),
+			expected: "-2.4",
 		},
 		{
-			value:    MustNewValue("2.304").(*Number),
+			value:    NewNumberFromFloat64(2.304),
 			round:    &tRound{"half", 2},
-			expected: MustNewValue("2.30").(*Number),
+			expected: "2.30",
 		},
 		{
-			value:    MustNewValue("2.305").(*Number),
+			value:    NewNumberFromFloat64(2.305),
 			round:    &tRound{"half", 2},
-			expected: MustNewValue("2.31").(*Number),
+			expected: "2.31",
 		},
 		{
-			value:    MustNewValue("-2.304").(*Number),
+			value:    NewNumberFromFloat64(-2.304),
 			round:    &tRound{"half", 2},
-			expected: MustNewValue("-2.30").(*Number),
+			expected: "-2.30",
 		},
 		{
-			value:    MustNewValue("-2.305").(*Number),
+			value:    NewNumberFromFloat64(-2.305),
 			round:    &tRound{"half", 2},
-			expected: MustNewValue("-2.31").(*Number),
+			expected: "-2.31",
 		},
 	}
 	for _, ex := range cases {
 		actual := ex.value.Round(ex.round.mode, ex.round.scale)
-		assert.Equal(s.T(), ex.expected, actual,
+		assert.Equal(s.T(), ex.expected, actual.String(),
 			"%s round %s %d should equal %s",
 			ex.value, ex.round.mode, ex.round.scale, ex.expected)
 	}
@@ -287,133 +296,134 @@ func (s *Zuite) TestNumber_Round() {
 
 func (s *Zuite) TestNumber_Div() {
 	cases := []struct {
-		left, right, expected *Number
-		round                 *tRound
+		left, right *Number
+		round       *tRound
+		expected    string
 	}{
 		{
-			left:     MustNewValue("8").(*Number),
-			right:    MustNewValue("2").(*Number),
-			expected: MustNewValue("4.0").(*Number),
+			left:     NewNumberFromInt(8),
+			right:    NewNumberFromInt(2),
+			expected: "4.0",
 			round:    &tRound{"up", 1},
 		},
 		{
-			left:     MustNewValue("8").(*Number),
-			right:    MustNewValue("2").(*Number),
-			expected: MustNewValue("4.00").(*Number),
+			left:     NewNumberFromInt(8),
+			right:    NewNumberFromInt(2),
+			expected: "4.00",
 			round:    &tRound{"up", 2},
 		},
 		{
-			left:     MustNewValue("1").(*Number),
-			right:    MustNewValue("7").(*Number),
-			expected: MustNewValue("0.1").(*Number),
+			left:     NewNumberFromInt(1),
+			right:    NewNumberFromInt(7),
+			expected: "0.1",
 			round:    &tRound{"down", 1},
 		},
 		{
-			left:     MustNewValue("1").(*Number),
-			right:    MustNewValue("7").(*Number),
-			expected: MustNewValue("0.2").(*Number),
+			left:     NewNumberFromInt(1),
+			right:    NewNumberFromInt(7),
+			expected: "0.2",
 			round:    &tRound{"up", 1},
 		},
 		{
-			left:     MustNewValue("1").(*Number),
-			right:    MustNewValue("7").(*Number),
-			expected: MustNewValue("0.14").(*Number),
+			left:     NewNumberFromInt(1),
+			right:    NewNumberFromInt(7),
+			expected: "0.14",
 			round:    &tRound{"down", 2},
 		},
 		{
-			left:     MustNewValue("1").(*Number),
-			right:    MustNewValue("7").(*Number),
-			expected: MustNewValue("0.15").(*Number),
+			left:     NewNumberFromInt(1),
+			right:    NewNumberFromInt(7),
+			expected: "0.15",
 			round:    &tRound{"up", 2},
 		},
 		{
-			left:     MustNewValue("7").(*Number),
-			right:    MustNewValue("1.23").(*Number),
-			expected: MustNewValue("5.691").(*Number),
+			left:     NewNumberFromInt(7),
+			right:    NewNumberFromFloat64(1.23),
+			expected: "5.691",
 			round:    &tRound{"down", 3},
 		},
 		{
-			left:     MustNewValue("7").(*Number),
-			right:    MustNewValue("1.23").(*Number),
-			expected: MustNewValue("5.691").(*Number),
+			left:     NewNumberFromInt(7),
+			right:    NewNumberFromFloat64(1.23),
+			expected: "5.691",
 			round:    &tRound{"up", 3},
 		},
 		{
-			left:     MustNewValue("7").(*Number),
-			right:    MustNewValue("1.23").(*Number),
-			expected: MustNewValue("5.6910").(*Number),
+			left:     NewNumberFromInt(7),
+			right:    NewNumberFromFloat64(1.23),
+			expected: "5.6910",
 			round:    &tRound{"down", 4},
 		},
 		{
-			left:     MustNewValue("7").(*Number),
-			right:    MustNewValue("1.23").(*Number),
-			expected: MustNewValue("5.6911").(*Number),
+			left:     NewNumberFromInt(7),
+			right:    NewNumberFromFloat64(1.23),
+			expected: "5.6911",
 			round:    &tRound{"up", 4},
 		},
 		{
-			left:     MustNewValue("7").(*Number),
-			right:    MustNewValue("1.23").(*Number),
-			expected: MustNewValue("5.69105").(*Number),
+			left:     NewNumberFromInt(7),
+			right:    NewNumberFromFloat64(1.23),
+			expected: "5.69105",
 			round:    &tRound{"down", 5},
 		},
 		{
-			left:     MustNewValue("7").(*Number),
-			right:    MustNewValue("1.23").(*Number),
-			expected: MustNewValue("5.69106").(*Number),
+			left:     NewNumberFromInt(7),
+			right:    NewNumberFromFloat64(1.23),
+			expected: "5.69106",
 			round:    &tRound{"up", 5},
 		},
 		{
-			left:     MustNewValue("7.777").(*Number),
-			right:    MustNewValue("1.6").(*Number),
-			expected: MustNewValue("4").(*Number),
+			left:     NewNumberFromFloat64(7.777),
+			right:    NewNumberFromFloat64(1.6),
+			expected: "4",
 			round:    &tRound{"down", 0},
 		},
 		{
-			left:     MustNewValue("7.777").(*Number),
-			right:    MustNewValue("1.6").(*Number),
-			expected: MustNewValue("5").(*Number),
+			left:     NewNumberFromFloat64(7.777),
+			right:    NewNumberFromFloat64(1.6),
+			expected: "5",
 			round:    &tRound{"up", 0},
 		},
 		{
-			left:     MustNewValue("7.777").(*Number),
-			right:    MustNewValue("1.6").(*Number),
-			expected: MustNewValue("4.8").(*Number),
+			left:     NewNumberFromFloat64(7.777),
+			right:    NewNumberFromFloat64(1.6),
+			expected: "4.8",
 			round:    &tRound{"down", 1},
 		},
 		{
-			left:     MustNewValue("7.777").(*Number),
-			right:    MustNewValue("1.6").(*Number),
-			expected: MustNewValue("4.9").(*Number),
+			left:     NewNumberFromFloat64(7.777),
+			right:    NewNumberFromFloat64(1.6),
+			expected: "4.9",
 			round:    &tRound{"up", 1},
 		},
 		{
-			left:     MustNewValue("9.999999").(*Number),
-			right:    MustNewValue("1").(*Number),
-			expected: MustNewValue("9").(*Number),
+			left:     NewNumberFromFloat64(9.999999),
+			right:    NewNumberFromInt(1),
+			expected: "9",
 			round:    &tRound{"down", 0},
 		},
 		{
-			left:     MustNewValue("9.999999").(*Number),
-			right:    MustNewValue("1").(*Number),
-			expected: MustNewValue("10").(*Number),
+			left:     NewNumberFromFloat64(9.999999),
+			right:    NewNumberFromInt(1),
+			expected: "10",
 			round:    &tRound{"up", 0},
 		},
 		{
-			left:     MustNewValue("7").(*Number),
-			right:    MustNewValue("2.22").(*Number),
-			expected: MustNewValue("3.1532").(*Number),
+			left:     NewNumberFromInt(7),
+			right:    NewNumberFromFloat64(2.22),
+			expected: "3.1532",
 			round:    &tRound{"half", 4},
 		},
 		{
-			left:     MustNewValue("-7").(*Number),
-			right:    MustNewValue("2.22").(*Number),
-			expected: MustNewValue("-3.1532").(*Number),
+			left:     NewNumberFromInt(-7),
+			right:    NewNumberFromFloat64(2.22),
+			expected: "-3.1532",
 			round:    &tRound{"half", 4},
 		},
 	}
 	for _, ex := range cases {
 		actual := ex.left.Div(ex.right, ex.round.mode, ex.round.scale)
-		assert.Equal(s.T(), ex.expected, actual,
+		assert.Equal(s.T(), ex.expected, actual.String(),
 			"%s / %s round %s %d should equal %s",
 			ex.left, ex.right, ex.round.mode, ex.round.scale, ex.expected)
 	}

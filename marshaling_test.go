@@ -26,8 +26,8 @@ func (s *Zuite) TestMarshaling_simple() {
 	forciblySetId(ws, "the-id")
 	ws.MustSet("text", NewText(`some text with " and stuff`))
 	ws.MustSet("bool", NewBool(true))
-	ws.MustSet("num_0", MustNewValue("123"))
-	ws.MustSet("num_2", MustNewValue("123.45"))
+	ws.MustSet("num_0", NewNumberFromInt(123))
+	ws.MustSet("num_2", NewNumberFromFloat64(123.45))
 	ws.MustSet("undefined", vUndefined)
 
 	expected := `{"the-id":{
@@ -345,30 +345,31 @@ func (s *Zuite) TestStructScan_convert() {
 	}{
 		{NewText("hello"), stringTyp, "hello"},
 		{NewBool(true), stringTyp, "true"},
-		{MustNewValue("123.45"), stringTyp, "123.45"},
+		{NewNumberFromFloat64(123.45), stringTyp, "123.45"},
 
 		{NewBool(true), boolTyp, true},
 
-		{MustNewValue("123"), intTyp, int(123)},
-		{MustNewValue("123"), int64Typ, int64(123)},
+		{NewNumberFromInt(123), intTyp, int(123)},
+		{NewNumberFromInt64(123), int64Typ, int64(123)},
 
-		{MustNewValue("123.45"), float32Typ, float32(123.45)},
-		{MustNewValue("123.45"), float64Typ, float64(123.45)},
+		{NewNumberFromFloat32(123.45), float32Typ, float32(123.45)},
+		{NewNumberFromFloat64(123.45), float64Typ, float64(123.45)},
 
-		{MustNewValue("127"), int8Typ, int8(127)},
-		{MustNewValue("-128"), int8Typ, int8(-128)},
-		{MustNewValue("32_767"), int16Typ, int16(32767)},
-		{MustNewValue("-32_768"), int16Typ, int16(-32768)},
-		{MustNewValue("2_147_483_647"), int32Typ, int32(2147483647)},
-		{MustNewValue("-2_147_483_648"), int32Typ, int32(-2147483648)},
-		{MustNewValue("9_223_372_036_854_775_807"), int64Typ, int64(9223372036854775807)},
-		{MustNewValue("-9_223_372_036_854_775_808"), int64Typ, int64(-9223372036854775808)},
+		{NewNumberFromInt8(127), int8Typ, int8(127)},
+		{NewNumberFromInt8(-128), int8Typ, int8(-128)},
+		{NewNumberFromInt16(32767), int16Typ, int16(32767)},
+		{NewNumberFromInt16(-32768), int16Typ, int16(-32768)},
+		{NewNumberFromInt32(2147483647), int32Typ, int32(2147483647)},
+		{NewNumberFromInt32(-2147483648), int32Typ, int32(-2147483648)},
+		{NewNumberFromInt64(9223372036854775807), int64Typ, int64(9223372036854775807)},
+		{NewNumberFromInt64(-9223372036854775808), int64Typ, int64(-9223372036854775808)},
 
-		{MustNewValue("255"), uint8Typ, uint8(255)},
-		{MustNewValue("65_535"), uint16Typ, uint16(65535)},
-		{MustNewValue("4_294_967_295"), uint32Typ, uint32(4294967295)},
+		{NewNumberFromUint(255), uintTyp, uint(255)},
+		{NewNumberFromUint8(255), uint8Typ, uint8(255)},
+		{NewNumberFromUint16(65535), uint16Typ, uint16(65535)},
+		{NewNumberFromUint32(4294967295), uint32Typ, uint32(4294967295)},
 		// TODO: See issue #29: support for arbitrary precision numbers
-		// {MustNewValue("18_446_744_073_709_551_615"), int64Typ, uint64(18446744073709551615)},
+		// {NewNumberFromUint64(18446744073709551615), uint64Typ, uint64(18446744073709551615)},
 	}
 	for _, ex := range cases {
 		ctx := convertCtx{
@@ -393,15 +394,15 @@ func (s *Zuite) TestStructScan_convertErrors() {
 		{NewBool(true), intTyp, "bool to int"},
 
 		{NewText("hello"), boolTyp, "text to bool"},
-		{MustNewValue("123.45"), boolTyp, "number[2] to bool"},
+		{NewNumberFromFloat64(123.45), boolTyp, "number[2] to bool"},
 
 		{NewText("hello"), intTyp, "text to int"},
 		{NewBool(true), intTyp, "bool to int"},
-		{MustNewValue("123.45"), intTyp, "number[2] to int"},
+		{NewNumberFromFloat64(123.45), intTyp, "number[2] to int"},
 
 		{NewText("hello"), int64Typ, "text to int64"},
 		{NewBool(true), int64Typ, "bool to int64"},
-		{MustNewValue("123.45"), int64Typ, "number[2] to int64"},
+		{NewNumberFromFloat64(123.45), int64Typ, "number[2] to int64"},
 
 		{NewText("hello"), float32Typ, "text to float32"},
 		{NewBool(true), float32Typ, "bool to float32"},
@@ -409,21 +410,21 @@ func (s *Zuite) TestStructScan_convertErrors() {
 		{NewText("hello"), float64Typ, "text to float64"},
 		{NewBool(true), float64Typ, "bool to float64"},
 
-		{MustNewValue("128"), int8Typ, "number[0] to int8, value out of range"},
-		{MustNewValue("-129"), int8Typ, "number[0] to int8, value out of range"},
-		{MustNewValue("32_768"), int16Typ, "number[0] to int16, value out of range"},
-		{MustNewValue("-32_769"), int16Typ, "number[0] to int16, value out of range"},
-		{MustNewValue("2_147_483_648"), int32Typ, "number[0] to int32, value out of range"},
-		{MustNewValue("-2_147_483_649"), int32Typ, "number[0] to int32, value out of range"},
+		{NewNumberFromInt(128), int8Typ, "number[0] to int8, value out of range"},
+		{NewNumberFromInt(-129), int8Typ, "number[0] to int8, value out of range"},
+		{NewNumberFromInt(32768), int16Typ, "number[0] to int16, value out of range"},
+		{NewNumberFromInt(-32769), int16Typ, "number[0] to int16, value out of range"},
+		{NewNumberFromInt(2147483648), int32Typ, "number[0] to int32, value out of range"},
+		{NewNumberFromInt(-2147483649), int32Typ, "number[0] to int32, value out of range"},
 		// TODO: See issue #29: support for arbitrary precision numbers
-		// {MustNewValue("9_223_372_036_854_775_808"), int64Typ, "number[0] to int64, value out of range"},
-		// {MustNewValue("-9_223_372_036_854_775_809"), int64Typ, "number[0] to int64, value out of range"},
+		// {MustParseLiteral("9_223_372_036_854_775_808"), int64Typ, "number[0] to int64, value out of range"},
+		// {MustParseLiteral("-9_223_372_036_854_775_809"), int64Typ, "number[0] to int64, value out of range"},
 
-		{MustNewValue("256"), uint8Typ, "number[0] to uint8, value out of range"},
-		{MustNewValue("65_536"), uint16Typ, "number[0] to uint16, value out of range"},
-		{MustNewValue("4_294_967_296"), uint32Typ, "number[0] to uint32, value out of range"},
+		{NewNumberFromInt(256), uint8Typ, "number[0] to uint8, value out of range"},
+		{NewNumberFromInt(65536), uint16Typ, "number[0] to uint16, value out of range"},
+		{NewNumberFromInt(4294967296), uint32Typ, "number[0] to uint32, value out of range"},
 		// TODO: See issue #29: support for arbitrary precision numbers
-		// {MustNewValue("18_446_744_073_709_551_616"), int64Typ, "number[0] to int64, value out of range"},
+		// {MustParseLiteral("18_446_744_073_709_551_616"), uint32Typ, "number[0] to int64, value out of range"},
 	}
 	for _, ex := range cases {
 		ctx := convertCtx{
@@ -433,6 +434,7 @@ func (s *Zuite) TestStructScan_convertErrors() {
 			destType:        ex.dest,
 		}
 		_, err := convert(ctx, ex.source)
-		assert.EqualError(s.T(), err, "field source to struct field Dest: cannot convert "+ex.expected)
+		assert.EqualErrorf(s.T(), err, "field source to struct field Dest: cannot convert "+ex.expected,
+			"converting %s to %s", ex.source, ex.dest)
 	}
 }
