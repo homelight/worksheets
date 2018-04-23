@@ -150,6 +150,56 @@ func (s *Zuite) TestParser_parseExpression() {
 			tSelector([]string{"foo", "len"}),
 			nil,
 		},
+		`sum(len(foo))`: &tCall{
+			tSelector([]string{"sum"}),
+			[]expression{
+				&tCall{
+					tSelector([]string{"len"}),
+					[]expression{
+						tSelector([]string{"foo"}),
+					},
+				},
+			},
+		},
+		`sum(len(foo),8)`: &tCall{
+			tSelector([]string{"sum"}),
+			[]expression{
+				&tCall{
+					tSelector([]string{"len"}),
+					[]expression{
+						tSelector([]string{"foo"}),
+					},
+				},
+				&Number{8, &NumberType{0}},
+			},
+		},
+
+		// calls -- allow trailing comma
+		`len(5,)`: &tCall{
+			tSelector([]string{"len"}),
+			[]expression{
+				&Number{5, &NumberType{0}},
+			},
+		},
+		`first_of(1,2,3,)`: &tCall{
+			tSelector([]string{"first_of"}),
+			[]expression{
+				&Number{1, &NumberType{0}},
+				&Number{2, &NumberType{0}},
+				&Number{3, &NumberType{0}},
+			},
+		},
+		`sum(len(5,),)`: &tCall{
+			tSelector([]string{"sum"}),
+			[]expression{
+				&tCall{
+					tSelector([]string{"len"}),
+					[]expression{
+						&Number{5, &NumberType{0}},
+					},
+				},
+			},
+		},
 
 		// unop and binop
 		`3 + 4`: &tBinop{opPlus, &Number{3, &NumberType{0}}, &Number{4, &NumberType{0}}, nil},
@@ -209,11 +259,15 @@ func (s *Zuite) TestParser_parseExpression() {
 			nil,
 		},
 	}
+
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))
 		actual, err := p.parseExpression(true)
-		require.NoError(s.T(), err, input)
-		assert.Equal(s.T(), expected, actual, input)
+		if assert.NoError(s.T(), err, input) {
+			if assert.Equal(s.T(), "", p.next(), "%s should have reached eof", input) {
+				assert.Equal(s.T(), expected, actual, input)
+			}
+		}
 	}
 }
 
@@ -300,9 +354,8 @@ func (s *Zuite) TestParser_parseExpressionErrors() {
 		`5 round down 33`:                                                `scale cannot be greater than 32`,
 		`5 round down 9999999999999999999999999999999999999999999999999`: `scale cannot be greater than 32`,
 
-		`len(5,`:  `expecting expression`,
-		`len(5,)`: `expecting expression`,
-		`len(5!`:  `expecting , or )`,
+		`len(5,`: `expecting expression`,
+		`len(5!`: `expecting , or )`,
 
 		// will need to revisit when we implement mod operator
 		`4%0`:     `number must terminate with percent if present`,

@@ -48,6 +48,7 @@ type Value interface {
 	// String returns a string representation of the value.
 	String() string
 
+	expression
 	dbWriteValue() string
 	jsonMarshalValue(m *marshaler, b *bytes.Buffer)
 	structScanConvert(ctx convertCtx) (reflect.Value, error)
