@@ -344,11 +344,18 @@ func (typ *TextType) dbReadValue(l *loader, value string) (Value, error) {
 }
 
 func (typ *BoolType) dbReadValue(l *loader, value string) (Value, error) {
-	return NewValue(value)
+	switch value {
+	case "true":
+		return NewBool(true), nil
+	case "false":
+		return NewBool(false), nil
+	default:
+		return nil, fmt.Errorf("unreadable value for bool %s", value)
+	}
 }
 
 func (typ *NumberType) dbReadValue(l *loader, value string) (Value, error) {
-	return NewValue(value)
+	return NewNumberFromString(value)
 }
 
 func (typ *SliceType) dbReadValue(l *loader, value string) (Value, error) {
