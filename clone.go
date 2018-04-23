@@ -75,7 +75,7 @@ func (c *cloner) cloneWs(ws *Worksheet) *Worksheet {
 
 	dup := ws.def.newUninitializedWorksheet()
 	dup.data[indexId] = NewText(uuid.Must(uuid.NewV4()).String())
-	dup.data[indexVersion] = MustNewValue("1")
+	dup.data[indexVersion] = NewNumberFromInt(1)
 	c.mapping[ws.Id()] = dup.Id()
 	c.clones[dup.Id()] = dup
 

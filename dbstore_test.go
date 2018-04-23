@@ -13,7 +13,6 @@
 package worksheets
 
 import (
-	"fmt"
 	"math"
 	"strings"
 	"time"
@@ -257,7 +256,7 @@ func (s *Zuite) TestUpdateUndefinedField() {
 		return err
 	})
 
-	err = ws.Set("age", MustNewValue("73"))
+	err = ws.Set("age", NewNumberFromInt(73))
 	require.NoError(s.T(), err)
 
 	s.MustRunTransaction(func(tx *runner.Tx) error {
@@ -272,7 +271,7 @@ func (s *Zuite) TestProperlyLoadUndefinedField() {
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		ws := s.defs.MustNewWorksheet("simple")
 		wsId = ws.Id()
-		ws.MustSet("age", MustNewValue("123456"))
+		ws.MustSet("age", NewNumberFromInt(123456))
 
 		session := s.store.Open(tx)
 		_, err := session.Save(ws)
@@ -468,7 +467,7 @@ func (s *Zuite) TestSignoffPattern() {
 	require.Equal(s.T(), "false", ws.MustGet("is_signedoff").String())
 
 	// worksheet is signed off
-	ws.MustSet("signoff_at", MustNewValue(fmt.Sprintf("%d", ws.Version())))
+	ws.MustSet("signoff_at", NewNumberFromInt(ws.Version()))
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := s.store.Open(tx)
 		_, err := session.SaveOrUpdate(ws)
@@ -489,7 +488,7 @@ func (s *Zuite) TestSignoffPattern() {
 
 	// worksheet is signed off again, except this time, the update will fail
 	// (due to a concurrent modification)
-	ws.MustSet("signoff_at", MustNewValue(fmt.Sprintf("%d", ws.Version())))
+	ws.MustSet("signoff_at", NewNumberFromInt(ws.Version()))
 	_, err := s.db.Exec("update worksheets set version = version + 1 where id = $1", ws.Id())
 	require.NoError(s.T(), err)
 

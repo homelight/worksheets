@@ -15,7 +15,6 @@ package worksheets
 import (
 	"fmt"
 	"io"
-	"strconv"
 
 	"github.com/satori/go.uuid"
 )
@@ -319,7 +318,7 @@ func (defs *Definitions) NewWorksheet(name string) (*Worksheet, error) {
 	}
 
 	// version
-	if err := ws.Set("version", MustNewValue(strconv.Itoa(1))); err != nil {
+	if err := ws.Set("version", NewNumberFromInt(1)); err != nil {
 		panic(fmt.Sprintf("unexpected %s", err))
 	}
 

@@ -123,7 +123,7 @@ func (s *Zuite) TestRefsSave_withDataInRefWorksheet() {
 	)
 	ws.MustSet("simple", simple)
 	simple.MustSet("name", alice)
-	simple.MustSet("age", MustNewValue("120"))
+	simple.MustSet("age", NewNumberFromInt(120))
 
 	// We forcibly set both worksheets' identifiers to have a known ordering
 	// when comparing the db state.

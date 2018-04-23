@@ -28,7 +28,7 @@ type dup_me worksheet {
 func (s *Zuite) TestClone_simple() {
 	ws := s.cloneDefs.MustNewWorksheet("dup_me")
 	ws.MustSet("value", NewText("Mary had a little lamb"))
-	ws.data[indexVersion] = MustNewValue("666")
+	ws.data[indexVersion] = NewNumberFromInt(666)
 
 	dup := ws.Clone()
 	require.True(s.T(), ws != dup, "dup must be a different instance than ws")
@@ -37,7 +37,7 @@ func (s *Zuite) TestClone_simple() {
 	require.Len(s.T(), dup.orig, 0)
 	require.Equal(s.T(), map[int]Value{
 		indexId:      NewText(dup.Id()),
-		indexVersion: MustNewValue("1"),
+		indexVersion: NewNumberFromInt(1),
 		1:            NewText("Mary had a little lamb"),
 	}, dup.data)
 	require.Len(s.T(), dup.parents, 0)
@@ -62,12 +62,12 @@ func (s *Zuite) TestClone_withOneWsRef() {
 
 	require.Equal(s.T(), map[int]Value{
 		indexId:      NewText(dup1.Id()),
-		indexVersion: MustNewValue("1"),
+		indexVersion: NewNumberFromInt(1),
 		4:            dup2,
 	}, dup1.data)
 	require.Equal(s.T(), map[int]Value{
 		indexId:      NewText(dup2.Id()),
-		indexVersion: MustNewValue("1"),
+		indexVersion: NewNumberFromInt(1),
 	}, dup2.data)
 
 	require.Len(s.T(), dup1.parents, 0)
@@ -105,13 +105,13 @@ func (s *Zuite) TestClone_withTwoWsRefToSameWs() {
 
 	require.Equal(s.T(), map[int]Value{
 		indexId:      NewText(dup1.Id()),
-		indexVersion: MustNewValue("1"),
+		indexVersion: NewNumberFromInt(1),
 		4:            dup2,
 		5:            dup2,
 	}, dup1.data)
 	require.Equal(s.T(), map[int]Value{
 		indexId:      NewText(dup2.Id()),
-		indexVersion: MustNewValue("1"),
+		indexVersion: NewNumberFromInt(1),
 	}, dup2.data)
 
 	require.Len(s.T(), dup1.parents, 0)
@@ -129,12 +129,12 @@ func (s *Zuite) TestClone_withTwoWsRefToSameWs() {
 
 func (s *Zuite) TestClone_withSliceOfValues() {
 	ws := s.cloneDefs.MustNewWorksheet("dup_me")
-	ws.MustAppend("v_slice", MustNewValue("2"))
-	ws.MustAppend("v_slice", MustNewValue("3"))
-	ws.MustAppend("v_slice", MustNewValue("3"))
-	ws.MustAppend("v_slice", MustNewValue("5"))
-	ws.MustAppend("v_slice", MustNewValue("8"))
-	ws.MustAppend("v_slice", MustNewValue("13"))
+	ws.MustAppend("v_slice", NewNumberFromInt(2))
+	ws.MustAppend("v_slice", NewNumberFromInt(3))
+	ws.MustAppend("v_slice", NewNumberFromInt(3))
+	ws.MustAppend("v_slice", NewNumberFromInt(5))
+	ws.MustAppend("v_slice", NewNumberFromInt(8))
+	ws.MustAppend("v_slice", NewNumberFromInt(13))
 	ws.MustDel("v_slice", 2)
 	wsSlice := ws.data[2].(*Slice)
 
@@ -158,11 +158,11 @@ func (s *Zuite) TestClone_withSliceOfValues() {
 	require.Equal(s.T(), wsSlice.typ, dupSlice.typ)
 	require.Equal(s.T(), 5, dupSlice.lastRank)
 	require.Equal(s.T(), []sliceElement{
-		{1, MustNewValue("2")},
-		{2, MustNewValue("3")},
-		{3, MustNewValue("5")},
-		{4, MustNewValue("8")},
-		{5, MustNewValue("13")},
+		{1, NewNumberFromInt(2)},
+		{2, NewNumberFromInt(3)},
+		{3, NewNumberFromInt(5)},
+		{4, NewNumberFromInt(8)},
+		{5, NewNumberFromInt(13)},
 	}, dupSlice.elements)
 }
 
