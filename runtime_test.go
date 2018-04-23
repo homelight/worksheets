@@ -164,6 +164,17 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 		`if(0 < -1, "unused", if("a" == "a", "good", 1 / 0 round down 0))`: `"good"`,
 		`if(true, 1)`:  `1`,
 		`if(false, 1)`: `undefined`,
+
+		// first_of
+		`first_of(undefined)`:                  `undefined`,
+		`first_of(1)`:                          `1`,
+		`first_of(undefined,2)`:                `2`,
+		`first_of(undefined,undefined,3)`:      `3`,
+		`first_of(slice_t)`:                    `"Alice"`,
+		`first_of(slice_nu)`:                   `3`,
+		`first_of(slice_bu)`:                   `false`,
+		`first_of(undefined,slice_nu)`:         `3`,
+		`first_of(undefined,slice_t,slice_nu)`: `"Alice"`,
 	}
 	for input, output := range cases {
 		// fixture
@@ -213,6 +224,7 @@ func (s *Zuite) TestRuntime_parseAndEvalExprExpectingFailure() {
 		`sum(slice_t)`:   `sum: argument #1 expected to be slice of numbers`,
 		`if(1)`:          `if: at least 2 argument(s) expected but only 1 found`,
 		`if(1,2,3,4)`:    `if: at most 3 argument(s) expected but 4 found`,
+		`first_of()`:     `first_of: at least 1 argument(s) expected but none found`,
 	}
 	for input, output := range cases {
 		// fixture
