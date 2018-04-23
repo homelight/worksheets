@@ -405,6 +405,10 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 				}
 				p.next()
 				moreArgs = choice == "more"
+				if moreArgs && p.peek(pRparen) {
+					moreArgs = false
+					p.next()
+				}
 			}
 			first = &tCall{selector, args}
 		}
