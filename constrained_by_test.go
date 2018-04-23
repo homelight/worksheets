@@ -14,7 +14,6 @@ package worksheets
 
 import (
 	"math"
-	"strconv"
 	"strings"
 
 	"github.com/stretchr/testify/require"
@@ -48,7 +47,7 @@ func (s *Zuite) TestWorksheet_constrainedByNonBoolExpression() {
 	ws := defs.MustNewWorksheet("constrained_non_bool_constrained_expression")
 
 	require.False(s.T(), ws.MustIsSet("some_field"))
-	err = ws.Set("some_field", MustNewValue("7"))
+	err = ws.Set("some_field", NewNumberFromInt(7))
 	require.Equal(s.T(), "7 not a valid value for constrained field some_field", err.Error())
 	require.False(s.T(), ws.MustIsSet("some_field"))
 }
@@ -77,7 +76,7 @@ func (fn perimeterAndAreaConstraints) Compute(values ...Value) Value {
 	}
 	switch t := values[2].(type) {
 	case *Number:
-		field_c = t.value
+		field_c = t.Round(ModeHalf, 2).value / 100
 	case *Undefined:
 		field_c = 0
 	}
@@ -117,7 +116,7 @@ func (fn hypotenuse) Compute(values ...Value) Value {
 		field_b = 0
 	}
 	c := math.Sqrt(float64(field_a*field_a + field_b*field_b))
-	hypotVal, _ := NewValue(strconv.FormatFloat(c, 'f', 0, 64))
+	hypotVal := NewNumberFromFloat64(c).Round(ModeHalf, 2)
 	return hypotVal
 }
 
@@ -143,8 +142,7 @@ func (fn area) Compute(values ...Value) Value {
 	case *Undefined:
 		return vUndefined
 	}
-	a := float64(field_a * field_b / 2)
-	areaVal, _ := NewValue(strconv.FormatFloat(a, 'f', 0, 64))
+	areaVal := NewNumberFromFloat64(float64(field_a * field_b / 2))
 	return areaVal
 }
 
@@ -173,18 +171,18 @@ func (s *Zuite) TestWorksheet_constrainedByAndComputedBy() {
 	ws := defs.MustNewWorksheet("constrained_and_computed")
 
 	require.False(s.T(), ws.MustIsSet("field_a"))
-	err = ws.Set("field_a", MustNewValue("28"))
+	err = ws.Set("field_a", NewNumberFromInt(28))
 	require.NoError(s.T(), err)
 
-	err = ws.Set("field_b", MustNewValue("90"))
+	err = ws.Set("field_b", NewNumberFromInt(90))
 	require.Equal(s.T(), "90 not a valid value for constrained field field_b", err.Error())
 
-	err = ws.Set("field_b", MustNewValue("21"))
+	err = ws.Set("field_b", NewNumberFromInt(21))
 	require.NoError(s.T(), err)
 
-	err = ws.Set("field_b", MustNewValue("1")) // too small in area
+	err = ws.Set("field_b", NewNumberFromInt(1)) // too small in area
 	require.Equal(s.T(), "1 not a valid value for constrained field field_b", err.Error())
 
-	err = ws.Set("field_b", MustNewValue("50")) // too long of perimiter
+	err = ws.Set("field_b", NewNumberFromInt(50)) // too long of perimiter
 	require.Equal(s.T(), "50 not a valid value for constrained field field_b", err.Error())
 }

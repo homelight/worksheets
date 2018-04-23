@@ -292,7 +292,7 @@ func (s *Zuite) TestWorksheet_diff() {
 		},
 		indexVersion: change{
 			before: vUndefined,
-			after:  MustNewValue("1"),
+			after:  NewNumberFromInt(1),
 		},
 	}, ws.diff())
 
@@ -308,7 +308,7 @@ func (s *Zuite) TestWorksheet_diff() {
 		},
 		indexVersion: change{
 			before: vUndefined,
-			after:  MustNewValue("1"),
+			after:  NewNumberFromInt(1),
 		},
 		1: change{
 			before: vUndefined,
@@ -327,7 +327,7 @@ func (s *Zuite) TestWorksheet_diff() {
 		},
 		indexVersion: change{
 			before: vUndefined,
-			after:  MustNewValue("1"),
+			after:  NewNumberFromInt(1),
 		},
 		1: change{
 			before: vUndefined,
@@ -348,7 +348,7 @@ func (s *Zuite) TestWorksheet_diff() {
 		},
 		indexVersion: change{
 			before: vUndefined,
-			after:  MustNewValue("1"),
+			after:  NewNumberFromInt(1),
 		},
 		1: change{
 			before: bob,
