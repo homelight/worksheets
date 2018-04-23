@@ -135,16 +135,18 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 		`undefined >= 86`:        `undefined`,
 		`undefined >= undefined`: `undefined`,
 
-		// functions
+		// len
 		`len("Bob")`:     `3`,
 		`len(undefined)`: `undefined`,
 		`len(slice_t)`:   `2`,
 		`len(text)`:      `5`,
 
+		// sum
 		`sum(slice_n0)`: `10`,
 		`sum(slice_n2)`: `11.10`,
 		`sum(slice_nu)`: `undefined`,
 
+		// sumiftrue
 		`sumiftrue(slice_n0, slice_b)`:   `7`,
 		`sumiftrue(slice_n2, slice_b)`:   `7.77`,
 		`sumiftrue(slice_nu, slice_b)`:   `undefined`,
@@ -153,12 +155,15 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 		`sumiftrue(undefined, slice_b)`:  `undefined`,
 		`sumiftrue(slice_n0, undefined)`: `undefined`,
 
+		// if
 		`if(true, 1, 3)`:                                                   `1`,
 		`if(false, 1, 3)`:                                                  `3`,
 		`if(undefined, 1, 3)`:                                              `undefined`,
 		`if(true, 1, 3 / 0 round down 0)`:                                  `1`,
 		`if(false, 1 / 0 round down 0, 3)`:                                 `3`,
 		`if(0 < -1, "unused", if("a" == "a", "good", 1 / 0 round down 0))`: `"good"`,
+		`if(true, 1)`:  `1`,
+		`if(false, 1)`: `undefined`,
 	}
 	for input, output := range cases {
 		// fixture
@@ -191,8 +196,9 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 		require.Equal(s.T(), "", p.next(), "%s should have reached eof", input)
 
 		actual, err := expr.compute(ws)
-		require.NoError(s.T(), err, input)
-		assert.Equal(s.T(), expected, actual, "%s should equal %s was %s", input, output, actual)
+		if assert.NoError(s.T(), err, input) {
+			assert.Equal(s.T(), expected, actual, "%s should equal %s was %s", input, output, actual)
+		}
 	}
 }
 
@@ -200,11 +206,13 @@ func (s *Zuite) TestRuntime_parseAndEvalExprExpectingFailure() {
 	cases := map[string]string{
 		`no_such_func()`: `unknown function no_such_func`,
 		`no.such.func()`: `unknown function no.such.func`,
-		`len(1, 2)`:      `len expects 1 argument(s)`,
-		`len(1)`:         `len expects argument #1 to be text, or slice`,
-		`sum(1, 2)`:      `sum expects 1 argument(s)`,
-		`sum(1)`:         `sum expects argument #1 to be slice of numbers`,
-		`sum(slice_t)`:   `sum expects argument #1 to be slice of numbers`,
+		`len(1, 2)`:      `len: 1 argument(s) expected but 2 found`,
+		`len(1)`:         `len: argument #1 expected to be text, or slice`,
+		`sum(1, 2)`:      `sum: 1 argument(s) expected but 2 found`,
+		`sum(1)`:         `sum: argument #1 expected to be slice of numbers`,
+		`sum(slice_t)`:   `sum: argument #1 expected to be slice of numbers`,
+		`if(1)`:          `if: at least 2 argument(s) expected but only 1 found`,
+		`if(1,2,3,4)`:    `if: at most 3 argument(s) expected but 4 found`,
 	}
 	for input, output := range cases {
 		// fixture
@@ -218,6 +226,6 @@ func (s *Zuite) TestRuntime_parseAndEvalExprExpectingFailure() {
 		require.Equal(s.T(), "", p.next(), "%s should have reached eof", input)
 
 		_, err = expr.compute(ws)
-		require.EqualError(s.T(), err, output, input)
+		assert.EqualError(s.T(), err, output, input)
 	}
 }

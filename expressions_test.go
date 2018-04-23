@@ -82,7 +82,21 @@ func (s *Zuite) TestSelectorSliceTypes() {
 	}
 }
 
-func (s *Zuite) TestFnArgs() {
+func (s *Zuite) TestFnArgs_checkArgsNum() {
+	args := newFnArgs(nil, []expression{vZero})
+
+	// before lazy eval
+	err := args.checkArgsNum(4)
+	require.EqualError(s.T(), err, "4 argument(s) expected but 1 found")
+
+	// after lazy eval
+	_, err = args.get(0)
+	require.NoError(s.T(), err)
+	err = args.checkArgsNum(4)
+	require.EqualError(s.T(), err, "4 argument(s) expected but 1 found")
+}
+
+func (s *Zuite) TestFnArgs_get() {
 	args := newFnArgs(nil, []expression{vZero})
 	s.Len(args.exprs, 1)
 	s.NotNil(args.exprs[0])

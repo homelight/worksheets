@@ -305,6 +305,30 @@ func newFnArgs(ws *Worksheet, exprs []expression) *fnArgs {
 	return &args
 }
 
+func (args *fnArgs) checkArgsNum(nums ...int) error {
+	actual := len(args.exprs)
+	if len(nums) == 1 {
+		// exact
+		num := nums[0]
+		if actual != num {
+			return fmt.Errorf("%d argument(s) expected but %d found", num, actual)
+		}
+	} else {
+		// min - max
+		min, max := nums[0], nums[1]
+		if actual < min {
+			return fmt.Errorf("at least %d argument(s) expected but only %d found", min, actual)
+		} else if max < actual {
+			return fmt.Errorf("at most %d argument(s) expected but %d found", max, actual)
+		}
+	}
+	return nil
+}
+
+func (args *fnArgs) has(index int) bool {
+	return index < len(args.exprs)
+}
+
 func (args *fnArgs) get(index int) (Value, error) {
 	// compute?
 	if expr := args.exprs[index]; expr != nil {
@@ -316,11 +340,11 @@ func (args *fnArgs) get(index int) (Value, error) {
 	return args.values[index], args.errs[index]
 }
 
-var functions = map[string]struct {
-	argsNum int
-	fn      func(args *fnArgs) (Value, error)
-}{
-	"len": {1, func(args *fnArgs) (Value, error) {
+var functions = map[string]func(args *fnArgs) (Value, error){
+	"len": func(args *fnArgs) (Value, error) {
+		if err := args.checkArgsNum(1); err != nil {
+			return nil, err
+		}
 		arg, err := args.get(0)
 		if err != nil {
 			return nil, err
@@ -333,10 +357,13 @@ var functions = map[string]struct {
 		case *Slice:
 			return NewNumberFromInt(len(v.elements)), nil
 		default:
-			return nil, fmt.Errorf("len expects argument #1 to be text, or slice")
+			return nil, fmt.Errorf("argument #1 expected to be text, or slice")
 		}
-	}},
-	"sum": {1, func(args *fnArgs) (Value, error) {
+	},
+	"sum": func(args *fnArgs) (Value, error) {
+		if err := args.checkArgsNum(1); err != nil {
+			return nil, err
+		}
 		arg, err := args.get(0)
 		if err != nil {
 			return nil, err
@@ -347,7 +374,7 @@ var functions = map[string]struct {
 		case *Slice:
 			numType, ok := v.typ.elementType.(*NumberType)
 			if !ok {
-				return nil, fmt.Errorf("sum expects argument #1 to be slice of numbers")
+				return nil, fmt.Errorf("argument #1 expected to be slice of numbers")
 			}
 			sum := &Number{0, numType}
 			for _, elem := range v.elements {
@@ -359,10 +386,13 @@ var functions = map[string]struct {
 			}
 			return sum, nil
 		default:
-			return nil, fmt.Errorf("sum expects argument #1 to be slice of numbers")
+			return nil, fmt.Errorf("argument #1 expected to be slice of numbers")
 		}
-	}},
-	"sumiftrue": {2, func(args *fnArgs) (Value, error) {
+	},
+	"sumiftrue": func(args *fnArgs) (Value, error) {
+		if err := args.checkArgsNum(2); err != nil {
+			return nil, err
+		}
 		arg0, err := args.get(0)
 		if err != nil {
 			return nil, err
@@ -377,9 +407,9 @@ var functions = map[string]struct {
 		}
 		values, ok := arg0.(*Slice)
 		if !ok {
-			return nil, fmt.Errorf("sumiftrue expects argument #1 to be slice of numbers")
+			return nil, fmt.Errorf("argument #1 expected to be slice of numbers")
 		} else if _, ok := values.typ.elementType.(*NumberType); !ok {
-			return nil, fmt.Errorf("sumiftrue expects argument #1 to be slice of numbers")
+			return nil, fmt.Errorf("argument #1 expected to be slice of numbers")
 		}
 
 		if _, ok := arg1.(*Undefined); ok {
@@ -387,13 +417,13 @@ var functions = map[string]struct {
 		}
 		conditions, ok := arg1.(*Slice)
 		if !ok {
-			return nil, fmt.Errorf("sumiftrue expects argument #2 to be slice of bools")
+			return nil, fmt.Errorf("argument #2 expected to be slice of bools")
 		} else if _, ok := conditions.typ.elementType.(*BoolType); !ok {
-			return nil, fmt.Errorf("sumiftrue expects argument #2 to be slice of bools")
+			return nil, fmt.Errorf("argument #2 expected to be slice of bools")
 		}
 
 		if len(values.Elements()) != len(conditions.Elements()) {
-			return nil, fmt.Errorf("sumiftrue expects argument #1 and argument #2 to be the same length")
+			return nil, fmt.Errorf("argument #1 and argument #2 expected to be the same length")
 		}
 
 		numType, _ := values.typ.elementType.(*NumberType)
@@ -412,8 +442,11 @@ var functions = map[string]struct {
 			}
 		}
 		return sum, nil
-	}},
-	"if": {3, func(args *fnArgs) (Value, error) {
+	},
+	"if": func(args *fnArgs) (Value, error) {
+		if err := args.checkArgsNum(2, 3); err != nil {
+			return nil, err
+		}
 		cond, err := args.get(0)
 		if err != nil {
 			return nil, err
@@ -424,7 +457,7 @@ var functions = map[string]struct {
 		}
 
 		if _, ok := cond.(*Bool); !ok {
-			return nil, fmt.Errorf("if expects argument #1 to be bool")
+			return nil, fmt.Errorf("argument #1 expected to be bool")
 		}
 
 		if cond.(*Bool).value {
@@ -432,9 +465,13 @@ var functions = map[string]struct {
 			return args.get(1)
 		} else {
 			// else-branch
-			return args.get(2)
+			if args.has(2) {
+				return args.get(2)
+			} else {
+				return vUndefined, nil
+			}
 		}
-	}},
+	},
 }
 
 func (e *tCall) compute(ws *Worksheet) (Value, error) {
@@ -443,11 +480,12 @@ func (e *tCall) compute(ws *Worksheet) (Value, error) {
 		return nil, fmt.Errorf("unknown function %s", e.name)
 	}
 
-	if len(e.args) != fn.argsNum {
-		return nil, fmt.Errorf("%s expects %d argument(s)", e.name, fn.argsNum)
+	value, err := fn(newFnArgs(ws, e.args))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %s", e.name, err)
 	}
 
-	return fn.fn(newFnArgs(ws, e.args))
+	return value, nil
 }
 
 type ePlugin struct {
