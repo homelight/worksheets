@@ -78,6 +78,22 @@ func (e *Bool) compute(ws *Worksheet) (Value, error) {
 	return e, nil
 }
 
+func (ws *Worksheet) selectors() []tSelector {
+	return nil
+}
+
+func (ws *Worksheet) compute(_ *Worksheet) (Value, error) {
+	return ws, nil
+}
+
+func (slice *Slice) selectors() []tSelector {
+	return nil
+}
+
+func (slice *Slice) compute(_ *Worksheet) (Value, error) {
+	return slice, nil
+}
+
 func (e tSelector) selectors() []tSelector {
 	return []tSelector{e}
 }
