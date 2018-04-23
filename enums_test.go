@@ -33,12 +33,11 @@ type questionnaire worksheet {
 	1:who  team_member
 	2:whos []team_member
 	3:is_a_hotdog_a_sandwich yes_or_no computed_by {
-		return if(
-			who == "pratik", "yes", if(
-			who == "jane", "no", if(
-			who == "the_devil", "42!",
-			undefined
-		)))
+		return first_of(
+			if(who == "pratik",    "yes" ),
+			if(who == "jane",      "no"  ),
+			if(who == "the_devil", "42!" ),
+		)
 	}
 }`
 
