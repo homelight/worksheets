@@ -137,48 +137,76 @@ func (value *Undefined) String() string {
 	return "undefined"
 }
 
+// NewNumberFromString returns a new Number from a string representation.
+func NewNumberFromString(value string) (*Number, error) {
+	v, err := NewValue(value)
+	if err != nil {
+		return nil, err
+	}
+	n, ok := v.(*Number)
+	if !ok {
+		return nil, fmt.Errorf("not a number %s", value)
+	}
+	return n, nil
+}
+
+// NewNumberFromInt returns a new Number from int.
 func NewNumberFromInt(num int) *Number {
 	return &Number{int64(num), &NumberType{0}}
 }
 
+// NewNumberFromInt8 returns a new Number from int8.
 func NewNumberFromInt8(num int8) *Number {
 	return &Number{int64(num), &NumberType{0}}
 }
 
+// NewNumberFromInt16 returns a new Number from int16.
 func NewNumberFromInt16(num int16) *Number {
 	return &Number{int64(num), &NumberType{0}}
 }
 
+// NewNumberFromInt32 returns a new Number from int32.
 func NewNumberFromInt32(num int32) *Number {
 	return &Number{int64(num), &NumberType{0}}
 }
 
+// NewNumberFromInt64 returns a new Number from int64.
 func NewNumberFromInt64(num int64) *Number {
 	return &Number{num, &NumberType{0}}
 }
 
+// NewNumberFromUint returns a new Number from uint.
 func NewNumberFromUint(num uint) *Number {
 	return &Number{int64(num), &NumberType{0}}
 }
 
+// NewNumberFromUint8 returns a new Number from uint8.
 func NewNumberFromUint8(num uint8) *Number {
 	return &Number{int64(num), &NumberType{0}}
 }
 
+// NewNumberFromUint16 returns a new Number from uint16.
 func NewNumberFromUint16(num uint16) *Number {
 	return &Number{int64(num), &NumberType{0}}
 }
 
+// NewNumberFromUint32 returns a new Number from uint32.
 func NewNumberFromUint32(num uint32) *Number {
 	return &Number{int64(num), &NumberType{0}}
 }
 
+// NewNumberFromFloat32 returns a new Number from float32.
 func NewNumberFromFloat32(num float32) *Number {
 	return NewNumberFromFloat64(float64(num))
 }
 
+// NewNumberFromFloat64 returns a new Number from float64.
 func NewNumberFromFloat64(num float64) *Number {
-	return MustNewValue(strconv.FormatFloat(num, 'f', -1, 64)).(*Number)
+	value, err := NewNumberFromString(strconv.FormatFloat(num, 'f', -1, 64))
+	if err != nil {
+		panic(fmt.Sprintf("unexpected %s", err))
+	}
+	return value
 }
 
 func (value *Number) Type() Type {
