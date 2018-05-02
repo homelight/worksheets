@@ -514,30 +514,30 @@ func (s *DbZuite) TestDeprecatedField() {
 	}`))
 
 	store := NewStore(defs)
+	var id string
 
-	ws := defs.MustNewWorksheet("some_worksheet")
-	ws.MustSet("field_one", NewText("one"))
-	ws.MustSet("field_two", NewText("two"))
-	ws.MustSet("field_three", NewText("three"))
-	var err error
 	s.MustRunTransaction(func(tx *runner.Tx) error {
-		session := store.Open(tx)
-		_, err = session.SaveOrUpdate(ws)
-		return nil
-	})
-	require.NoError(s.T(), err)
+		ws := defs.MustNewWorksheet("some_worksheet")
+		ws.MustSet("field_one", NewText("one"))
+		ws.MustSet("field_two", NewText("two"))
+		ws.MustSet("field_three", NewText("three"))
 
+		id = ws.Id()
+		session := store.Open(tx)
+		_, err := session.SaveOrUpdate(ws)
+		return err
+	})
+
+	// update definition
 	defs = MustNewDefinitions(strings.NewReader(`worksheet some_worksheet {
 		1:field_one text
 		3:field_three text
 	}`))
 	store = NewStore(defs)
 
-	var wsFromStore *Worksheet
 	s.MustRunTransaction(func(tx *runner.Tx) error {
 		session := store.Open(tx)
-		wsFromStore, err = session.Load(ws.Id())
+		_, err := session.Load(id)
 		return err
 	})
-	require.NoError(s.T(), err)
 }
