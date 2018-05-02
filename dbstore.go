@@ -258,7 +258,7 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 		// field
 		field, ok := ws.def.fieldsByIndex[index]
 		if !ok {
-			return nil, fmt.Errorf("unknown value with field index %d", index)
+			continue // skip deprecated fields
 		}
 
 		// load, and potentially defer hydration of value

@@ -505,3 +505,39 @@ func (s *DbZuite) TestSignoffPattern() {
 	require.Equal(s.T(), "3", ws.MustGet("version").String())
 	require.Equal(s.T(), "false", ws.MustGet("is_signedoff").String())
 }
+
+func (s *DbZuite) TestDeprecatedField() {
+	defs := MustNewDefinitions(strings.NewReader(`worksheet some_worksheet {
+		1:field_one text
+		2:field_two text
+		3:field_three text
+	}`))
+
+	store := NewStore(defs)
+	var id string
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		ws := defs.MustNewWorksheet("some_worksheet")
+		ws.MustSet("field_one", NewText("one"))
+		ws.MustSet("field_two", NewText("two"))
+		ws.MustSet("field_three", NewText("three"))
+
+		id = ws.Id()
+		session := store.Open(tx)
+		_, err := session.SaveOrUpdate(ws)
+		return err
+	})
+
+	// update definition
+	defs = MustNewDefinitions(strings.NewReader(`worksheet some_worksheet {
+		1:field_one text
+		3:field_three text
+	}`))
+	store = NewStore(defs)
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := store.Open(tx)
+		_, err := session.Load(id)
+		return err
+	})
+}
