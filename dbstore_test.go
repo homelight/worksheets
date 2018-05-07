@@ -505,8 +505,8 @@ func (s *Zuite) TestSignoffPattern() {
 	require.Equal(s.T(), "false", ws.MustGet("is_signedoff").String())
 }
 
-func (s *DbZuite) TestDeprecatedField() {
-	defs := MustNewDefinitions(strings.NewReader(`worksheet some_worksheet {
+func (s *Zuite) TestDeprecatedField() {
+	defs := MustNewDefinitions(strings.NewReader(`type some_worksheet worksheet {
 		1:field_one text
 		2:field_two text
 		3:field_three text
@@ -528,7 +528,7 @@ func (s *DbZuite) TestDeprecatedField() {
 	})
 
 	// update definition
-	defs = MustNewDefinitions(strings.NewReader(`worksheet some_worksheet {
+	defs = MustNewDefinitions(strings.NewReader(`type some_worksheet worksheet {
 		1:field_one text
 		3:field_three text
 	}`))
