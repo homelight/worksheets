@@ -259,7 +259,7 @@ func (p *parser) parseEnum(name string) (*EnumType, error) {
 	}
 
 	var elements map[string]bool
-	for p.peek(pName) {
+	for p.peek(pText) {
 		name := p.next()
 
 		_, err = p.nextAndCheck(pComma)
@@ -270,11 +270,15 @@ func (p *parser) parseEnum(name string) (*EnumType, error) {
 		if elements == nil {
 			elements = make(map[string]bool)
 		}
+		name, err = strconv.Unquote(name)
+		if err != nil {
+			panic(fmt.Sprintf("unexpected: %s", err))
+		}
 		elements[name] = true
 	}
 
 	if !p.peek(pRacco) {
-		_, err = p.nextAndCheck(pName)
+		_, err = p.nextAndCheck(pText)
 		if err == nil {
 			panic("unexpected")
 		}
