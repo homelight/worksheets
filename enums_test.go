@@ -18,15 +18,15 @@ import (
 
 var enumsDefs = `
 type team_member enum {
-	pratik,
-	jane,
-	alex,
-	the_devil,
+	"pratik",
+	"jane",
+	"alex",
+	"the_devil",
 }
 
 type yes_or_no enum {
-	yes,
-	no,
+	"yes",
+	"no",
 }
 
 type questionnaire worksheet {

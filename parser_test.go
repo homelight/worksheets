@@ -69,10 +69,11 @@ func (s *Zuite) TestParser_parseWorksheet() {
 
 func (s *Zuite) TestParser_parseEnum() {
 	cases := map[string][]string{
-		`{}`:               nil,
-		`{foo,}`:           []string{"foo"},
-		`{foo,bar,}`:       []string{"foo", "bar"},
-		`{one,two,three,}`: []string{"one", "two", "three"},
+		`{}`:                     nil,
+		`{"foo",}`:               []string{"foo"},
+		`{"foo","bar",}`:         []string{"foo", "bar"},
+		`{"one","two","three",}`: []string{"one", "two", "three"},
+		`{"hello world",}`:       []string{"hello world"},
 	}
 	for input, elements := range cases {
 		var expected map[string]bool
@@ -85,7 +86,7 @@ func (s *Zuite) TestParser_parseEnum() {
 
 		p := newParser(strings.NewReader(input))
 		enum, err := p.parseEnum("simple")
-		require.NoError(s.T(), err)
+		require.NoError(s.T(), err, input)
 		require.Equal(s.T(), "simple", enum.name)
 		require.Equal(s.T(), expected, enum.elements)
 		require.True(s.T(), p.isEof(), input)
@@ -94,9 +95,9 @@ func (s *Zuite) TestParser_parseEnum() {
 
 func (s *Zuite) TestParser_parseEnumErrors() {
 	cases := map[string]string{
-		`{`:     "expected name, found <eof>",
-		`{foo}`: "expected ,, found }",
-		`{5}`:   "expected name, found 5",
+		`{`:       "expected text, found <eof>",
+		`{"foo"}`: "expected ,, found }",
+		`{5}`:     "expected text, found 5",
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))
