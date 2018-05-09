@@ -403,6 +403,7 @@ type Scenario struct {
 	// Name is the scenario's name.
 	Name string
 
+	source   string
 	steps    []*gherkin.Step
 	commands []command
 }
@@ -412,21 +413,27 @@ func (s Scenario) Run(ctx Context) error {
 	ctx.sheets = make(map[string]*worksheets.Worksheet)
 	for i, cmd := range s.commands {
 		if err := cmd.run(&ctx); err != nil {
-			return fmt.Errorf("%s: %s", s.steps[i].Text, err)
+			return niceErr(s.source, s.steps[i], err)
 		}
 	}
 	return nil
 }
 
+func niceErr(source string, step *gherkin.Step, err error) error {
+	return fmt.Errorf("%s:%d:%d: %s: %s",
+		source, step.Location.Line, step.Location.Column,
+		step.Text, err)
+}
+
 // ReadFeature reads a feature in gherkin syntax, and parses out all the
 // scenarios contained herein.
-func ReadFeature(reader io.Reader) ([]Scenario, error) {
+func ReadFeature(reader io.Reader, source string) ([]Scenario, error) {
 	doc, err := gherkin.ParseGherkinDocument(reader)
 	if err != nil {
 		return nil, err
 	}
 
-	scenarios, err := docToScenarios(doc)
+	scenarios, err := docToScenarios(doc, source)
 	if err != nil {
 		return nil, err
 	}
@@ -441,7 +448,7 @@ func RunFeature(t *testing.T, filename string, opts ...Context) {
 		t.Fatal(err)
 	}
 
-	scenarios, err := ReadFeature(bufio.NewReader(file))
+	scenarios, err := ReadFeature(bufio.NewReader(file), filename)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -468,7 +475,7 @@ func RunFeature(t *testing.T, filename string, opts ...Context) {
 	}
 }
 
-func docToScenarios(doc *gherkin.GherkinDocument) ([]Scenario, error) {
+func docToScenarios(doc *gherkin.GherkinDocument, source string) ([]Scenario, error) {
 	var (
 		bgSteps    []*gherkin.Step
 		bgCommands []command
@@ -481,7 +488,7 @@ func docToScenarios(doc *gherkin.GherkinDocument) ([]Scenario, error) {
 			for _, step := range child.Steps {
 				cmd, err := stepToCommand(step)
 				if err != nil {
-					return nil, err
+					return nil, niceErr(source, step, err)
 				}
 				commands = append(commands, cmd)
 			}
@@ -494,16 +501,17 @@ func docToScenarios(doc *gherkin.GherkinDocument) ([]Scenario, error) {
 			for _, step := range child.Steps {
 				cmd, err := stepToCommand(step)
 				if err != nil {
-					return nil, err
+					return nil, niceErr(source, step, err)
 				}
 				bgCommands = append(bgCommands, cmd)
 			}
 			bgSteps = child.Steps
 		default:
-			return nil, fmt.Errorf("unknwon child type %T\n", child)
+			return nil, fmt.Errorf("%s: unknwon child type %T\n", source, child)
 		}
 	}
 	for i := range scenarios {
+		scenarios[i].source = source
 		scenarios[i].steps = append(bgSteps, scenarios[i].steps...)
 		scenarios[i].commands = append(bgCommands, scenarios[i].commands...)
 	}

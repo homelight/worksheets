@@ -55,7 +55,7 @@ func runFeature(filename string) bool {
 	defer file.Close()
 
 	// read feature
-	scenarios, err := wstesting.ReadFeature(bufio.NewReader(file))
+	scenarios, err := wstesting.ReadFeature(bufio.NewReader(file), filename)
 	if err != nil {
 		fmt.Printf("%s\n", filename)
 		fmt.Printf("FAIL\t%s\n", err)
