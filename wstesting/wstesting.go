@@ -286,7 +286,7 @@ func (cmd cCreate) run(ctx *Context) error {
 	if ctx.Defs == nil {
 		return fmt.Errorf("must first load definitions file")
 	}
-	if _, ok := ctx.Sheets[cmd.ws]; ok {
+	if _, ok := ctx.sheets[cmd.ws]; ok {
 		return fmt.Errorf("worksheet %s already created", cmd.ws)
 	}
 
@@ -295,12 +295,12 @@ func (cmd cCreate) run(ctx *Context) error {
 		return err
 	}
 
-	ctx.Sheets[cmd.ws] = ws
+	ctx.sheets[cmd.ws] = ws
 	return nil
 }
 
 func (cmd cSet) run(ctx *Context) error {
-	ws, ok := ctx.Sheets[cmd.ws]
+	ws, ok := ctx.sheets[cmd.ws]
 	if !ok {
 		return fmt.Errorf("worksheet %s not yet created", cmd.ws)
 	}
@@ -313,7 +313,7 @@ func (cmd cSet) run(ctx *Context) error {
 }
 
 func (cmd cAppend) run(ctx *Context) error {
-	ws, ok := ctx.Sheets[cmd.ws]
+	ws, ok := ctx.sheets[cmd.ws]
 	if !ok {
 		return fmt.Errorf("worksheet %s not yet created", cmd.ws)
 	}
@@ -326,7 +326,7 @@ func (cmd cAppend) run(ctx *Context) error {
 }
 
 func (cmd cDel) run(ctx *Context) error {
-	ws, ok := ctx.Sheets[cmd.ws]
+	ws, ok := ctx.sheets[cmd.ws]
 	if !ok {
 		return fmt.Errorf("worksheet %s not yet created", cmd.ws)
 	}
@@ -339,7 +339,7 @@ func (cmd cDel) run(ctx *Context) error {
 }
 
 func (cmd cAssert) run(ctx *Context) error {
-	ws, ok := ctx.Sheets[cmd.ws]
+	ws, ok := ctx.sheets[cmd.ws]
 	if !ok {
 		return fmt.Errorf("worksheet %s not yet created", cmd.ws)
 	}
@@ -391,11 +391,11 @@ type Context struct {
 	// from a ws definition file.
 	Defs *worksheets.Definitions
 
-	// Sheets are the worksheets defined as the scenario is running. Since this
+	// sheets are the worksheets defined as the scenario is running. Since this
 	// map is modified during scenario execution, it is strongly suggested to
 	// provide `nil`, or to provide a fresh copy for each and every scenario
 	// run.
-	Sheets map[string]*worksheets.Worksheet
+	sheets map[string]*worksheets.Worksheet
 }
 
 // Scenario represents a single scenario from a .feature.
@@ -409,9 +409,7 @@ type Scenario struct {
 
 // Run runs the scenario using the provided context.
 func (s Scenario) Run(ctx Context) error {
-	if ctx.Sheets == nil {
-		ctx.Sheets = make(map[string]*worksheets.Worksheet)
-	}
+	ctx.sheets = make(map[string]*worksheets.Worksheet)
 	for i, cmd := range s.commands {
 		if err := cmd.run(&ctx); err != nil {
 			return fmt.Errorf("%s: %s", s.steps[i].Text, err)
@@ -437,7 +435,7 @@ func ReadFeature(reader io.Reader) ([]Scenario, error) {
 }
 
 // RunFeature runs a feature test.
-func RunFeature(t *testing.T, filename string) {
+func RunFeature(t *testing.T, filename string, opts ...Context) {
 	file, err := os.Open(filename)
 	if err != nil {
 		t.Fatal(err)
@@ -448,13 +446,21 @@ func RunFeature(t *testing.T, filename string) {
 		t.Fatal(err)
 	}
 
+	// context
+	var ctx Context
+	switch len(opts) {
+	case 0:
+		ctx.CurrentDir = filepath.Dir(filename)
+	case 1:
+		ctx = opts[0]
+	default:
+		t.Fatalf("too many contexts provided")
+	}
+
 	// run scenarios
-	currentDir := filepath.Dir(filename)
 	for _, scenario := range scenarios {
 		t.Run(scenario.Name, func(t *testing.T) {
-			err := scenario.Run(Context{
-				CurrentDir: currentDir,
-			})
+			err := scenario.Run(ctx)
 			if err != nil {
 				t.Error(err)
 			}
