@@ -1,6 +1,6 @@
 type player enum {
-	round,
-	cross,
+	"round",
+	"cross",
 }
 
 type tic_tac_toe worksheet {
