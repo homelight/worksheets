@@ -14,8 +14,8 @@ shared: &run_steps
     # golang
     - run: go get -v -t -d ./...
     - run: go test -v ./...
-    - run: go run tools/wstest.go `find features -name '*.feature'`
-    - run: go build -tags=gofuzz ./...
+    - run: go run tools/wstest.go `find examples -name '*.feature'`
+    - run: go build -tags=gofuzz ./fuzz
 
 jobs:
   buildGo1.8:
