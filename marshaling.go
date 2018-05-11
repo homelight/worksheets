@@ -132,6 +132,30 @@ type WorksheetConverter interface {
 var worksheetConverterType = reflect.TypeOf((*WorksheetConverter)(nil)).Elem()
 
 func (ws *Worksheet) StructScan(dest interface{}) error {
+	// mapping function returns ws field, ignore/skip, error
+	// this function uses tags
+	f := func(refWs *Worksheet, currentField reflect.StructField) (*Field, bool, error) {
+		tag, ok := currentField.Tag.Lookup("ws")
+
+		if !ok {
+			return nil, false, nil
+		}
+
+		if tag == "" {
+			return nil, false, fmt.Errorf("struct field %s: cannot have empty tag name", currentField.Name)
+		}
+
+		field, ok := refWs.def.fieldsByName[tag]
+		if !ok {
+			return nil, false, fmt.Errorf("unknown field %s", tag)
+		}
+
+		return field, true, nil
+	}
+	return ws.StructScanWithNameFunc(dest, f)
+}
+
+func (ws *Worksheet) StructScanWithNameFunc(dest interface{}, nameFn func(*Worksheet,reflect.StructField) (*Field, bool, error)) error {
 	v := reflect.ValueOf(dest)
 	if v.Type().Kind() != reflect.Ptr || v.Type().Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("dest must be a *struct")
@@ -142,19 +166,11 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 	for i := 0; i < t.NumField(); i++ {
 		f := v.Field(i)
 		ft := t.Field(i)
-		tag, ok := ft.Tag.Lookup("ws")
-
-		if !ok {
+		field, ok, err := nameFn(ws, ft)
+		if err != nil {
+			return err
+		} else if !ok {
 			continue
-		}
-
-		if tag == "" {
-			return fmt.Errorf("struct field %s: cannot have empty tag name", ft.Name)
-		}
-
-		field, ok := ws.def.fieldsByName[tag]
-		if !ok {
-			return fmt.Errorf("unknown field %s", tag)
 		}
 
 		// for now, no support for slices or worksheets
@@ -166,12 +182,12 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 			return fmt.Errorf("struct field %s: cannot StructScan worksheets (yet)", ft.Name)
 		}
 
-		_, wsValue, _ := ws.get(tag)
+		_, wsValue, _ := ws.get(field.Name())
 
 		// undefined
 		if _, ok := wsValue.(*Undefined); ok {
 			if ft.Type.Kind() != reflect.Ptr {
-				return fmt.Errorf("field %s to struct field %s: undefined into not nullable", tag, ft.Name)
+				return fmt.Errorf("field %s to struct field %s: undefined into not nullable", field.Name(), ft.Name)
 			}
 			f.Set(reflect.Zero(ft.Type))
 			continue

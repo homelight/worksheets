@@ -14,8 +14,10 @@ package worksheets
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -437,4 +439,75 @@ func (s *Zuite) TestStructScan_convertErrors() {
 		assert.EqualErrorf(s.T(), err, "field source to struct field Dest: cannot convert "+ex.expected,
 			"converting %s to %s", ex.source, ex.dest)
 	}
+}
+
+func (s *Zuite) TestStructScanWithNameFunc_fixedReturn() {
+	ws := s.defs.MustNewWorksheet("all_types")
+	ws.MustSet("text", NewText("hello, world!"))
+
+	var data struct {
+		Text string
+	}
+	f := func(refWs *Worksheet, _ reflect.StructField) (*Field, bool, error) {
+		field, ok := refWs.def.fieldsByName["text"]
+		if !ok {
+			return nil, false, errors.New("oops")
+		}
+
+		return field, true, nil
+	}
+	err := ws.StructScanWithNameFunc(&data, f)
+	s.Require().NoError(err)
+	s.Equal("hello, world!", data.Text)
+}
+
+func (s *Zuite) TestStructScanWithNameFunc_lowercaseField() {
+	ws := s.defs.MustNewWorksheet("all_types")
+	ws.MustSet("text", NewText("hello, world!"))
+
+	var data struct {
+		Text string
+	}
+	f := func(refWs *Worksheet, currentField reflect.StructField) (*Field, bool, error) {
+		field, ok := refWs.def.fieldsByName[strings.ToLower(currentField.Name)]
+		if !ok {
+			return nil, false, errors.New("oops")
+		}
+
+		return field, true, nil
+	}
+	err := ws.StructScanWithNameFunc(&data, f)
+	s.Require().NoError(err)
+	s.Equal("hello, world!", data.Text)
+}
+
+func (s *Zuite) TestStructScanWithNameFunc_ignored() {
+	ws := s.defs.MustNewWorksheet("all_types")
+	ws.MustSet("text", NewText("hello, world!"))
+
+	var data struct {
+		Text string
+	}
+	f := func(refWs *Worksheet, currentField reflect.StructField) (*Field, bool, error) {
+		return nil, false, nil
+	}
+	err := ws.StructScanWithNameFunc(&data, f)
+	s.Require().NoError(err)
+	s.Equal("", data.Text)
+}
+
+func (s *Zuite) TestStructScanWithNameFunc_error() {
+	ws := s.defs.MustNewWorksheet("all_types")
+	ws.MustSet("text", NewText("hello, world!"))
+
+	var data struct {
+		Text string
+	}
+	f := func(refWs *Worksheet, currentField reflect.StructField) (*Field, bool, error) {
+		return nil, false, errors.New("this is bad")
+	}
+	err := ws.StructScanWithNameFunc(&data, f)
+	s.Require().Error(err)
+	s.EqualError(err, "this is bad")
+	s.Equal("", data.Text)
 }
