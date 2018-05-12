@@ -208,7 +208,7 @@ func convert(ctx convertCtx, value Value) (reflect.Value, error) {
 		if err := exporter.WorksheetConvert(value); err != nil {
 			return reflect.Value{}, err
 		}
-		return reflect.ValueOf(exporter), nil
+		return reflect.ValueOf(exporter).Elem(), nil
 	}
 
 	if ctx.destType.Kind() == reflect.Ptr {
