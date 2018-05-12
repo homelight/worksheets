@@ -157,13 +157,9 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 			return fmt.Errorf("unknown field %s", tag)
 		}
 
-		// for now, no support for slices or worksheets
+		// for now, no support for slices
 		if _, ok := field.typ.(*SliceType); ok {
 			return fmt.Errorf("struct field %s: cannot StructScan slices (yet)", ft.Name)
-		}
-
-		if _, ok := field.typ.(*Definition); ok {
-			return fmt.Errorf("struct field %s: cannot StructScan worksheets (yet)", ft.Name)
 		}
 
 		_, wsValue, _ := ws.get(tag)
@@ -349,7 +345,15 @@ func (value *Number) structScanConvert(ctx convertCtx) (reflect.Value, error) {
 }
 
 func (value *Worksheet) structScanConvert(ctx convertCtx) (reflect.Value, error) {
-	return ctx.cannotConvert("not supported yet")
+	if ctx.destType.Kind() != reflect.Struct {
+		return ctx.cannotConvert("dest must be a struct")
+	}
+	newVal := reflect.New(ctx.destType)
+	err := value.StructScan(newVal.Interface())
+	if err != nil {
+		return reflect.Value{}, err
+	}
+	return newVal.Elem(), nil
 }
 
 func (value *Slice) structScanConvert(ctx convertCtx) (reflect.Value, error) {
