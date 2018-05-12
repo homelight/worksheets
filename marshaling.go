@@ -196,21 +196,6 @@ type convertCtx struct {
 }
 
 func convert(ctx convertCtx, value Value) (reflect.Value, error) {
-	// do WorksheetConverter types first
-	if ctx.destType.AssignableTo(worksheetConverterType) {
-		exporter := reflect.New(ctx.destType.Elem()).Interface().(WorksheetConverter)
-		if err := exporter.WorksheetConvert(value); err != nil {
-			return reflect.Value{}, err
-		}
-		return reflect.ValueOf(exporter), nil
-	} else if reflect.PtrTo(ctx.destType).AssignableTo(worksheetConverterType) {
-		exporter := reflect.New(ctx.destType).Interface().(WorksheetConverter)
-		if err := exporter.WorksheetConvert(value); err != nil {
-			return reflect.Value{}, err
-		}
-		return reflect.ValueOf(exporter).Elem(), nil
-	}
-
 	if ctx.destType.Kind() == reflect.Ptr {
 		ctx.destType = ctx.destType.Elem()
 		v, err := convert(ctx, value)
@@ -220,6 +205,15 @@ func convert(ctx convertCtx, value Value) (reflect.Value, error) {
 		locus := reflect.New(ctx.destType)
 		locus.Elem().Set(v)
 		return locus, nil
+	}
+
+	// if we have a type that uses a custom converter, use it instead of standard conversion
+	if reflect.PtrTo(ctx.destType).AssignableTo(worksheetConverterType) {
+		exporter := reflect.New(ctx.destType).Interface().(WorksheetConverter)
+		if err := exporter.WorksheetConvert(value); err != nil {
+			return reflect.Value{}, err
+		}
+		return reflect.ValueOf(exporter).Elem(), nil
 	}
 
 	return value.structScanConvert(ctx)
