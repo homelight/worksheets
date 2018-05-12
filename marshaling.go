@@ -157,11 +157,6 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 			return fmt.Errorf("unknown field %s", tag)
 		}
 
-		// for now, no support for slices
-		if _, ok := field.typ.(*SliceType); ok {
-			return fmt.Errorf("struct field %s: cannot StructScan slices (yet)", ft.Name)
-		}
-
 		_, wsValue, _ := ws.get(tag)
 
 		// undefined
@@ -170,23 +165,6 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 				return fmt.Errorf("field %s to struct field %s: undefined into not nullable", tag, ft.Name)
 			}
 			f.Set(reflect.Zero(ft.Type))
-			continue
-		}
-
-		// WorksheetConverter
-		if ft.Type.AssignableTo(worksheetConverterType) {
-			exporter := reflect.New(ft.Type.Elem()).Interface().(WorksheetConverter)
-			if err := exporter.WorksheetConvert(wsValue); err != nil {
-				return err
-			}
-			f.Set(reflect.ValueOf(exporter))
-			continue
-		} else if reflect.PtrTo(ft.Type).AssignableTo(worksheetConverterType) {
-			exporter := reflect.New(ft.Type).Interface().(WorksheetConverter)
-			if err := exporter.WorksheetConvert(wsValue); err != nil {
-				return err
-			}
-			f.Set(reflect.ValueOf(exporter).Elem())
 			continue
 		}
 
@@ -218,6 +196,21 @@ type convertCtx struct {
 }
 
 func convert(ctx convertCtx, value Value) (reflect.Value, error) {
+	// do WorksheetConverter types first
+	if ctx.destType.AssignableTo(worksheetConverterType) {
+		exporter := reflect.New(ctx.destType.Elem()).Interface().(WorksheetConverter)
+		if err := exporter.WorksheetConvert(value); err != nil {
+			return reflect.Value{}, err
+		}
+		return reflect.ValueOf(exporter), nil
+	} else if reflect.PtrTo(ctx.destType).AssignableTo(worksheetConverterType) {
+		exporter := reflect.New(ctx.destType).Interface().(WorksheetConverter)
+		if err := exporter.WorksheetConvert(value); err != nil {
+			return reflect.Value{}, err
+		}
+		return reflect.ValueOf(exporter), nil
+	}
+
 	if ctx.destType.Kind() == reflect.Ptr {
 		ctx.destType = ctx.destType.Elem()
 		v, err := convert(ctx, value)
@@ -357,7 +350,27 @@ func (value *Worksheet) structScanConvert(ctx convertCtx) (reflect.Value, error)
 }
 
 func (value *Slice) structScanConvert(ctx convertCtx) (reflect.Value, error) {
-	return ctx.cannotConvert("not supported yet")
+	if ctx.destType.Kind() != reflect.Slice && ctx.destType.Kind() != reflect.Array {
+		return ctx.cannotConvert("dest must be a slice or array")
+	}
+	locus := reflect.New(ctx.destType)
+	if ctx.destType.Kind() == reflect.Slice {
+		// create backing array
+		locus.Elem().Set(reflect.MakeSlice(ctx.destType, len(value.Elements()), len(value.Elements())))
+	} else { // reflect.Array
+		if locus.Elem().Len() != len(value.Elements()) {
+			return ctx.cannotConvert("index out of range")
+		}
+	}
+	ctx.destType = ctx.destType.Elem()
+	for i, wsElem := range value.Elements() {
+		newVal, err := convert(ctx, wsElem)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		locus.Elem().Index(i).Set(newVal)
+	}
+	return locus.Elem(), nil
 }
 
 func (ctx convertCtx) valueOutOfRange() (reflect.Value, error) {

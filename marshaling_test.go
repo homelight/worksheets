@@ -256,14 +256,73 @@ func (s *Zuite) TestStructScan_skipFieldsWithNoTag() {
 	require.Equal(s.T(), "ignore me", data.Ignore)
 }
 
-func (s *Zuite) TestStructScan_slicesNotSupported() {
-	ws := s.defs.MustNewWorksheet("all_types")
-
+func (s *Zuite) TestStructScan_slices() {
 	var data struct {
 		Texts []string `ws:"slice_t"`
 	}
+
+	ws := s.defs.MustNewWorksheet("all_types")
+	ws.MustAppend("slice_t", NewText("a"))
+	ws.MustAppend("slice_t", NewText("b"))
+	ws.MustAppend("slice_t", NewText("c"))
+
 	err := ws.StructScan(&data)
-	require.EqualError(s.T(), err, "struct field Texts: cannot StructScan slices (yet)")
+	s.Require().NoError(err)
+	s.Equal([]string{"a", "b", "c"}, data.Texts)
+}
+
+func (s *Zuite) TestStructScan_slicesEmpty() {
+	var data struct {
+		Texts []string `ws:"slice_t"`
+	}
+
+	ws := s.defs.MustNewWorksheet("all_types")
+
+	err := ws.StructScan(&data)
+	s.Require().NoError(err)
+	s.Equal([]string{}, data.Texts)
+}
+
+func (s *Zuite) TestStructScan_slicesToArrayField() {
+	var data struct {
+		Texts [3]string `ws:"slice_t"`
+	}
+
+	ws := s.defs.MustNewWorksheet("all_types")
+	ws.MustAppend("slice_t", NewText("a"))
+	ws.MustAppend("slice_t", NewText("b"))
+	ws.MustAppend("slice_t", NewText("c"))
+
+	err := ws.StructScan(&data)
+	s.Require().NoError(err)
+	s.Equal([3]string{"a", "b", "c"}, data.Texts)
+}
+
+func (s *Zuite) TestStructScan_slicesToArrayOutOfRange() {
+	var data struct {
+		Texts [2]string `ws:"slice_t"`
+	}
+
+	ws := s.defs.MustNewWorksheet("all_types")
+
+	// empty
+	err := ws.StructScan(&data)
+	s.EqualError(err, "field slice_t to struct field Texts: cannot convert []text to [2]string, index out of range")
+
+	// 1 elem
+	ws.MustAppend("slice_t", NewText("a"))
+	err = ws.StructScan(&data)
+	s.EqualError(err, "field slice_t to struct field Texts: cannot convert []text to [2]string, index out of range")
+
+	// 2 elems, matched array length!
+	ws.MustAppend("slice_t", NewText("b"))
+	err = ws.StructScan(&data)
+	s.NoError(err)
+
+	// 3 elems oops
+	ws.MustAppend("slice_t", NewText("c"))
+	err = ws.StructScan(&data)
+	s.EqualError(err, "field slice_t to struct field Texts: cannot convert []text to [2]string, index out of range")
 }
 
 func (s *Zuite) TestStructScan_refsPtr() {
