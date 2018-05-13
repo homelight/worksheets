@@ -352,11 +352,11 @@ func (s *Zuite) TestStructScan_refsPtr() {
 
 func (s *Zuite) TestStructScan_refsNoPtr() {
 	type allTypesOtherStruct struct {
-		Num0 int             `ws:"num_0"`
+		Num0 int `ws:"num_0"`
 	}
 	type allTypesStruct struct {
 		Ws   allTypesOtherStruct `ws:"ws"`
-		Num0 int             `ws:"num_0"`
+		Num0 int                 `ws:"num_0"`
 	}
 
 	ws := s.defs.MustNewWorksheet("all_types")
@@ -375,6 +375,92 @@ func (s *Zuite) TestStructScan_refsNoPtr() {
 
 	child := parent.Ws
 	s.Equal(456, child.Num0)
+}
+
+type ping struct {
+	Pong *pong `ws:"point_to_pong"`
+}
+
+type pong struct {
+	Ping *ping `ws:"point_to_ping"`
+}
+
+func (s *Zuite) TestStructScan_refsCircularIndirect() {
+	pingWs := s.defs.MustNewWorksheet("ping")
+	pongWs := s.defs.MustNewWorksheet("pong")
+
+	pongWs.MustSet("point_to_ping", pingWs)
+	pingWs.MustSet("point_to_pong", pongWs)
+
+	var ping ping
+	err := pingWs.StructScan(&ping)
+	s.Require().NoError(err)
+
+	s.Equal(ping, *ping.Pong.Ping)
+	s.Equal(ping.Pong, ping.Pong.Ping.Pong)
+}
+
+func (s *Zuite) TestStructScan_refsCircularDirect() {
+	type meAndMyFriends struct {
+		Me      *meAndMyFriends  `ws:"point_to_me"`
+		MyPeeps []meAndMyFriends `ws:"point_to_my_friends"`
+	}
+
+	joey := s.defs.MustNewWorksheet("with_refs_and_cycles")
+	phoebe := s.defs.MustNewWorksheet("with_refs_and_cycles")
+	russ := s.defs.MustNewWorksheet("with_refs_and_cycles")
+
+	// know thyself
+	joey.MustSet("point_to_me", joey)
+	phoebe.MustSet("point_to_me", phoebe)
+	russ.MustSet("point_to_me", russ)
+
+	// everyone is friends (except russ is too cool to reciprocate)
+	// since things don't flush automatically, we have to be careful to cascade properly
+	// and not set refs to worksheet data we plan to mutate
+	// TODO figure out flush
+	phoebe.MustAppend("point_to_my_friends", russ)
+	joey.MustAppend("point_to_my_friends", phoebe)
+	joey.MustAppend("point_to_my_friends", russ)
+
+	var f1 meAndMyFriends
+	err := joey.StructScan(&f1)
+	s.Require().NoError(err)
+
+	s.Require().Equal(2, len(f1.MyPeeps))
+	f2 := f1.MyPeeps[0]
+	f3 := f1.MyPeeps[1]
+	s.Equal(f1, *f1.Me)
+	s.Equal(f2.MyPeeps[0], f3)
+	s.Zero(len(f3.MyPeeps))
+}
+
+func (s *Zuite) TestStructScan_refsRepeat() {
+	type thing struct {
+		Name string `ws:"name"`
+	}
+
+	type pedantic struct {
+		ThatThing      thing   `ws:"point_to_something"`
+		JustMakingSure *thing  `ws:"point_to_the_same_thing"`
+		KeepItSafe     []thing `ws:"and_again"`
+	}
+
+	t := s.defs.MustNewWorksheet("simple")
+	t.MustSet("name", NewText("hi look at me"))
+
+	ws := s.defs.MustNewWorksheet("with_repeat_refs")
+	ws.MustSet("point_to_something", t)
+	ws.MustSet("point_to_the_same_thing", t)
+	ws.MustAppend("and_again", t)
+
+	var p pedantic
+	err := ws.StructScan(&p)
+	s.Require().NoError(err)
+
+	s.Require().Equal(1, len(p.KeepItSafe))
+	s.Equal(p.ThatThing, *p.JustMakingSure)
+	s.Equal(p.ThatThing, p.KeepItSafe[0])
 }
 
 type special struct {
