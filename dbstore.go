@@ -391,7 +391,7 @@ func (typ *Definition) dbReadValue(l *loader, value string) (Value, error) {
 }
 
 func (typ *EnumType) dbReadValue(l *loader, value string) (Value, error) {
-	panic("implement me")
+	return (&TextType{}).dbReadValue(l, value)
 }
 
 func (l *loader) nextSlicesToHydrate() map[string]*Slice {
