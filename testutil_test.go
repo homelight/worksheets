@@ -69,6 +69,15 @@ type with_refs worksheet {
 
 type with_refs_and_cycles worksheet {
 	404:point_to_me with_refs_and_cycles
+}
+
+type ping worksheet {
+	123:point_to_pong pong
+	124:slice_of_ping []ping
+}
+
+type pong worksheet {
+	321:point_to_ping ping
 }`
 
 func forciblySetId(ws *Worksheet, id string) {

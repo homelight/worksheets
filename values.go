@@ -530,13 +530,18 @@ func (value *Slice) Equal(that Value) bool {
 }
 
 func (value *Slice) String() string {
+	seen := make(map[string]bool)
+	return value.stringerHelper(seen)
+}
+
+func (value *Slice) stringerHelper(seen map[string]bool) string {
 	var buffer bytes.Buffer
 	buffer.WriteRune('[')
 	for i, element := range value.elements {
 		if i != 0 {
 			buffer.WriteRune(' ')
 		}
-		buffer.WriteString(element.value.String())
+		buffer.WriteString(stringerHelperSwitch(seen, element.value))
 	}
 	buffer.WriteRune(']')
 	return buffer.String()
@@ -551,6 +556,15 @@ func (ws *Worksheet) Equal(that Value) bool {
 }
 
 func (ws *Worksheet) String() string {
+	seen := make(map[string]bool)
+	return stringerHelperSwitch(seen, ws)
+}
+
+func (ws *Worksheet) stringerHelper(seen map[string]bool) string {
+	if _, ok := seen[ws.Id()]; ok {
+		return "<#ref>"
+	}
+	seen[ws.Id()] = true
 	fieldNames := make([]string, 0, len(ws.data)-2)
 	for index := range ws.data {
 		if index != indexId && index != indexVersion {
@@ -569,8 +583,19 @@ func (ws *Worksheet) String() string {
 		}
 		buffer.WriteString(fieldName)
 		buffer.WriteRune(':')
-		buffer.WriteString(value.String())
+		buffer.WriteString(stringerHelperSwitch(seen, value))
 	}
 	buffer.WriteRune(']')
 	return buffer.String()
+}
+
+func stringerHelperSwitch(seen map[string]bool, v Value) string {
+	switch typedVal := v.(type) {
+	case *Worksheet:
+		return typedVal.stringerHelper(seen)
+	case *Slice:
+		return typedVal.stringerHelper(seen)
+	default:
+		return v.String()
+	}
 }
