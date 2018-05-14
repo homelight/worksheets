@@ -14,6 +14,8 @@ package worksheets
 
 import (
 	"github.com/stretchr/testify/require"
+
+	"github.com/helloeave/dat/sqlx-runner"
 )
 
 var enumsDefs = `
@@ -77,4 +79,32 @@ func (s *Zuite) TestEnum_hotdogConundrum() {
 
 	err := ws.Set("who", NewText("the_devil"))
 	require.EqualError(s.T(), err, "cannot assign 42! to yes_or_no")
+}
+
+func (s *Zuite) TestEnum_saveInDb() {
+	var wsId string
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		ws := s.enumsDefs.MustNewWorksheet("questionnaire")
+		err := ws.Set("who", NewText("pratik"))
+		if err != nil {
+			return err
+		}
+		wsId = ws.Id()
+
+		session := s.store.Open(tx)
+		_, err = session.Save(ws)
+		return err
+	})
+
+	var wsFromStore *Worksheet
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := NewStore(s.enumsDefs).Open(tx)
+		var err error
+		wsFromStore, err = session.Load(wsId)
+		return err
+	})
+
+	s.Equal(`"pratik"`, wsFromStore.MustGet("who").String())
+	s.Equal(`"yes"`, wsFromStore.MustGet("is_a_hotdog_a_sandwich").String())
 }
