@@ -57,7 +57,7 @@ func (s *Zuite) TestValueString() {
 
 		ws: `worksheet[age:73 name:"Alice"]`,
 
-		ping: `worksheet[point_to_pong:worksheet[point_to_ping:<#ref>]]`,
+		ping:     `worksheet[point_to_pong:worksheet[point_to_ping:<#ref>]]`,
 		pingSelf: `worksheet[slice_of_ping:[<#ref>]]`,
 	}
 	for value, expected := range cases {
