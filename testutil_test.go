@@ -73,7 +73,7 @@ type with_refs_and_cycles worksheet {
 
 type ping worksheet {
 	123:point_to_pong pong
-    124:slice_of_ping []ping
+	124:slice_of_ping []ping
 }
 
 type pong worksheet {
