@@ -515,6 +515,9 @@ var functions = map[string]func(args *fnArgs) (Value, error){
 		}
 	},
 	"first_of": rFirstOf,
+	"min":      rMin,
+	"max":      rMax,
+	"slice":    rSlice,
 }
 
 func rFirstOf(args *fnArgs) (Value, error) {
@@ -536,6 +539,110 @@ func rFirstOf(args *fnArgs) (Value, error) {
 		}
 	}
 	return vUndefined, nil
+}
+
+type foldNumbers interface {
+	update(value *Number)
+	result() Value
+}
+
+func rFoldNumbers(f foldNumbers, args *fnArgs) (Value, error) {
+	if err := args.checkMinArgsNum(1); err != nil {
+		return nil, err
+	}
+	for i := 0; i < args.num(); i++ {
+		arg, err := args.get(i)
+		if err != nil {
+			return nil, err
+		}
+		switch value := arg.(type) {
+		case *Undefined:
+			return value, nil
+		case *Number:
+			f.update(value)
+		case *Slice:
+			result, err := rFoldNumbers(f, newFnArgs(args.ws, value.Elements()))
+			if err != nil {
+				return nil, err
+			}
+			f.update(result.(*Number))
+		default:
+			return nil, fmt.Errorf("encountered non-numerical argument")
+		}
+	}
+	return f.result(), nil
+}
+
+type minFolder struct {
+	min *Number
+}
+
+func (f *minFolder) update(value *Number) {
+	if f.min == nil || value.LessThan(f.min) {
+		f.min = value
+	}
+}
+
+func (f *minFolder) result() Value {
+	return f.min
+}
+
+func rMin(args *fnArgs) (Value, error) {
+	return rFoldNumbers(&minFolder{}, args)
+}
+
+type maxFolder struct {
+	max *Number
+}
+
+func (f *maxFolder) update(value *Number) {
+	if f.max == nil || value.GreaterThan(f.max) {
+		f.max = value
+	}
+}
+
+func (f *maxFolder) result() Value {
+	return f.max
+}
+
+func rMax(args *fnArgs) (Value, error) {
+	return rFoldNumbers(&maxFolder{}, args)
+}
+
+func rSlice(args *fnArgs) (Value, error) {
+	if err := args.checkMinArgsNum(1); err != nil {
+		return nil, err
+	}
+	var (
+		values      []Value
+		elementType Type
+	)
+	for i := 0; i < args.num(); i++ {
+		arg, err := args.get(i)
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := arg.Type().(*UndefinedType); !ok {
+			if elementType == nil {
+				elementType = arg.Type()
+			} else if nElementType, ok := elementType.(*NumberType); ok {
+				if nArgType, ok := arg.Type().(*NumberType); ok {
+					if nElementType.scale < nArgType.scale {
+						elementType = nArgType
+					}
+				} else {
+					return nil, fmt.Errorf("cannot mix incompatible types %s and %s in slice", elementType, arg.Type())
+				}
+			} else if !arg.assignableTo(elementType) {
+				return nil, fmt.Errorf("cannot mix incompatible types %s and %s in slice", elementType, arg.Type())
+			}
+		}
+		values = append(values, arg)
+	}
+	if elementType == nil {
+		return nil, fmt.Errorf("unable to infer slice type, only undefined values encountered")
+	}
+	return newSlice(&SliceType{elementType}, values...), nil
 }
 
 func (e *tCall) compute(ws *Worksheet) (Value, error) {
