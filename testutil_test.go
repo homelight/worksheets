@@ -72,11 +72,12 @@ type with_refs_and_cycles worksheet {
 }
 
 type ping worksheet {
-	123:point_to_pong         pong
+	123:point_to_pong pong
+    124:slice_of_ping []ping
 }
 
 type pong worksheet {
-	321:point_to_ping         ping
+	321:point_to_ping ping
 }`
 
 func forciblySetId(ws *Worksheet, id string) {

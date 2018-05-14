@@ -27,6 +27,10 @@ func (s *Zuite) TestValueString() {
 	ping.MustSet("point_to_pong", pong)
 	pong.MustSet("point_to_ping", ping)
 
+	// slice cycle
+	pingSelf := s.defs.MustNewWorksheet("ping")
+	pingSelf.MustAppend("slice_of_ping", pingSelf)
+
 	cases := map[Value]string{
 		vUndefined: "undefined",
 
@@ -54,6 +58,7 @@ func (s *Zuite) TestValueString() {
 		ws: `worksheet[age:73 name:"Alice"]`,
 
 		ping: `worksheet[point_to_pong:worksheet[point_to_ping:<#ref>]]`,
+		pingSelf: `worksheet[slice_of_ping:[<#ref>]]`,
 	}
 	for value, expected := range cases {
 		assert.Equal(s.T(), expected, value.String())
