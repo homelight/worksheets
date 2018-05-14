@@ -53,7 +53,7 @@ func (s *Zuite) TestValueString() {
 
 		ws: `worksheet[age:73 name:"Alice"]`,
 
-		ping: `worksheet[point_to_pong:worksheet[point_to_ping:<ref_to_seen_worksheet>]]`,
+		ping: `worksheet[point_to_pong:worksheet[point_to_ping:<#ref>]]`,
 	}
 	for value, expected := range cases {
 		assert.Equal(s.T(), expected, value.String())

@@ -562,7 +562,7 @@ func (ws *Worksheet) String() string {
 
 func (ws *Worksheet) stringerHelper(seen map[string]bool) string {
 	if _, ok := seen[ws.Id()]; ok {
-		return "<ref_to_seen_worksheet>"
+		return "<#ref>"
 	}
 	seen[ws.Id()] = true
 	fieldNames := make([]string, 0, len(ws.data)-2)
