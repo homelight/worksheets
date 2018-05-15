@@ -211,7 +211,7 @@ func (s *Zuite) TestStructScan_notOptionalYetUndefined() {
 		Text string `ws:"text"`
 	}
 	err := ws.StructScan(&data)
-	require.EqualError(s.T(), err, "field text to struct field Text: cannot convert text to string, dest must be a ptr")
+	require.EqualError(s.T(), err, "field text to struct field Text: cannot convert undefined to string, dest must be a *string")
 }
 
 func (s *Zuite) TestStructScan_optionalWithUndefined() {
@@ -263,10 +263,12 @@ func (s *Zuite) TestStructScan_slices() {
 		Ints   *[]int      `ws:"slice_n0"`
 		Floats *[]*float64 `ws:"slice_n2"`
 	}
-	t := true
-	f := false
-	n1 := float64(1)
-	n2 := 2.12
+	var (
+		t  = true
+		f  = false
+		n1 = float64(1)
+		n2 = 2.12
+	)
 	testCases := []struct {
 		field          string
 		elems          []Value
@@ -318,8 +320,8 @@ func (s *Zuite) TestStructScan_slicesEmpty() {
 
 	err := ws.StructScan(&data)
 	s.Require().NoError(err)
-	s.Empty(data.Texts)
-	s.Empty(data.Bools)
+	s.Nil(data.Texts)
+	s.Nil(data.Bools)
 	s.Nil(data.Ints)
 	s.Nil(data.Floats)
 }
@@ -422,6 +424,7 @@ func (s *Zuite) TestStructScan_refsCircularDirect() {
 	joey.MustAppend("point_to_my_friends", phoebe)
 	joey.MustAppend("point_to_my_friends", russ)
 
+	// normally: f1 = joey, f2 = phoebe, and f3 = russ
 	var f1 meAndMyFriends
 	err := joey.StructScan(&f1)
 	s.Require().NoError(err)

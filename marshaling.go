@@ -241,7 +241,8 @@ func convert(dests map[string]interface{}, ctx convertCtx, value Value) (reflect
 
 func (value *Undefined) structScanConvert(_ map[string]interface{}, ctx convertCtx) (reflect.Value, error) {
 	if ctx.destType.Kind() != reflect.Ptr {
-		return ctx.cannotConvert("dest must be a ptr")
+		ctx.sourceType = value.Type()
+		return ctx.cannotConvert(fmt.Sprintf("dest must be a *%s", ctx.destType.Name()))
 	}
 	return reflect.Zero(ctx.destType), nil
 }
@@ -376,7 +377,6 @@ func (value *Slice) structScanConvert(dests map[string]interface{}, ctx convertC
 		return reflect.Zero(ctx.destType), nil
 	}
 	locus := reflect.New(ctx.destType)
-	// create backing slice
 	locus.Elem().Set(reflect.MakeSlice(ctx.destType, len(value.Elements()), len(value.Elements())))
 	ctx.destType = ctx.destType.Elem()
 	for i, wsElem := range value.Elements() {
