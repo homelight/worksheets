@@ -454,7 +454,7 @@ Scenario: the_name_here_2
 		doc, err := gherkin.ParseGherkinDocument(strings.NewReader(ex.doc))
 		require.NoError(s.T(), err)
 
-		actual, err := docToScenarios(doc)
+		actual, err := docToScenarios(doc, "")
 		if assert.NoError(s.T(), err, ex.doc) {
 			for i := range actual {
 				assert.Len(s.T(), actual[i].steps, len(actual[i].commands))
