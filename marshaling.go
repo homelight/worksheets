@@ -151,7 +151,7 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 		return err
 	}
 
-	for k, v := range dests {
+	for _, v := range dests {
 		for _, fn := range v.sets {
 			fn(v.dest)
 		}
