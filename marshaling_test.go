@@ -211,7 +211,7 @@ func (s *Zuite) TestStructScan_notOptionalYetUndefined() {
 		Text string `ws:"text"`
 	}
 	err := ws.StructScan(&data)
-	require.EqualError(s.T(), err, "field text to struct field Text: undefined into not nullable")
+	require.EqualError(s.T(), err, "field text to struct field Text: cannot convert text to string, dest must be a ptr")
 }
 
 func (s *Zuite) TestStructScan_optionalWithUndefined() {
@@ -257,72 +257,71 @@ func (s *Zuite) TestStructScan_skipFieldsWithNoTag() {
 }
 
 func (s *Zuite) TestStructScan_slices() {
-	var data struct {
-		Texts []string `ws:"slice_t"`
+	type allSortsOfSlices struct {
+		Texts  []string    `ws:"slice_t"`
+		Bools  []*bool     `ws:"slice_b"`
+		Ints   *[]int      `ws:"slice_n0"`
+		Floats *[]*float64 `ws:"slice_n2"`
+	}
+	t := true
+	f := false
+	n1 := float64(1)
+	n2 := 2.12
+	testCases := []struct {
+		field          string
+		elems          []Value
+		expectedStruct allSortsOfSlices
+	}{
+		{
+			field:          "slice_t",
+			elems:          []Value{NewText("a"), NewText("b"), NewText("c"), NewText("")},
+			expectedStruct: allSortsOfSlices{Texts: []string{"a", "b", "c", ""}},
+		},
+		{
+			field:          "slice_b",
+			elems:          []Value{NewBool(true), vUndefined, NewBool(false)},
+			expectedStruct: allSortsOfSlices{Bools: []*bool{&t, nil, &f}},
+		},
+		{
+			field:          "slice_n0",
+			elems:          []Value{NewNumberFromInt(1), NewNumberFromInt(2), NewNumberFromInt(3)},
+			expectedStruct: allSortsOfSlices{Ints: &[]int{1, 2, 3}},
+		},
+		{
+			field:          "slice_n2",
+			elems:          []Value{NewNumberFromInt(1), NewNumberFromFloat64(2.12), vUndefined},
+			expectedStruct: allSortsOfSlices{Floats: &[]*float64{&n1, &n2, nil}},
+		},
 	}
 
-	ws := s.defs.MustNewWorksheet("all_types")
-	ws.MustAppend("slice_t", NewText("a"))
-	ws.MustAppend("slice_t", NewText("b"))
-	ws.MustAppend("slice_t", NewText("c"))
-
-	err := ws.StructScan(&data)
-	s.Require().NoError(err)
-	s.Equal([]string{"a", "b", "c"}, data.Texts)
+	for _, tc := range testCases {
+		ws := s.defs.MustNewWorksheet("all_types")
+		for _, e := range tc.elems {
+			ws.MustAppend(tc.field, e)
+		}
+		var data allSortsOfSlices
+		err := ws.StructScan(&data)
+		s.NoError(err)
+		s.Equal(tc.expectedStruct, data)
+	}
 }
 
 func (s *Zuite) TestStructScan_slicesEmpty() {
 	var data struct {
-		Texts []string `ws:"slice_t"`
+		Texts  []string    `ws:"slice_t"`
+		Bools  []*bool     `ws:"slice_b"`
+		Ints   *[]int      `ws:"slice_n0"`
+		Floats *[]*float64 `ws:"slice_n2"`
 	}
 
 	ws := s.defs.MustNewWorksheet("all_types")
 
 	err := ws.StructScan(&data)
 	s.Require().NoError(err)
-	s.Equal([]string{}, data.Texts)
-}
-
-func (s *Zuite) TestStructScan_slicesToArrayField() {
-	var data struct {
-		Texts [3]string `ws:"slice_t"`
-	}
-
-	ws := s.defs.MustNewWorksheet("all_types")
-	ws.MustAppend("slice_t", NewText("a"))
-	ws.MustAppend("slice_t", NewText("b"))
-	ws.MustAppend("slice_t", NewText("c"))
-
-	err := ws.StructScan(&data)
-	s.Require().NoError(err)
-	s.Equal([3]string{"a", "b", "c"}, data.Texts)
-}
-
-func (s *Zuite) TestStructScan_slicesToArrayOutOfRange() {
-	var data struct {
-		Texts [2]string `ws:"slice_t"`
-	}
-
-	ws := s.defs.MustNewWorksheet("all_types")
-
-	// empty
-	err := ws.StructScan(&data)
-	s.EqualError(err, "field slice_t to struct field Texts: cannot convert []text to [2]string, index out of range")
-
-	// 1 elem
-	ws.MustAppend("slice_t", NewText("a"))
-	err = ws.StructScan(&data)
-	s.EqualError(err, "field slice_t to struct field Texts: cannot convert []text to [2]string, index out of range")
-
-	// 2 elems, matched array length!
-	ws.MustAppend("slice_t", NewText("b"))
-	err = ws.StructScan(&data)
-	s.NoError(err)
-
-	// 3 elems oops
-	ws.MustAppend("slice_t", NewText("c"))
-	err = ws.StructScan(&data)
-	s.EqualError(err, "field slice_t to struct field Texts: cannot convert []text to [2]string, index out of range")
+	s.Empty(data.Texts)
+	s.Empty(data.Bools)
+	s.Nil(data.Ints)
+	s.Nil(data.Floats)
 }
 
 func (s *Zuite) TestStructScan_refsPtr() {

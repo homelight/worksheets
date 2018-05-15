@@ -174,15 +174,6 @@ func (s *structScanner) structScan(ws *Worksheet) error {
 
 		_, wsValue, _ := ws.get(tag)
 
-		// undefined
-		if _, ok := wsValue.(*Undefined); ok {
-			if ft.Type.Kind() != reflect.Ptr {
-				return fmt.Errorf("field %s to struct field %s: undefined into not nullable", tag, ft.Name)
-			}
-			f.Set(reflect.Zero(ft.Type))
-			continue
-		}
-
 		// default conversion
 		ctx := convertCtx{
 			sourceFieldName: field.name,
@@ -226,7 +217,12 @@ func convert(ctx convertCtx, value Value) (reflect.Value, error) {
 		}
 	}
 
-	if ctx.destType.Kind() == reflect.Ptr {
+	// let undefined->ptr be handled by a converter, custom or standard
+	if _, ok := value.(*Undefined); !ok && ctx.destType.Kind() == reflect.Ptr {
+		// for empty slice ptr, we special case and return nil
+		if sliceVal, ok := value.(*Slice); ok && len(sliceVal.Elements()) == 0 {
+			return reflect.Zero(ctx.destType), nil
+		}
 		ctx.destType = ctx.destType.Elem()
 		v, err := convert(ctx, value)
 		if err != nil {
@@ -250,7 +246,10 @@ func convert(ctx convertCtx, value Value) (reflect.Value, error) {
 }
 
 func (value *Undefined) structScanConvert(ctx convertCtx) (reflect.Value, error) {
-	panic("should never be called")
+	if ctx.destType.Kind() != reflect.Ptr {
+		return ctx.cannotConvert("dest must be a ptr")
+	}
+	return reflect.Zero(ctx.destType), nil
 }
 
 func (value *Text) structScanConvert(ctx convertCtx) (reflect.Value, error) {
@@ -376,20 +375,18 @@ func (value *Worksheet) structScanConvert(ctx convertCtx) (reflect.Value, error)
 }
 
 func (value *Slice) structScanConvert(ctx convertCtx) (reflect.Value, error) {
-	if ctx.destType.Kind() != reflect.Slice && ctx.destType.Kind() != reflect.Array {
-		return ctx.cannotConvert("dest must be a slice or array")
+	if ctx.destType.Kind() != reflect.Slice {
+		return ctx.cannotConvert("dest must be a slice")
+	}
+	if len(value.Elements()) == 0 {
+		return reflect.Zero(ctx.destType), nil
 	}
 	locus := reflect.New(ctx.destType)
-	if ctx.destType.Kind() == reflect.Slice {
-		// create backing array
-		locus.Elem().Set(reflect.MakeSlice(ctx.destType, len(value.Elements()), len(value.Elements())))
-	} else { // reflect.Array
-		if locus.Elem().Len() != len(value.Elements()) {
-			return ctx.cannotConvert("index out of range")
-		}
-	}
+	// create backing slice
+	locus.Elem().Set(reflect.MakeSlice(ctx.destType, len(value.Elements()), len(value.Elements())))
 	ctx.destType = ctx.destType.Elem()
 	for i, wsElem := range value.Elements() {
+		ctx.sourceType = wsElem.Type()
 		newVal, err := convert(ctx, wsElem)
 		if err != nil {
 			return reflect.Value{}, err
