@@ -305,23 +305,26 @@ func (e *tCall) selectors() []tSelector {
 // where evaluating early would result in a division by 0.
 type fnArgs struct {
 	ws     *Worksheet
+	round  *tRound
 	exprs  []expression
 	values []Value
 	errs   []error
 }
 
-func newFnArgs(ws *Worksheet, values []Value) *fnArgs {
+func newFnArgs(ws *Worksheet, round *tRound, values []Value) *fnArgs {
 	return &fnArgs{
 		ws:     ws,
+		round:  round,
 		exprs:  make([]expression, len(values)),
 		values: values,
 		errs:   make([]error, len(values)),
 	}
 }
 
-func newLazyFnArgs(ws *Worksheet, exprs []expression) *fnArgs {
+func newLazyFnArgs(ws *Worksheet, round *tRound, exprs []expression) *fnArgs {
 	args := fnArgs{
 		ws:     ws,
+		round:  round,
 		exprs:  make([]expression, len(exprs)),
 		values: make([]Value, len(exprs)),
 		errs:   make([]error, len(exprs)),
@@ -490,6 +493,7 @@ var functions = map[string]func(args *fnArgs) (Value, error){
 	"min":      rMin,
 	"max":      rMax,
 	"slice":    rSlice,
+	"avg":      rAvg,
 }
 
 func rFirstOf(args *fnArgs) (Value, error) {
@@ -503,7 +507,7 @@ func rFirstOf(args *fnArgs) (Value, error) {
 		}
 		switch a := arg.(type) {
 		case *Slice:
-			return rFirstOf(newFnArgs(args.ws, a.Elements()))
+			return rFirstOf(newFnArgs(args.ws, args.round, a.Elements()))
 		case *Undefined:
 			continue
 		default:
@@ -534,7 +538,7 @@ func rFoldNumbers(f foldNumbers, args *fnArgs, minArgs int) (Value, error) {
 			f.update(value)
 		case *Slice:
 			if value.Len() != 0 {
-				result, err := rFoldNumbers(f, newFnArgs(args.ws, value.Elements()), 0)
+				result, err := rFoldNumbers(f, newFnArgs(args.ws, args.round, value.Elements()), 0)
 				if err != nil {
 					return nil, err
 				}
@@ -637,15 +641,48 @@ func rSlice(args *fnArgs) (Value, error) {
 	return newSlice(&SliceType{elementType}, values...), nil
 }
 
+type avgFolder struct {
+	sum   *Number
+	count int
+	round *tRound
+}
+
+func (f *avgFolder) update(value *Number) {
+	f.sum = f.sum.Plus(value)
+	f.count++
+}
+
+func (f *avgFolder) result() Value {
+	return f.sum.Div(NewNumberFromInt(f.count), f.round.mode, f.round.scale)
+}
+
+func rAvg(args *fnArgs) (Value, error) {
+	if args.round == nil {
+		return nil, fmt.Errorf("missing rounding mode")
+	}
+	return rFoldNumbers(&avgFolder{
+		sum:   vZero,
+		round: args.round,
+	}, args, 1)
+}
+
 func (e *tCall) compute(ws *Worksheet) (Value, error) {
 	fn, ok := functions[e.name[0]]
 	if len(e.name) != 1 || !ok {
 		return nil, fmt.Errorf("unknown function %s", e.name)
 	}
 
-	value, err := fn(newLazyFnArgs(ws, e.args))
+	value, err := fn(newLazyFnArgs(ws, e.round, e.args))
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", e.name, err)
+	}
+
+	if e.round != nil {
+		nValue, ok := value.(*Number)
+		if !ok {
+			return nil, fmt.Errorf("unable to round non-numerical value")
+		}
+		value = nValue.Round(e.round.mode, e.round.scale)
 	}
 
 	return value, nil

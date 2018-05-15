@@ -83,7 +83,7 @@ func (s *Zuite) TestSelectorSliceTypes() {
 }
 
 func (s *Zuite) TestFnArgs_newFromValues() {
-	args := newFnArgs(nil, []Value{vZero})
+	args := newFnArgs(nil, nil, []Value{vZero})
 	require.Equal(s.T(), 1, args.num())
 	require.True(s.T(), args.has(0))
 	require.False(s.T(), args.has(1))
@@ -93,7 +93,7 @@ func (s *Zuite) TestFnArgs_newFromValues() {
 }
 
 func (s *Zuite) TestFnArgs_checkArgsNum() {
-	args := newLazyFnArgs(nil, []expression{vZero})
+	args := newLazyFnArgs(nil, nil, []expression{vZero})
 
 	// before lazy eval
 	err := args.checkArgsNum(4)
@@ -107,7 +107,7 @@ func (s *Zuite) TestFnArgs_checkArgsNum() {
 }
 
 func (s *Zuite) TestFnArgs_get() {
-	args := newLazyFnArgs(nil, []expression{vZero})
+	args := newLazyFnArgs(nil, nil, []expression{vZero})
 	s.Len(args.exprs, 1)
 	s.NotNil(args.exprs[0])
 	s.Len(args.values, 1)
