@@ -37,6 +37,12 @@ const (
 	ModeHalf              = "half"
 )
 
+// deferredSet is used during marshaling to properly populate reused non-pointer struct references
+type deferredSet struct {
+	dest interface{}
+	sets []func(interface{})
+}
+
 // Value represents a runtime value.
 type Value interface {
 	// Type returns this value's type.
@@ -51,7 +57,7 @@ type Value interface {
 	expression
 	dbWriteValue() string
 	jsonMarshalValue(m *marshaler, b *bytes.Buffer)
-	structScanConvert(dests map[string]interface{}, ctx convertCtx) (reflect.Value, error)
+	structScanConvert(dests map[string]*deferredSet, ctx convertCtx) (reflect.Value, error)
 
 	// assignableTo returns whether this value is assignable to type typ.
 	//

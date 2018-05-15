@@ -417,9 +417,7 @@ func (s *Zuite) TestStructScan_refsCircularDirect() {
 	russ.MustSet("point_to_me", russ)
 
 	// everyone is friends (except russ is too cool to reciprocate)
-	// since things don't flush automatically, we have to be careful to cascade properly
-	// and not set refs to worksheet data we plan to mutate
-	// TODO figure out flush
+	phoebe.MustAppend("point_to_my_friends", joey)
 	phoebe.MustAppend("point_to_my_friends", russ)
 	joey.MustAppend("point_to_my_friends", phoebe)
 	joey.MustAppend("point_to_my_friends", russ)
@@ -433,7 +431,11 @@ func (s *Zuite) TestStructScan_refsCircularDirect() {
 	f2 := f1.MyPeeps[0]
 	f3 := f1.MyPeeps[1]
 	s.Equal(f1, *f1.Me)
-	s.Equal(f2.MyPeeps[0], f3)
+	s.Equal(f1.MyPeeps[0], f2)
+	s.Equal(f1.MyPeeps[1], f3)
+	s.Require().Equal(2, len(f2.MyPeeps))
+	s.Equal(f2.MyPeeps[0], f1)
+	s.Equal(f2.MyPeeps[1], f3)
 	s.Zero(len(f3.MyPeeps))
 }
 
