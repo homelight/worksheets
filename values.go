@@ -456,19 +456,32 @@ type Slice struct {
 	elements []sliceElement
 }
 
-func newSlice(typ *SliceType) *Slice {
-	return &Slice{
-		id:  uuid.Must(uuid.NewV4()).String(),
-		typ: typ,
-	}
+func newSlice(typ *SliceType, values ...Value) *Slice {
+	var (
+		id       = uuid.Must(uuid.NewV4()).String()
+		lastRank = 0
+	)
+	return newSliceWithIdAndLastRank(typ, id, lastRank, values...)
 }
 
-func newSliceWithIdAndLastRank(typ *SliceType, id string, lastRank int) *Slice {
-	return &Slice{
+func newSliceWithIdAndLastRank(typ *SliceType, id string, lastRank int, values ...Value) *Slice {
+	slice := &Slice{
 		id:       id,
 		typ:      typ,
 		lastRank: lastRank,
 	}
+	for _, value := range values {
+		var err error
+		slice, err = slice.doAppend(value)
+		if err != nil {
+			panic(err)
+		}
+	}
+	return slice
+}
+
+func (slice *Slice) Len() int {
+	return len(slice.elements)
 }
 
 func (slice *Slice) Elements() []Value {

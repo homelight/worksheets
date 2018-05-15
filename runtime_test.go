@@ -142,9 +142,12 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 		`len(text)`:      `5`,
 
 		// sum
-		`sum(slice_n0)`: `10`,
-		`sum(slice_n2)`: `11.10`,
-		`sum(slice_nu)`: `undefined`,
+		`sum(1)`:                   `1`,
+		`sum(1, 2.0, 3.00)`:        `6.00`,
+		`sum(slice(1, 2.0, 3.00))`: `6.00`,
+		`sum(slice_n0)`:            `10`,
+		`sum(slice_n2)`:            `11.10`,
+		`sum(slice_nu)`:            `undefined`,
 
 		// sumiftrue
 		`sumiftrue(slice_n0, slice_b)`:   `7`,
@@ -175,6 +178,17 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 		`first_of(slice_bu)`:                   `false`,
 		`first_of(undefined,slice_nu)`:         `3`,
 		`first_of(undefined,slice_t,slice_nu)`: `"Alice"`,
+
+		// min
+		`min(1, 2, 3)`:              `1`,
+		`min(1, slice(2, 3), -4)`:   `-4`,
+		`min(slice(-1.008, -5.32))`: `-5.32`,
+
+		// max
+		`max(1, 2, 3)`:              `3`,
+		`max(1, slice(2, 3), -4)`:   `3`,
+		`max(slice(-1.008, -5.32))`: `-1.008`,
+		`max(1, 2, 3) round down 2`: `3.00`,
 	}
 	for input, output := range cases {
 		// fixture
@@ -207,28 +221,54 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 		require.Equal(s.T(), "", p.next(), "%s should have reached eof", input)
 
 		actual, err := expr.compute(ws)
-		if assert.NoError(s.T(), err, input) {
-			assert.Equal(s.T(), expected, actual, "%s should equal %s was %s", input, output, actual)
+		if s.NoError(err, input) {
+			s.Equal(expected, actual, "%s should equal %s was %s", input, output, actual)
 		}
 	}
 }
 
 func (s *Zuite) TestRuntime_parseAndEvalExprExpectingFailure() {
 	cases := map[string]string{
-		`no_such_func()`: `unknown function no_such_func`,
-		`no.such.func()`: `unknown function no.such.func`,
-		`len(1, 2)`:      `len: 1 argument(s) expected but 2 found`,
-		`len(1)`:         `len: argument #1 expected to be text, or slice`,
-		`sum(1, 2)`:      `sum: 1 argument(s) expected but 2 found`,
-		`sum(1)`:         `sum: argument #1 expected to be slice of numbers`,
-		`sum(slice_t)`:   `sum: argument #1 expected to be slice of numbers`,
-		`if(1)`:          `if: at least 2 argument(s) expected but only 1 found`,
-		`if(1,2,3,4)`:    `if: at most 3 argument(s) expected but 4 found`,
-		`first_of()`:     `first_of: at least 1 argument(s) expected but none found`,
+		`no_such_func()`:   `unknown function no_such_func`,
+		`no.such.func()`:   `unknown function no.such.func`,
+		`len(1, 2)`:        `len: 1 argument(s) expected but 2 found`,
+		`len(1)`:           `len: argument #1 expected to be text, or slice`,
+		`sum()`:            `sum: at least 1 argument(s) expected but none found`,
+		`sum("a")`:         `sum: encountered non-numerical argument`,
+		`sum(slice_t)`:     `sum: encountered non-numerical argument`,
+		`if(1)`:            `if: at least 2 argument(s) expected but only 1 found`,
+		`if(1,2,3,4)`:      `if: at most 3 argument(s) expected but 4 found`,
+		`first_of()`:       `first_of: at least 1 argument(s) expected but none found`,
+		`slice()`:          `slice: at least 1 argument(s) expected but none found`,
+		`slice(undefined)`: `slice: unable to infer slice type, only undefined values encountered`,
+		`slice(1, "one")`:  `slice: cannot mix incompatible types number[0] and text in slice`,
+		`slice("one", 1)`:  `slice: cannot mix incompatible types text and number[0] in slice`,
+		`min()`:            `min: at least 1 argument(s) expected but none found`,
+		`min("one")`:       `min: encountered non-numerical argument`,
+		`max()`:            `max: at least 1 argument(s) expected but none found`,
+		`max("one")`:       `max: encountered non-numerical argument`,
 	}
 	for input, output := range cases {
 		// fixture
 		ws := s.defs.MustNewWorksheet("all_types")
+		ws.MustSet("text", alice)
+		ws.MustAppend("slice_t", alice)
+		ws.MustAppend("slice_t", bob)
+		ws.MustAppend("slice_n0", NewNumberFromInt(2))
+		ws.MustAppend("slice_n0", NewNumberFromInt(3))
+		ws.MustAppend("slice_n0", NewNumberFromInt(5))
+		ws.MustAppend("slice_n2", NewNumberFromFloat64(2.22))
+		ws.MustAppend("slice_n2", NewNumberFromFloat64(3.33))
+		ws.MustAppend("slice_n2", NewNumberFromFloat64(5.55))
+		ws.MustAppend("slice_nu", NewUndefined())
+		ws.MustAppend("slice_nu", NewNumberFromInt(3))
+		ws.MustAppend("slice_nu", NewNumberFromInt(5))
+		ws.MustAppend("slice_b", NewBool(true))
+		ws.MustAppend("slice_b", NewBool(false))
+		ws.MustAppend("slice_b", NewBool(true))
+		ws.MustAppend("slice_bu", NewUndefined())
+		ws.MustAppend("slice_bu", NewBool(false))
+		ws.MustAppend("slice_bu", NewBool(true))
 
 		// test
 		p := newParser(strings.NewReader(input))
@@ -239,5 +279,47 @@ func (s *Zuite) TestRuntime_parseAndEvalExprExpectingFailure() {
 
 		_, err = expr.compute(ws)
 		assert.EqualError(s.T(), err, output, input)
+	}
+}
+
+func (s *Zuite) TestRuntime_rSlice() {
+	cases := []struct {
+		args []Value
+		typ  Type
+	}{
+		// simple
+		{
+			args: []Value{NewNumberFromInt(6)},
+			typ:  &NumberType{0},
+		},
+		{
+			args: []Value{NewText("")},
+			typ:  &TextType{},
+		},
+		// slice of numbers takes largest scale
+		{
+			args: []Value{
+				NewNumberFromInt(6),
+				NewNumberFromInt(7).Round(ModeHalf, 1),
+			},
+			typ: &NumberType{1},
+		},
+		// with undefined, simply skip when doing type inference
+		{
+			args: []Value{NewText(""), vUndefined},
+			typ:  &TextType{},
+		},
+		{
+			args: []Value{vUndefined, NewText("")},
+			typ:  &TextType{},
+		},
+	}
+	for _, ex := range cases {
+		result, err := rSlice(newFnArgs(nil, ex.args))
+		if s.NoError(err) {
+			actual := result.(*Slice)
+			s.Equal(ex.args, actual.Elements(), "%v", ex.args)
+			s.Equal(ex.typ, actual.typ.elementType, "%v", ex.args)
+		}
 	}
 }
