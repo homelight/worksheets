@@ -518,8 +518,8 @@ type foldNumbers interface {
 	result() Value
 }
 
-func rFoldNumbers(f foldNumbers, args *fnArgs, min int) (Value, error) {
-	if err := args.checkMinArgsNum(min); err != nil {
+func rFoldNumbers(f foldNumbers, args *fnArgs, minArgs int) (Value, error) {
+	if err := args.checkMinArgsNum(minArgs); err != nil {
 		return nil, err
 	}
 	for i := 0; i < args.num(); i++ {

@@ -241,6 +241,7 @@ func (s *Zuite) TestRuntime_parseAndEvalExprExpectingFailure() {
 		`slice()`:          `slice: at least 1 argument(s) expected but none found`,
 		`slice(undefined)`: `slice: unable to infer slice type, only undefined values encountered`,
 		`slice(1, "one")`:  `slice: cannot mix incompatible types number[0] and text in slice`,
+		`slice("one", 1)`:  `slice: cannot mix incompatible types text and number[0] in slice`,
 		`min()`:            `min: at least 1 argument(s) expected but none found`,
 		`min("one")`:       `min: encountered non-numerical argument`,
 		`max()`:            `max: at least 1 argument(s) expected but none found`,
