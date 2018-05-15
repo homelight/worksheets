@@ -480,6 +480,10 @@ func newSliceWithIdAndLastRank(typ *SliceType, id string, lastRank int, values .
 	return slice
 }
 
+func (slice *Slice) Len() int {
+	return len(slice.elements)
+}
+
 func (slice *Slice) Elements() []Value {
 	var values []Value
 	for _, element := range slice.elements {

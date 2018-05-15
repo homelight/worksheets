@@ -142,6 +142,8 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 		`len(text)`:      `5`,
 
 		// sum
+		`sum(1)`:        `1`,
+		`sum(1, 2)`:     `3`,
 		`sum(slice_n0)`: `10`,
 		`sum(slice_n2)`: `11.10`,
 		`sum(slice_nu)`: `undefined`,
@@ -185,7 +187,7 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 		`max(1, 2, 3)`:              `3`,
 		`max(1, slice(2, 3), -4)`:   `3`,
 		`max(slice(-1.008, -5.32))`: `-1.008`,
-		`max(1, 2, 3) round down 2`: `3.01`,
+		`max(1, 2, 3) round down 2`: `3.00`,
 	}
 	for input, output := range cases {
 		// fixture
@@ -230,9 +232,9 @@ func (s *Zuite) TestRuntime_parseAndEvalExprExpectingFailure() {
 		`no.such.func()`:   `unknown function no.such.func`,
 		`len(1, 2)`:        `len: 1 argument(s) expected but 2 found`,
 		`len(1)`:           `len: argument #1 expected to be text, or slice`,
-		`sum(1, 2)`:        `sum: 1 argument(s) expected but 2 found`,
-		`sum(1)`:           `sum: argument #1 expected to be slice of numbers`,
-		`sum(slice_t)`:     `sum: argument #1 expected to be slice of numbers`,
+		`sum()`:            `sum: at least 1 argument(s) expected but none found`,
+		`sum("a")`:         `sum: encountered non-numerical argument`,
+		`sum(slice_t)`:     `sum: encountered non-numerical argument`,
 		`if(1)`:            `if: at least 2 argument(s) expected but only 1 found`,
 		`if(1,2,3,4)`:      `if: at most 3 argument(s) expected but 4 found`,
 		`first_of()`:       `first_of: at least 1 argument(s) expected but none found`,
@@ -247,6 +249,24 @@ func (s *Zuite) TestRuntime_parseAndEvalExprExpectingFailure() {
 	for input, output := range cases {
 		// fixture
 		ws := s.defs.MustNewWorksheet("all_types")
+		ws.MustSet("text", alice)
+		ws.MustAppend("slice_t", alice)
+		ws.MustAppend("slice_t", bob)
+		ws.MustAppend("slice_n0", NewNumberFromInt(2))
+		ws.MustAppend("slice_n0", NewNumberFromInt(3))
+		ws.MustAppend("slice_n0", NewNumberFromInt(5))
+		ws.MustAppend("slice_n2", NewNumberFromFloat64(2.22))
+		ws.MustAppend("slice_n2", NewNumberFromFloat64(3.33))
+		ws.MustAppend("slice_n2", NewNumberFromFloat64(5.55))
+		ws.MustAppend("slice_nu", NewUndefined())
+		ws.MustAppend("slice_nu", NewNumberFromInt(3))
+		ws.MustAppend("slice_nu", NewNumberFromInt(5))
+		ws.MustAppend("slice_b", NewBool(true))
+		ws.MustAppend("slice_b", NewBool(false))
+		ws.MustAppend("slice_b", NewBool(true))
+		ws.MustAppend("slice_bu", NewUndefined())
+		ws.MustAppend("slice_bu", NewBool(false))
+		ws.MustAppend("slice_bu", NewBool(true))
 
 		// test
 		p := newParser(strings.NewReader(input))

@@ -402,35 +402,7 @@ var functions = map[string]func(args *fnArgs) (Value, error){
 			return nil, fmt.Errorf("argument #1 expected to be text, or slice")
 		}
 	},
-	"sum": func(args *fnArgs) (Value, error) {
-		if err := args.checkArgsNum(1); err != nil {
-			return nil, err
-		}
-		arg, err := args.get(0)
-		if err != nil {
-			return nil, err
-		}
-		switch v := arg.(type) {
-		case *Undefined:
-			return vUndefined, nil
-		case *Slice:
-			numType, ok := v.typ.elementType.(*NumberType)
-			if !ok {
-				return nil, fmt.Errorf("argument #1 expected to be slice of numbers")
-			}
-			sum := &Number{0, numType}
-			for _, elem := range v.elements {
-				if num, ok := elem.value.(*Number); ok {
-					sum = sum.Plus(num)
-				} else {
-					return vUndefined, nil
-				}
-			}
-			return sum, nil
-		default:
-			return nil, fmt.Errorf("argument #1 expected to be slice of numbers")
-		}
-	},
+	"sum": rSum,
 	"sumiftrue": func(args *fnArgs) (Value, error) {
 		if err := args.checkArgsNum(2); err != nil {
 			return nil, err
@@ -546,8 +518,8 @@ type foldNumbers interface {
 	result() Value
 }
 
-func rFoldNumbers(f foldNumbers, args *fnArgs) (Value, error) {
-	if err := args.checkMinArgsNum(1); err != nil {
+func rFoldNumbers(f foldNumbers, args *fnArgs, min int) (Value, error) {
+	if err := args.checkMinArgsNum(min); err != nil {
 		return nil, err
 	}
 	for i := 0; i < args.num(); i++ {
@@ -557,20 +529,40 @@ func rFoldNumbers(f foldNumbers, args *fnArgs) (Value, error) {
 		}
 		switch value := arg.(type) {
 		case *Undefined:
-			return value, nil
+			return vUndefined, nil
 		case *Number:
 			f.update(value)
 		case *Slice:
-			result, err := rFoldNumbers(f, newFnArgs(args.ws, value.Elements()))
-			if err != nil {
-				return nil, err
+			if value.Len() != 0 {
+				result, err := rFoldNumbers(f, newFnArgs(args.ws, value.Elements()), 0)
+				if err != nil {
+					return nil, err
+				}
+				if result == vUndefined {
+					return vUndefined, nil
+				}
 			}
-			f.update(result.(*Number))
 		default:
 			return nil, fmt.Errorf("encountered non-numerical argument")
 		}
 	}
 	return f.result(), nil
+}
+
+type sumFolder struct {
+	sum *Number
+}
+
+func (f *sumFolder) update(value *Number) {
+	f.sum = f.sum.Plus(value)
+}
+
+func (f *sumFolder) result() Value {
+	return f.sum
+}
+
+func rSum(args *fnArgs) (Value, error) {
+	return rFoldNumbers(&sumFolder{sum: vZero}, args, 1)
 }
 
 type minFolder struct {
@@ -588,7 +580,7 @@ func (f *minFolder) result() Value {
 }
 
 func rMin(args *fnArgs) (Value, error) {
-	return rFoldNumbers(&minFolder{}, args)
+	return rFoldNumbers(&minFolder{}, args, 1)
 }
 
 type maxFolder struct {
@@ -606,7 +598,7 @@ func (f *maxFolder) result() Value {
 }
 
 func rMax(args *fnArgs) (Value, error) {
-	return rFoldNumbers(&maxFolder{}, args)
+	return rFoldNumbers(&maxFolder{}, args, 1)
 }
 
 func rSlice(args *fnArgs) (Value, error) {
