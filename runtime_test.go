@@ -142,11 +142,12 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 		`len(text)`:      `5`,
 
 		// sum
-		`sum(1)`:        `1`,
-		`sum(1, 2)`:     `3`,
-		`sum(slice_n0)`: `10`,
-		`sum(slice_n2)`: `11.10`,
-		`sum(slice_nu)`: `undefined`,
+		`sum(1)`:                   `1`,
+		`sum(1, 2.0, 3.00)`:        `6.00`,
+		`sum(slice(1, 2.0, 3.00))`: `6.00`,
+		`sum(slice_n0)`:            `10`,
+		`sum(slice_n2)`:            `11.10`,
+		`sum(slice_nu)`:            `undefined`,
 
 		// sumiftrue
 		`sumiftrue(slice_n0, slice_b)`:   `7`,
