@@ -266,17 +266,56 @@ func (s *Zuite) TestStructScan_slicesNotSupported() {
 	require.EqualError(s.T(), err, "struct field Texts: cannot StructScan slices (yet)")
 }
 
-type allTypesStruct struct {
-	Ws   *allTypesStruct `ws:"ws"`
-	Num0 int             `ws:"num_0"`
-}
+func (s *Zuite) TestStructScan_refsPtr() {
+	type allTypesStruct struct {
+		Ws   *allTypesStruct `ws:"ws"`
+		Num0 int             `ws:"num_0"`
+	}
 
-func (s *Zuite) TestStructScan_refsNotSupported() {
 	ws := s.defs.MustNewWorksheet("all_types")
+	ws.MustSet("num_0", NewNumberFromInt(123))
+
+	wsChild := s.defs.MustNewWorksheet("all_types")
+	wsChild.MustSet("num_0", NewNumberFromInt(456))
+
+	ws.MustSet("ws", wsChild)
 
 	var parent allTypesStruct
 	err := ws.StructScan(&parent)
-	require.EqualError(s.T(), err, "struct field Ws: cannot StructScan worksheets (yet)")
+	s.Require().NoError(err)
+
+	s.Equal(123, parent.Num0)
+
+	child := parent.Ws
+	s.Equal(456, child.Num0)
+	s.Nil(child.Ws)
+}
+
+func (s *Zuite) TestStructScan_refsNoPtr() {
+	type allTypesOtherStruct struct {
+		Num0 int             `ws:"num_0"`
+	}
+	type allTypesStruct struct {
+		Ws   allTypesOtherStruct `ws:"ws"`
+		Num0 int             `ws:"num_0"`
+	}
+
+	ws := s.defs.MustNewWorksheet("all_types")
+	ws.MustSet("num_0", NewNumberFromInt(123))
+
+	wsChild := s.defs.MustNewWorksheet("all_types")
+	wsChild.MustSet("num_0", NewNumberFromInt(456))
+
+	ws.MustSet("ws", wsChild)
+
+	var parent allTypesStruct
+	err := ws.StructScan(&parent)
+	s.Require().NoError(err)
+
+	s.Equal(123, parent.Num0)
+
+	child := parent.Ws
+	s.Equal(456, child.Num0)
 }
 
 type special struct {
