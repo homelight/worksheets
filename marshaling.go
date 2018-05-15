@@ -157,42 +157,7 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 			return fmt.Errorf("unknown field %s", tag)
 		}
 
-		// for now, no support for slices or worksheets
-		if _, ok := field.typ.(*SliceType); ok {
-			return fmt.Errorf("struct field %s: cannot StructScan slices (yet)", ft.Name)
-		}
-
-		if _, ok := field.typ.(*Definition); ok {
-			return fmt.Errorf("struct field %s: cannot StructScan worksheets (yet)", ft.Name)
-		}
-
 		_, wsValue, _ := ws.get(tag)
-
-		// undefined
-		if _, ok := wsValue.(*Undefined); ok {
-			if ft.Type.Kind() != reflect.Ptr {
-				return fmt.Errorf("field %s to struct field %s: undefined into not nullable", tag, ft.Name)
-			}
-			f.Set(reflect.Zero(ft.Type))
-			continue
-		}
-
-		// WorksheetConverter
-		if ft.Type.AssignableTo(worksheetConverterType) {
-			exporter := reflect.New(ft.Type.Elem()).Interface().(WorksheetConverter)
-			if err := exporter.WorksheetConvert(wsValue); err != nil {
-				return err
-			}
-			f.Set(reflect.ValueOf(exporter))
-			continue
-		} else if reflect.PtrTo(ft.Type).AssignableTo(worksheetConverterType) {
-			exporter := reflect.New(ft.Type).Interface().(WorksheetConverter)
-			if err := exporter.WorksheetConvert(wsValue); err != nil {
-				return err
-			}
-			f.Set(reflect.ValueOf(exporter).Elem())
-			continue
-		}
 
 		// default conversion
 		ctx := convertCtx{
@@ -222,7 +187,12 @@ type convertCtx struct {
 }
 
 func convert(ctx convertCtx, value Value) (reflect.Value, error) {
-	if ctx.destType.Kind() == reflect.Ptr {
+	// let undefined->ptr be handled by a converter, custom or standard
+	if _, ok := value.(*Undefined); !ok && ctx.destType.Kind() == reflect.Ptr {
+		// for empty slice ptr, we special case and return nil
+		if sliceVal, ok := value.(*Slice); ok && len(sliceVal.Elements()) == 0 {
+			return reflect.Zero(ctx.destType), nil
+		}
 		ctx.destType = ctx.destType.Elem()
 		v, err := convert(ctx, value)
 		if err != nil {
@@ -233,11 +203,23 @@ func convert(ctx convertCtx, value Value) (reflect.Value, error) {
 		return locus, nil
 	}
 
+	// if we have a type that uses a custom converter, use it instead of standard conversion
+	if reflect.PtrTo(ctx.destType).AssignableTo(worksheetConverterType) {
+		exporter := reflect.New(ctx.destType).Interface().(WorksheetConverter)
+		if err := exporter.WorksheetConvert(value); err != nil {
+			return reflect.Value{}, err
+		}
+		return reflect.ValueOf(exporter).Elem(), nil
+	}
+
 	return value.structScanConvert(ctx)
 }
 
 func (value *Undefined) structScanConvert(ctx convertCtx) (reflect.Value, error) {
-	panic("should never be called")
+	if ctx.destType.Kind() != reflect.Ptr {
+		return ctx.cannotConvert("dest must be a ptr")
+	}
+	return reflect.Zero(ctx.destType), nil
 }
 
 func (value *Text) structScanConvert(ctx convertCtx) (reflect.Value, error) {
@@ -349,11 +331,37 @@ func (value *Number) structScanConvert(ctx convertCtx) (reflect.Value, error) {
 }
 
 func (value *Worksheet) structScanConvert(ctx convertCtx) (reflect.Value, error) {
-	return ctx.cannotConvert("not supported yet")
+	if ctx.destType.Kind() != reflect.Struct {
+		return ctx.cannotConvert("dest must be a struct")
+	}
+	newVal := reflect.New(ctx.destType)
+	err := value.StructScan(newVal.Interface())
+	if err != nil {
+		return reflect.Value{}, err
+	}
+	return newVal.Elem(), nil
 }
 
 func (value *Slice) structScanConvert(ctx convertCtx) (reflect.Value, error) {
-	return ctx.cannotConvert("not supported yet")
+	if ctx.destType.Kind() != reflect.Slice {
+		return ctx.cannotConvert("dest must be a slice")
+	}
+	if len(value.Elements()) == 0 {
+		return reflect.Zero(ctx.destType), nil
+	}
+	locus := reflect.New(ctx.destType)
+	// create backing slice
+	locus.Elem().Set(reflect.MakeSlice(ctx.destType, len(value.Elements()), len(value.Elements())))
+	ctx.destType = ctx.destType.Elem()
+	for i, wsElem := range value.Elements() {
+		ctx.sourceType = wsElem.Type()
+		newVal, err := convert(ctx, wsElem)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		locus.Elem().Index(i).Set(newVal)
+	}
+	return locus.Elem(), nil
 }
 
 func (ctx convertCtx) valueOutOfRange() (reflect.Value, error) {

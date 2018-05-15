@@ -211,7 +211,7 @@ func (s *Zuite) TestStructScan_notOptionalYetUndefined() {
 		Text string `ws:"text"`
 	}
 	err := ws.StructScan(&data)
-	require.EqualError(s.T(), err, "field text to struct field Text: undefined into not nullable")
+	require.EqualError(s.T(), err, "field text to struct field Text: cannot convert text to string, dest must be a ptr")
 }
 
 func (s *Zuite) TestStructScan_optionalWithUndefined() {
@@ -256,27 +256,124 @@ func (s *Zuite) TestStructScan_skipFieldsWithNoTag() {
 	require.Equal(s.T(), "ignore me", data.Ignore)
 }
 
-func (s *Zuite) TestStructScan_slicesNotSupported() {
-	ws := s.defs.MustNewWorksheet("all_types")
-
-	var data struct {
-		Texts []string `ws:"slice_t"`
+func (s *Zuite) TestStructScan_slices() {
+	type allSortsOfSlices struct {
+		Texts  []string    `ws:"slice_t"`
+		Bools  []*bool     `ws:"slice_b"`
+		Ints   *[]int      `ws:"slice_n0"`
+		Floats *[]*float64 `ws:"slice_n2"`
 	}
-	err := ws.StructScan(&data)
-	require.EqualError(s.T(), err, "struct field Texts: cannot StructScan slices (yet)")
+	t := true
+	f := false
+	n1 := float64(1)
+	n2 := 2.12
+	testCases := []struct {
+		field          string
+		elems          []Value
+		expectedStruct allSortsOfSlices
+	}{
+		{
+			field:          "slice_t",
+			elems:          []Value{NewText("a"), NewText("b"), NewText("c"), NewText("")},
+			expectedStruct: allSortsOfSlices{Texts: []string{"a", "b", "c", ""}},
+		},
+		{
+			field:          "slice_b",
+			elems:          []Value{NewBool(true), vUndefined, NewBool(false)},
+			expectedStruct: allSortsOfSlices{Bools: []*bool{&t, nil, &f}},
+		},
+		{
+			field:          "slice_n0",
+			elems:          []Value{NewNumberFromInt(1), NewNumberFromInt(2), NewNumberFromInt(3)},
+			expectedStruct: allSortsOfSlices{Ints: &[]int{1, 2, 3}},
+		},
+		{
+			field:          "slice_n2",
+			elems:          []Value{NewNumberFromInt(1), NewNumberFromFloat64(2.12), vUndefined},
+			expectedStruct: allSortsOfSlices{Floats: &[]*float64{&n1, &n2, nil}},
+		},
+	}
+
+	for _, tc := range testCases {
+		ws := s.defs.MustNewWorksheet("all_types")
+		for _, e := range tc.elems {
+			ws.MustAppend(tc.field, e)
+		}
+		var data allSortsOfSlices
+		err := ws.StructScan(&data)
+		s.NoError(err)
+		s.Equal(tc.expectedStruct, data)
+	}
 }
 
-type allTypesStruct struct {
-	Ws   *allTypesStruct `ws:"ws"`
-	Num0 int             `ws:"num_0"`
-}
+func (s *Zuite) TestStructScan_slicesEmpty() {
+	var data struct {
+		Texts  []string    `ws:"slice_t"`
+		Bools  []*bool     `ws:"slice_b"`
+		Ints   *[]int      `ws:"slice_n0"`
+		Floats *[]*float64 `ws:"slice_n2"`
+	}
 
-func (s *Zuite) TestStructScan_refsNotSupported() {
 	ws := s.defs.MustNewWorksheet("all_types")
+
+	err := ws.StructScan(&data)
+	s.Require().NoError(err)
+	s.Empty(data.Texts)
+	s.Empty(data.Bools)
+	s.Nil(data.Ints)
+	s.Nil(data.Floats)
+}
+
+func (s *Zuite) TestStructScan_refsPtr() {
+	type allTypesStruct struct {
+		Ws   *allTypesStruct `ws:"ws"`
+		Num0 int             `ws:"num_0"`
+	}
+
+	ws := s.defs.MustNewWorksheet("all_types")
+	ws.MustSet("num_0", NewNumberFromInt(123))
+
+	wsChild := s.defs.MustNewWorksheet("all_types")
+	wsChild.MustSet("num_0", NewNumberFromInt(456))
+
+	ws.MustSet("ws", wsChild)
 
 	var parent allTypesStruct
 	err := ws.StructScan(&parent)
-	require.EqualError(s.T(), err, "struct field Ws: cannot StructScan worksheets (yet)")
+	s.Require().NoError(err)
+
+	s.Equal(123, parent.Num0)
+
+	child := parent.Ws
+	s.Equal(456, child.Num0)
+	s.Nil(child.Ws)
+}
+
+func (s *Zuite) TestStructScan_refsNoPtr() {
+	type allTypesOtherStruct struct {
+		Num0 int `ws:"num_0"`
+	}
+	type allTypesStruct struct {
+		Ws   allTypesOtherStruct `ws:"ws"`
+		Num0 int                 `ws:"num_0"`
+	}
+
+	ws := s.defs.MustNewWorksheet("all_types")
+	ws.MustSet("num_0", NewNumberFromInt(123))
+
+	wsChild := s.defs.MustNewWorksheet("all_types")
+	wsChild.MustSet("num_0", NewNumberFromInt(456))
+
+	ws.MustSet("ws", wsChild)
+
+	var parent allTypesStruct
+	err := ws.StructScan(&parent)
+	s.Require().NoError(err)
+
+	s.Equal(123, parent.Num0)
+
+	child := parent.Ws
+	s.Equal(456, child.Num0)
 }
 
 type special struct {
