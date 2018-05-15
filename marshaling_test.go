@@ -561,7 +561,7 @@ func (s *Zuite) TestStructScan_convert() {
 			destFieldName:   "Dest",
 			destType:        ex.dest,
 		}
-		actual, err := convert(ctx, ex.source)
+		actual, err := convert(nil, ctx, ex.source)
 		require.NoError(s.T(), err)
 		assert.Equal(s.T(), ex.expected, actual.Interface())
 	}
@@ -616,7 +616,7 @@ func (s *Zuite) TestStructScan_convertErrors() {
 			destFieldName:   "Dest",
 			destType:        ex.dest,
 		}
-		_, err := convert(ctx, ex.source)
+		_, err := convert(nil, ctx, ex.source)
 		assert.EqualErrorf(s.T(), err, "field source to struct field Dest: cannot convert "+ex.expected,
 			"converting %s to %s", ex.source, ex.dest)
 	}
