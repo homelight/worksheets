@@ -192,6 +192,59 @@ func (s *Zuite) TestStructScan_emptyTagName() {
 	require.EqualError(s.T(), err, "struct field Text: cannot have empty tag name")
 }
 
+func (s *Zuite) TestStructScan_badTagName() {
+	ws := s.defs.MustNewWorksheet("all_types")
+
+	var data struct {
+		Text string `ws:"abc"`
+	}
+	err := ws.StructScan(&data)
+	require.EqualError(s.T(), err, "struct field Text: unknown ws field abc")
+}
+
+func (s *Zuite) TestStructScan_defaultMappings() {
+	ws := s.defs.MustNewWorksheet("DefaultMappingsTest")
+	ws.MustSet("Name", NewText("pedro"))
+	ws.MustSet("Age", NewNumberFromInt(28))
+	childWs := s.defs.MustNewWorksheet("DefaultMappingsTest")
+	childWs.MustSet("Name", NewText("alicia"))
+	childWs.MustSet("Age", NewNumberFromInt(1))
+	ws.MustSet("Child", childWs)
+
+	type person struct {
+		Name  string
+		Age   int
+		Child *person
+	}
+
+	var data person
+	err := ws.StructScan(&data)
+	s.Require().NoError(err)
+	s.Equal("pedro", data.Name)
+	s.Equal(28, data.Age)
+	s.Require().NotNil(data.Child)
+	s.Equal("alicia", data.Child.Name)
+	s.Equal(1, data.Child.Age)
+}
+
+func (s *Zuite) TestStructScan_defaultMappingsIgnore() {
+	ws := s.defs.MustNewWorksheet("DefaultMappingsTest")
+	ws.MustSet("Name", NewText("julia"))
+	ws.MustSet("Age", NewNumberFromInt(31))
+
+	var data struct {
+		Name  string
+		Age   int    `ws:"-"`
+		Name2 string `ws:"Name"`
+	}
+
+	err := ws.StructScan(&data)
+	s.Require().NoError(err)
+	s.Equal("julia", data.Name)
+	s.Equal(0, data.Age) // zero-value, ws field value was ignored
+	s.Equal("julia", data.Name2)
+}
+
 func (s *Zuite) TestStructScan_notOptionalWithValue() {
 	ws := s.defs.MustNewWorksheet("all_types")
 	ws.MustSet("text", NewText("hello, world!"))
@@ -241,7 +294,7 @@ func (s *Zuite) TestStructScan_optionalWithValue() {
 	require.Equal(s.T(), "hello, world!", *data.Text)
 }
 
-func (s *Zuite) TestStructScan_skipFieldsWithNoTag() {
+func (s *Zuite) TestStructScan_skipUndefinedFieldsWithNoTag() {
 	ws := s.defs.MustNewWorksheet("all_types")
 	ws.MustSet("text", NewText("hello, world!"))
 
@@ -383,14 +436,14 @@ type ping struct {
 }
 
 type pong struct {
-	Ping *ping `ws:"point_to_ping"`
+	Ping *ping `ws:"point_to_Ping"`
 }
 
 func (s *Zuite) TestStructScan_refsCircularIndirect() {
-	pingWs := s.defs.MustNewWorksheet("ping")
+	pingWs := s.defs.MustNewWorksheet("Ping")
 	pongWs := s.defs.MustNewWorksheet("pong")
 
-	pongWs.MustSet("point_to_ping", pingWs)
+	pongWs.MustSet("point_to_Ping", pingWs)
 	pingWs.MustSet("point_to_pong", pongWs)
 
 	var ping ping

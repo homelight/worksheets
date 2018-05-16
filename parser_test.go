@@ -429,6 +429,7 @@ func (s *Zuite) TestParser_parseTypeLiteral() {
 		`[]bool`:        &SliceType{&BoolType{}},
 		`[][]number[9]`: &SliceType{&SliceType{&NumberType{9}}},
 		`foobar`:        &Definition{name: "foobar"},
+		`FooBar`:        &Definition{name: "FooBar"},
 	}
 	for input, expected := range cases {
 		p := newParser(strings.NewReader(input))
@@ -459,8 +460,8 @@ func (s *Zuite) TestTokenPatterns() {
 	}{
 		{
 			pName,
-			[]string{"a", "a_a", "a_0"},
-			[]string{"0", "_a", "a_"},
+			[]string{"a", "a_a", "a_0", "A", "a_A", "A_a", "A_0"},
+			[]string{"0", "_a", "a_", "_A", "A_"},
 		},
 	}
 	for _, ex := range cases {
