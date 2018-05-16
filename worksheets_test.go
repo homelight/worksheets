@@ -286,11 +286,11 @@ func (s *Zuite) TestWorksheet_diff() {
 
 	// initial diff
 	require.Equal(s.T(), map[int]change{
-		indexId: change{
+		indexId: {
 			before: vUndefined,
 			after:  NewText(ws.Id()),
 		},
-		indexVersion: change{
+		indexVersion: {
 			before: vUndefined,
 			after:  NewNumberFromInt(1),
 		},
@@ -302,15 +302,15 @@ func (s *Zuite) TestWorksheet_diff() {
 
 	// now, also expecting Alice
 	require.Equal(s.T(), map[int]change{
-		indexId: change{
+		indexId: {
 			before: vUndefined,
 			after:  NewText(ws.Id()),
 		},
-		indexVersion: change{
+		indexVersion: {
 			before: vUndefined,
 			after:  NewNumberFromInt(1),
 		},
-		1: change{
+		1: {
 			before: vUndefined,
 			after:  alice,
 		},
@@ -321,15 +321,15 @@ func (s *Zuite) TestWorksheet_diff() {
 	require.NoError(s.T(), err)
 
 	require.Equal(s.T(), map[int]change{
-		indexId: change{
+		indexId: {
 			before: vUndefined,
 			after:  NewText(ws.Id()),
 		},
-		indexVersion: change{
+		indexVersion: {
 			before: vUndefined,
 			after:  NewNumberFromInt(1),
 		},
-		1: change{
+		1: {
 			before: vUndefined,
 			after:  bob,
 		},
@@ -342,15 +342,15 @@ func (s *Zuite) TestWorksheet_diff() {
 
 	// now, name should go to an explicit undefine
 	require.Equal(s.T(), map[int]change{
-		indexId: change{
+		indexId: {
 			before: vUndefined,
 			after:  NewText(ws.Id()),
 		},
-		indexVersion: change{
+		indexVersion: {
 			before: vUndefined,
 			after:  NewNumberFromInt(1),
 		},
-		1: change{
+		1: {
 			before: bob,
 			after:  vUndefined,
 		},

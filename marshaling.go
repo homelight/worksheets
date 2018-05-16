@@ -30,15 +30,15 @@ func (ws *Worksheet) MarshalJSON() ([]byte, error) {
 	m.marshal(ws)
 
 	var (
-		not_first bool
-		b         bytes.Buffer
+		notFirst bool
+		b        bytes.Buffer
 	)
 	b.WriteRune('{')
 	for id, mashaled := range m.graph {
-		if not_first {
+		if notFirst {
 			b.WriteRune(',')
 		}
-		not_first = true
+		notFirst = true
 
 		b.WriteRune('"')
 		b.WriteString(id)
@@ -60,15 +60,15 @@ func (m *marshaler) marshal(ws *Worksheet) {
 	m.graph[ws.Id()] = nil
 
 	var (
-		not_first bool
-		b         bytes.Buffer
+		notFirst bool
+		b        bytes.Buffer
 	)
 	b.WriteRune('{')
 	for index, value := range ws.data {
-		if not_first {
+		if notFirst {
 			b.WriteRune(',')
 		}
-		not_first = true
+		notFirst = true
 
 		b.WriteRune('"')
 		b.WriteString(ws.def.fieldsByIndex[index].name)

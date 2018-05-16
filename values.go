@@ -97,7 +97,7 @@ type Value interface {
 	assignableTo(typ Type) bool
 }
 
-var _ []Value = []Value{
+var _ = []Value{
 	// Assert that all literals are Value.
 	vUndefined,
 	&Number{},

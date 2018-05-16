@@ -119,7 +119,7 @@ func (e tSelector) compute(ws *Worksheet) (Value, error) {
 		if !ok {
 			return nil, fmt.Errorf("sorry! more complex selectors are not supported yet!")
 		}
-		var elementType Type = subWsDef.fieldsByName[e[1]].Type()
+		var elementType = subWsDef.fieldsByName[e[1]].Type()
 		var elements []sliceElement
 		for _, elem := range selectedSlice.elements {
 			subWs, ok := elem.value.(*Worksheet)
