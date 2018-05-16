@@ -558,12 +558,12 @@ func foldExprs(exprs []expression, ops []tOp, rounds [][]*tRound) expression {
 folding:
 	for {
 		for i, end := 0, len(ops)-1; i <= end; i++ {
-			left := i == 0
+			left := (i == 0)
 			if !left {
 				left = opPrecedence[ops[i-1]] <= opPrecedence[ops[i]]
 			}
 
-			right := i == end
+			right := (i == end)
 			if !right {
 				right = opPrecedence[ops[i]] >= opPrecedence[ops[i+1]]
 			}
