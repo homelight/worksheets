@@ -251,6 +251,9 @@ func convert(dests wsDestinationMap, ctx convertCtx, value Value) (reflect.Value
 		if err := exporter.WorksheetConvert(value); err != nil {
 			return reflect.Value{}, err
 		}
+		if ws, ok := value.(*Worksheet); ok {
+			dests.newDestination(ws.Id(), exporter)
+		}
 		return reflect.ValueOf(exporter).Elem(), nil
 	}
 

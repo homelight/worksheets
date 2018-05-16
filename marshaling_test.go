@@ -468,33 +468,80 @@ func (s *Zuite) TestStructScan_refsRepeat() {
 }
 
 type special struct {
-	helloText string
+	HelloText string `ws:"xyz"` // this mapping should be totally ignored because converters kick in
 }
 
 var _ WorksheetConverter = &special{}
 
 func (sp *special) WorksheetConvert(value Value) error {
 	if text, ok := value.(*Text); ok {
-		sp.helloText = "hello, " + text.value
+		sp.HelloText = "hello, " + text.value
+		return nil
+	} else if ws, ok := value.(*Worksheet); ok {
+		ht := ws.MustGet("text").(*Text)
+		sp.HelloText = "hello! " + ht.value
 		return nil
 	}
 
-	return fmt.Errorf("can only convert text, was %s", value)
+	return fmt.Errorf("can only convert text and worksheet, was %s", value)
+}
+
+type specialSlice []special
+
+var _ WorksheetConverter = &specialSlice{}
+
+func (sps *specialSlice) WorksheetConvert(value Value) error {
+	if wsSlice, ok := value.(*Slice); ok {
+		for _, e := range wsSlice.Elements() {
+			newSp := &special{}
+			newSp.WorksheetConvert(e)
+			*sps = append(*sps, *newSp)
+		}
+		return nil
+	}
+
+	return fmt.Errorf("can only convert slice, was %s", value)
 }
 
 func (s *Zuite) TestStructScan_worksheetConverter() {
 	ws := s.defs.MustNewWorksheet("all_types")
 	ws.MustSet("text", NewText("world!"))
+	ws.MustAppend("slice_t", NewText("friend"))
+	ws.MustAppend("slice_t", NewText("other friend"))
+	childWs := s.defs.MustNewWorksheet("all_types")
+	childWs.MustSet("text", NewText("parent"))
+	ws.MustSet("ws", childWs)
 
 	var data struct {
-		Special    special  `ws:"text"`
-		SpecialPtr *special `ws:"text"`
+		Special         special       `ws:"text"`
+		SpecialPtr      *special      `ws:"text"`
+		SpecialSlice    specialSlice  `ws:"slice_t"`
+		SpecialSlicePtr *specialSlice `ws:"slice_t"`
+		SpecialWs       special       `ws:"ws"`
+		SpecialWsPtr    *special      `ws:"ws"`
 	}
 	err := ws.StructScan(&data)
-	require.NoError(s.T(), err)
-	require.Equal(s.T(), "hello, world!", data.Special.helloText)
-	require.NotNil(s.T(), data.SpecialPtr)
-	require.Equal(s.T(), "hello, world!", data.SpecialPtr.helloText)
+	s.Require().NoError(err)
+
+	s.Equal("hello, world!", data.Special.HelloText)
+
+	s.Require().NotNil(data.SpecialPtr)
+	s.Equal("hello, world!", data.SpecialPtr.HelloText)
+
+	s.Require().Len(data.SpecialSlice, 2)
+	s.Equal("hello, friend", data.SpecialSlice[0].HelloText)
+	s.Equal("hello, other friend", data.SpecialSlice[1].HelloText)
+
+	s.Require().NotNil(data.SpecialSlicePtr)
+	spSlice := *data.SpecialSlicePtr
+	s.Require().Len(spSlice, 2)
+	s.Equal("hello, friend", spSlice[0].HelloText)
+	s.Equal("hello, other friend", spSlice[1].HelloText)
+
+	s.Equal("hello! parent", data.SpecialWs.HelloText)
+
+	s.Require().NotNil(data.SpecialWsPtr)
+	s.Equal("hello! parent", data.SpecialWsPtr.HelloText)
 }
 
 func (s *Zuite) TestStructScan_worksheetConverterWithUndefined() {
