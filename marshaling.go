@@ -156,6 +156,34 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 	return nil
 }
 
+// getWsField allows us to get the ws field from either a ws tag
+// or the StructField name itself, if the tag is not specified.
+// It returns a boolean for fields that should be processed (were not explicitly/implicitly ignored).
+func getWsField(ws *Worksheet, ft reflect.StructField) (*Field, bool, error) {
+	tag, ok := ft.Tag.Lookup("ws")
+	if ok {
+		if tag == "" {
+			return nil, false, fmt.Errorf("struct field %s: cannot have empty tag name", ft.Name)
+		} else if tag == "-" {
+			// explicitly ignored
+			return nil, false, nil
+		}
+		field, ok := ws.def.fieldsByName[tag]
+		if !ok {
+			return nil, false, fmt.Errorf("struct field %s: unknown ws field %s", ft.Name, tag)
+		}
+		return field, true, nil
+	} else {
+		// no tag, use StructField name directly
+		field, ok := ws.def.fieldsByName[ft.Name]
+		if !ok {
+			// don't blow up if not found, just ignore
+			return nil, false, nil
+		}
+		return field, true, nil
+	}
+}
+
 func structScan(dests wsDestinationMap, ws *Worksheet) error {
 	v := reflect.ValueOf(dests[ws.Id()].dest)
 	v = v.Elem()
@@ -163,22 +191,15 @@ func structScan(dests wsDestinationMap, ws *Worksheet) error {
 	for i := 0; i < t.NumField(); i++ {
 		f := v.Field(i)
 		ft := t.Field(i)
-		tag, ok := ft.Tag.Lookup("ws")
 
-		if !ok {
+		field, ok, err := getWsField(ws, ft)
+		if err != nil {
+			return err
+		} else if !ok {
 			continue
 		}
 
-		if tag == "" {
-			return fmt.Errorf("struct field %s: cannot have empty tag name", ft.Name)
-		}
-
-		field, ok := ws.def.fieldsByName[tag]
-		if !ok {
-			return fmt.Errorf("unknown field %s", tag)
-		}
-
-		_, wsValue, _ := ws.get(tag)
+		_, wsValue, _ := ws.get(field.name)
 
 		// default conversion
 		ctx := convertCtx{

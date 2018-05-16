@@ -85,6 +85,12 @@ type Ping worksheet {
 
 type pong worksheet {
 	321:point_to_Ping Ping
+}
+
+type DefaultMappingsTest worksheet {
+	83:Name  text
+	91:Age   number[0]
+	99:Child DefaultMappingsTest
 }`
 
 func forciblySetId(ws *Worksheet, id string) {
