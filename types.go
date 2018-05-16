@@ -34,7 +34,7 @@ type NamedType interface {
 }
 
 // Assert that all types (which are not 'named') implement the Type interface.
-var _ []Type = []Type{
+var _ = []Type{
 	&UndefinedType{},
 	&TextType{},
 	&BoolType{},
@@ -43,7 +43,7 @@ var _ []Type = []Type{
 }
 
 // Assert that named types implement the NamedType.
-var _ []NamedType = []NamedType{
+var _ = []NamedType{
 	&Definition{},
 	&EnumType{},
 }

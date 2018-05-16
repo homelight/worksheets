@@ -306,7 +306,3 @@ func (s *Zuite) snapshotDbState() *dbState {
 		sliceElementsRecs: sliceElementsRecs,
 	}
 }
-
-func p(v string) *string {
-	return &v
-}

@@ -701,7 +701,7 @@ func (p *parser) parseScale() (int, error) {
 	if err != nil {
 		return -1, err
 	}
-	var scale int = maxScale + 1
+	var scale = maxScale + 1
 	if len(sScale) <= len(strconv.Itoa(maxScale)) {
 		scale, err = strconv.Atoi(sScale)
 		if err != nil {

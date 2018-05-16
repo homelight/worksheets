@@ -70,10 +70,10 @@ func (s *Zuite) TestParser_parseWorksheet() {
 func (s *Zuite) TestParser_parseEnum() {
 	cases := map[string][]string{
 		`{}`:                     nil,
-		`{"foo",}`:               []string{"foo"},
-		`{"foo","bar",}`:         []string{"foo", "bar"},
-		`{"one","two","three",}`: []string{"one", "two", "three"},
-		`{"hello world",}`:       []string{"hello world"},
+		`{"foo",}`:               {"foo"},
+		`{"foo","bar",}`:         {"foo", "bar"},
+		`{"one","two","three",}`: {"one", "two", "three"},
+		`{"hello world",}`:       {"hello world"},
 	}
 	for input, elements := range cases {
 		var expected map[string]bool
@@ -477,7 +477,7 @@ func (s *Zuite) TestTokenPatterns() {
 
 func (s *Zuite) TestTokenizer() {
 	cases := map[string][]string{
-		`worksheet simple {1:full_name text}`: []string{
+		`worksheet simple {1:full_name text}`: {
 			"worksheet",
 			"simple",
 			"{",
@@ -487,7 +487,7 @@ func (s *Zuite) TestTokenizer() {
 			"text",
 			"}",
 		},
-		`1_2___4.6_78___+_1_2`: []string{
+		`1_2___4.6_78___+_1_2`: {
 			"1",
 			"_2___4",
 			".6",
@@ -495,25 +495,25 @@ func (s *Zuite) TestTokenizer() {
 			"+",
 			"_1_2",
 		},
-		`1_2__6+7`: []string{
+		`1_2__6+7`: {
 			"1",
 			"_2__6",
 			"+",
 			"7",
 		},
-		`1_000*8%`: []string{
+		`1_000*8%`: {
 			"1", "_000", "*", "8%",
 		},
-		`5.75%*100`: []string{
+		`5.75%*100`: {
 			"5.75%", "*", "100",
 		},
-		`50_000 / 1.375%`: []string{
+		`50_000 / 1.375%`: {
 			"50", "_000", "/", "1.375%",
 		},
-		`0.000_100%`: []string{
+		`0.000_100%`: {
 			"0.000", "_100%",
 		},
-		`1!=2!3! =4==5=6= =7&&8&9& &0||1|2| |done`: []string{
+		`1!=2!3! =4==5=6= =7&&8&9& &0||1|2| |done`: {
 			"1", "!=",
 			"2", "!",
 			"3", "!", "=",
@@ -528,11 +528,11 @@ func (s *Zuite) TestTokenizer() {
 			"2", "|", "|",
 			"done",
 		},
-		"1// ignore my comment\n4": []string{
+		"1// ignore my comment\n4": {
 			"1",
 			"4",
 		},
-		`1/* this one too */4`: []string{
+		`1/* this one too */4`: {
 			"1",
 			"4",
 		},

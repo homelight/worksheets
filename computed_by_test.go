@@ -39,7 +39,7 @@ func (s *Zuite) TestComputedBy_externalComputedBy() {
 			`type simple worksheet {}`,
 			&Options{
 				Plugins: map[string]map[string]ComputedBy{
-					"not_so_simple": map[string]ComputedBy{
+					"not_so_simple": {
 						"unknown_name": nil,
 					},
 				},
@@ -50,7 +50,7 @@ func (s *Zuite) TestComputedBy_externalComputedBy() {
 			`type simple worksheet {}`,
 			&Options{
 				Plugins: map[string]map[string]ComputedBy{
-					"simple": map[string]ComputedBy{
+					"simple": {
 						"unknown_name": nil,
 					},
 				},
@@ -63,7 +63,7 @@ func (s *Zuite) TestComputedBy_externalComputedBy() {
 			}`,
 			&Options{
 				Plugins: map[string]map[string]ComputedBy{
-					"simple": map[string]ComputedBy{
+					"simple": {
 						"name": nil,
 					},
 				},
@@ -77,7 +77,7 @@ func (s *Zuite) TestComputedBy_externalComputedBy() {
 			}`,
 			&Options{
 				Plugins: map[string]map[string]ComputedBy{
-					"simple": map[string]ComputedBy{
+					"simple": {
 						"name": sayAlice([]string{}),
 					},
 				},
@@ -91,7 +91,7 @@ func (s *Zuite) TestComputedBy_externalComputedBy() {
 			}`,
 			&Options{
 				Plugins: map[string]map[string]ComputedBy{
-					"simple": map[string]ComputedBy{
+					"simple": {
 						"name": sayAlice([]string{"agee"}),
 					},
 				},
@@ -108,7 +108,7 @@ func (s *Zuite) TestComputedBy_externalComputedBy() {
 			}`,
 			&Options{
 				Plugins: map[string]map[string]ComputedBy{
-					"parent": map[string]ComputedBy{
+					"parent": {
 						"name": sayAlice([]string{"child.not_field"}),
 					},
 				},
@@ -132,7 +132,7 @@ func (s *Zuite) TestComputedBy_externalComputedBy() {
 func (s *Zuite) TestComputedBy_externalComputedByPlugin() {
 	opt := Options{
 		Plugins: map[string]map[string]ComputedBy{
-			"simple": map[string]ComputedBy{
+			"simple": {
 				"name": sayAlice([]string{"age"}),
 			},
 		},
@@ -243,7 +243,7 @@ func (fn bio) Compute(values ...Value) Value {
 func (s *Zuite) TestComputedBy_externalGood() {
 	opt := Options{
 		Plugins: map[string]map[string]ComputedBy{
-			"simple": map[string]ComputedBy{
+			"simple": {
 				"name": sayAlice([]string{"age"}),
 			},
 		},
@@ -265,7 +265,7 @@ func (s *Zuite) TestComputedBy_externalGood() {
 func (s *Zuite) TestComputedBy_externalGoodComplicated() {
 	opt := Options{
 		Plugins: map[string]map[string]ComputedBy{
-			"complicated": map[string]ComputedBy{
+			"complicated": {
 				"full_name": fullName([]string{"first_name", "last_name"}),
 				"age":       age([]string{"birth_year"}),
 				"bio":       bio([]string{"full_name", "birth_year", "age"}),

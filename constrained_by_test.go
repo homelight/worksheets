@@ -149,7 +149,7 @@ func (fn area) Compute(values ...Value) Value {
 func (s *Zuite) TestWorksheet_constrainedByAndComputedBy() {
 	opt := Options{
 		Plugins: map[string]map[string]ComputedBy{
-			"constrained_and_computed": map[string]ComputedBy{
+			"constrained_and_computed": {
 				"field_a": perimeterAndAreaConstraints([]string{"field_a", "field_b", "field_c", "area"}),
 				"field_b": perimeterAndAreaConstraints([]string{"field_a", "field_b", "field_c", "area"}),
 				"field_c": hypotenuse([]string{"field_a", "field_b"}),
