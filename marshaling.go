@@ -137,6 +137,27 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 		return fmt.Errorf("dest must be a *struct")
 	}
 
+	// dests stores refs to any worksheets that we have already scanned
+	// for reuse (and cycle termination)
+	dests := wsDestinationMap{
+		ws.Id(): {
+			dest,
+			nil,
+		},
+	}
+
+	err := structScan(dests, ws)
+	if err != nil {
+		return err
+	}
+
+	dests.setAllDestinations()
+
+	return nil
+}
+
+func structScan(dests wsDestinationMap, ws *Worksheet) error {
+	v := reflect.ValueOf(dests[ws.Id()].dest)
 	v = v.Elem()
 	t := v.Type()
 	for i := 0; i < t.NumField(); i++ {
@@ -157,42 +178,7 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 			return fmt.Errorf("unknown field %s", tag)
 		}
 
-		// for now, no support for slices or worksheets
-		if _, ok := field.typ.(*SliceType); ok {
-			return fmt.Errorf("struct field %s: cannot StructScan slices (yet)", ft.Name)
-		}
-
-		if _, ok := field.typ.(*Definition); ok {
-			return fmt.Errorf("struct field %s: cannot StructScan worksheets (yet)", ft.Name)
-		}
-
 		_, wsValue, _ := ws.get(tag)
-
-		// undefined
-		if _, ok := wsValue.(*Undefined); ok {
-			if ft.Type.Kind() != reflect.Ptr {
-				return fmt.Errorf("field %s to struct field %s: undefined into not nullable", tag, ft.Name)
-			}
-			f.Set(reflect.Zero(ft.Type))
-			continue
-		}
-
-		// WorksheetConverter
-		if ft.Type.AssignableTo(worksheetConverterType) {
-			exporter := reflect.New(ft.Type.Elem()).Interface().(WorksheetConverter)
-			if err := exporter.WorksheetConvert(wsValue); err != nil {
-				return err
-			}
-			f.Set(reflect.ValueOf(exporter))
-			continue
-		} else if reflect.PtrTo(ft.Type).AssignableTo(worksheetConverterType) {
-			exporter := reflect.New(ft.Type).Interface().(WorksheetConverter)
-			if err := exporter.WorksheetConvert(wsValue); err != nil {
-				return err
-			}
-			f.Set(reflect.ValueOf(exporter).Elem())
-			continue
-		}
 
 		// default conversion
 		ctx := convertCtx{
@@ -201,15 +187,23 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 			destFieldName:   ft.Name,
 			destType:        ft.Type,
 		}
-		value, err := convert(ctx, wsValue)
+		value, err := convert(dests, ctx, wsValue)
 		if err != nil {
 			return err
 		}
 
-		f.Set(value)
+		setOrDeferSet(dests, f, value, wsValue, ft.Type.Kind())
 	}
 
 	return nil
+}
+
+func setOrDeferSet(dests wsDestinationMap, f, v reflect.Value, wsValue Value, targetKind reflect.Kind) {
+	if childWs, ok := wsValue.(*Worksheet); ok && targetKind != reflect.Ptr {
+		dests.addLocus(childWs.Id(), f)
+	} else {
+		f.Set(v)
+	}
 }
 
 // convertCtx makes it easier to test than passing dest as reflect.StructField
@@ -221,10 +215,28 @@ type convertCtx struct {
 	destType        reflect.Type
 }
 
-func convert(ctx convertCtx, value Value) (reflect.Value, error) {
-	if ctx.destType.Kind() == reflect.Ptr {
+func convert(dests wsDestinationMap, ctx convertCtx, value Value) (reflect.Value, error) {
+	// this needs to be inside convert to make sure we check for elems in slices.
+	// we need to do it before pointer logic to make sure we return the same pointer.
+	if ws, ok := value.(*Worksheet); ok {
+		if savedDest, ok := dests[ws.Id()]; ok {
+			// we have seen this before, just return the saved dest ptr to struct or struct
+			if ctx.destType.Kind() == reflect.Ptr {
+				return reflect.ValueOf(savedDest.dest), nil
+			} else {
+				return reflect.ValueOf(savedDest.dest).Elem(), nil
+			}
+		}
+	}
+
+	// let undefined->ptr be handled by a converter, custom or standard
+	if _, ok := value.(*Undefined); !ok && ctx.destType.Kind() == reflect.Ptr {
+		// for empty slice ptr, we special case and return nil
+		if sliceVal, ok := value.(*Slice); ok && len(sliceVal.Elements()) == 0 {
+			return reflect.Zero(ctx.destType), nil
+		}
 		ctx.destType = ctx.destType.Elem()
-		v, err := convert(ctx, value)
+		v, err := convert(dests, ctx, value)
 		if err != nil {
 			return v, err
 		}
@@ -233,21 +245,37 @@ func convert(ctx convertCtx, value Value) (reflect.Value, error) {
 		return locus, nil
 	}
 
-	return value.structScanConvert(ctx)
+	// if we have a type that uses a custom converter, use it instead of standard conversion
+	if reflect.PtrTo(ctx.destType).AssignableTo(worksheetConverterType) {
+		exporter := reflect.New(ctx.destType).Interface().(WorksheetConverter)
+		if err := exporter.WorksheetConvert(value); err != nil {
+			return reflect.Value{}, err
+		}
+		if ws, ok := value.(*Worksheet); ok {
+			dests.newDestination(ws.Id(), exporter)
+		}
+		return reflect.ValueOf(exporter).Elem(), nil
+	}
+
+	return value.structScanConvert(dests, ctx)
 }
 
-func (value *Undefined) structScanConvert(ctx convertCtx) (reflect.Value, error) {
-	panic("should never be called")
+func (value *Undefined) structScanConvert(_ wsDestinationMap, ctx convertCtx) (reflect.Value, error) {
+	if ctx.destType.Kind() != reflect.Ptr {
+		ctx.sourceType = value.Type()
+		return ctx.cannotConvert(fmt.Sprintf("dest must be a *%s", ctx.destType.Name()))
+	}
+	return reflect.Zero(ctx.destType), nil
 }
 
-func (value *Text) structScanConvert(ctx convertCtx) (reflect.Value, error) {
+func (value *Text) structScanConvert(_ wsDestinationMap, ctx convertCtx) (reflect.Value, error) {
 	if ctx.destType.Kind() == reflect.String {
 		return reflect.ValueOf(value.value), nil
 	}
 	return ctx.cannotConvert()
 }
 
-func (value *Bool) structScanConvert(ctx convertCtx) (reflect.Value, error) {
+func (value *Bool) structScanConvert(_ wsDestinationMap, ctx convertCtx) (reflect.Value, error) {
 	if ctx.destType.Kind() == reflect.Bool {
 		return reflect.ValueOf(value.value), nil
 	} else if ctx.destType.Kind() == reflect.String {
@@ -256,7 +284,7 @@ func (value *Bool) structScanConvert(ctx convertCtx) (reflect.Value, error) {
 	return ctx.cannotConvert()
 }
 
-func (value *Number) structScanConvert(ctx convertCtx) (reflect.Value, error) {
+func (value *Number) structScanConvert(_ wsDestinationMap, ctx convertCtx) (reflect.Value, error) {
 	// to string
 	if ctx.destType.Kind() == reflect.String {
 		return reflect.ValueOf(value.String()), nil
@@ -348,12 +376,39 @@ func (value *Number) structScanConvert(ctx convertCtx) (reflect.Value, error) {
 	return ctx.cannotConvert()
 }
 
-func (value *Worksheet) structScanConvert(ctx convertCtx) (reflect.Value, error) {
-	return ctx.cannotConvert("not supported yet")
+func (value *Worksheet) structScanConvert(dests wsDestinationMap, ctx convertCtx) (reflect.Value, error) {
+	if ctx.destType.Kind() != reflect.Struct {
+		return ctx.cannotConvert("dest must be a struct")
+	}
+
+	newVal := reflect.New(ctx.destType)
+	dests.newDestination(value.Id(), newVal.Interface())
+	err := structScan(dests, value)
+	if err != nil {
+		return reflect.Value{}, err
+	}
+	return newVal.Elem(), nil
 }
 
-func (value *Slice) structScanConvert(ctx convertCtx) (reflect.Value, error) {
-	return ctx.cannotConvert("not supported yet")
+func (value *Slice) structScanConvert(dests wsDestinationMap, ctx convertCtx) (reflect.Value, error) {
+	if ctx.destType.Kind() != reflect.Slice {
+		return ctx.cannotConvert("dest must be a slice")
+	}
+	if len(value.Elements()) == 0 {
+		return reflect.Zero(ctx.destType), nil
+	}
+	locus := reflect.New(ctx.destType)
+	locus.Elem().Set(reflect.MakeSlice(ctx.destType, len(value.Elements()), len(value.Elements())))
+	ctx.destType = ctx.destType.Elem()
+	for i, wsElem := range value.Elements() {
+		ctx.sourceType = wsElem.Type()
+		newVal, err := convert(dests, ctx, wsElem)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		setOrDeferSet(dests, locus.Elem().Index(i), newVal, wsElem, ctx.destType.Kind())
+	}
+	return locus.Elem(), nil
 }
 
 func (ctx convertCtx) valueOutOfRange() (reflect.Value, error) {

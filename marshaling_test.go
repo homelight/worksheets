@@ -211,7 +211,7 @@ func (s *Zuite) TestStructScan_notOptionalYetUndefined() {
 		Text string `ws:"text"`
 	}
 	err := ws.StructScan(&data)
-	require.EqualError(s.T(), err, "field text to struct field Text: undefined into not nullable")
+	require.EqualError(s.T(), err, "field text to struct field Text: cannot convert undefined to string, dest must be a *string")
 }
 
 func (s *Zuite) TestStructScan_optionalWithUndefined() {
@@ -256,57 +256,292 @@ func (s *Zuite) TestStructScan_skipFieldsWithNoTag() {
 	require.Equal(s.T(), "ignore me", data.Ignore)
 }
 
-func (s *Zuite) TestStructScan_slicesNotSupported() {
-	ws := s.defs.MustNewWorksheet("all_types")
-
-	var data struct {
-		Texts []string `ws:"slice_t"`
+func (s *Zuite) TestStructScan_slices() {
+	type allSortsOfSlices struct {
+		Texts  []string    `ws:"slice_t"`
+		Bools  []*bool     `ws:"slice_b"`
+		Ints   *[]int      `ws:"slice_n0"`
+		Floats *[]*float64 `ws:"slice_n2"`
 	}
-	err := ws.StructScan(&data)
-	require.EqualError(s.T(), err, "struct field Texts: cannot StructScan slices (yet)")
+	var (
+		t  = true
+		f  = false
+		n1 = float64(1)
+		n2 = 2.12
+	)
+	testCases := []struct {
+		field          string
+		elems          []Value
+		expectedStruct allSortsOfSlices
+	}{
+		{
+			field:          "slice_t",
+			elems:          []Value{NewText("a"), NewText("b"), NewText("c"), NewText("")},
+			expectedStruct: allSortsOfSlices{Texts: []string{"a", "b", "c", ""}},
+		},
+		{
+			field:          "slice_b",
+			elems:          []Value{NewBool(true), vUndefined, NewBool(false)},
+			expectedStruct: allSortsOfSlices{Bools: []*bool{&t, nil, &f}},
+		},
+		{
+			field:          "slice_n0",
+			elems:          []Value{NewNumberFromInt(1), NewNumberFromInt(2), NewNumberFromInt(3)},
+			expectedStruct: allSortsOfSlices{Ints: &[]int{1, 2, 3}},
+		},
+		{
+			field:          "slice_n2",
+			elems:          []Value{NewNumberFromInt(1), NewNumberFromFloat64(2.12), vUndefined},
+			expectedStruct: allSortsOfSlices{Floats: &[]*float64{&n1, &n2, nil}},
+		},
+	}
+
+	for _, tc := range testCases {
+		ws := s.defs.MustNewWorksheet("all_types")
+		for _, e := range tc.elems {
+			ws.MustAppend(tc.field, e)
+		}
+		var data allSortsOfSlices
+		err := ws.StructScan(&data)
+		s.NoError(err)
+		s.Equal(tc.expectedStruct, data)
+	}
 }
 
-type allTypesStruct struct {
-	Ws   *allTypesStruct `ws:"ws"`
-	Num0 int             `ws:"num_0"`
-}
+func (s *Zuite) TestStructScan_slicesEmpty() {
+	var data struct {
+		Texts  []string    `ws:"slice_t"`
+		Bools  []*bool     `ws:"slice_b"`
+		Ints   *[]int      `ws:"slice_n0"`
+		Floats *[]*float64 `ws:"slice_n2"`
+	}
 
-func (s *Zuite) TestStructScan_refsNotSupported() {
 	ws := s.defs.MustNewWorksheet("all_types")
+
+	err := ws.StructScan(&data)
+	s.Require().NoError(err)
+	s.Nil(data.Texts)
+	s.Nil(data.Bools)
+	s.Nil(data.Ints)
+	s.Nil(data.Floats)
+}
+
+func (s *Zuite) TestStructScan_refsPtr() {
+	type allTypesStruct struct {
+		Ws   *allTypesStruct `ws:"ws"`
+		Num0 int             `ws:"num_0"`
+	}
+
+	ws := s.defs.MustNewWorksheet("all_types")
+	ws.MustSet("num_0", NewNumberFromInt(123))
+
+	wsChild := s.defs.MustNewWorksheet("all_types")
+	wsChild.MustSet("num_0", NewNumberFromInt(456))
+
+	ws.MustSet("ws", wsChild)
 
 	var parent allTypesStruct
 	err := ws.StructScan(&parent)
-	require.EqualError(s.T(), err, "struct field Ws: cannot StructScan worksheets (yet)")
+	s.Require().NoError(err)
+
+	s.Equal(123, parent.Num0)
+
+	child := parent.Ws
+	s.Equal(456, child.Num0)
+	s.Nil(child.Ws)
+}
+
+func (s *Zuite) TestStructScan_refsNoPtr() {
+	type allTypesOtherStruct struct {
+		Num0 int `ws:"num_0"`
+	}
+	type allTypesStruct struct {
+		Ws   allTypesOtherStruct `ws:"ws"`
+		Num0 int                 `ws:"num_0"`
+	}
+
+	ws := s.defs.MustNewWorksheet("all_types")
+	ws.MustSet("num_0", NewNumberFromInt(123))
+
+	wsChild := s.defs.MustNewWorksheet("all_types")
+	wsChild.MustSet("num_0", NewNumberFromInt(456))
+
+	ws.MustSet("ws", wsChild)
+
+	var parent allTypesStruct
+	err := ws.StructScan(&parent)
+	s.Require().NoError(err)
+
+	s.Equal(123, parent.Num0)
+
+	child := parent.Ws
+	s.Equal(456, child.Num0)
+}
+
+type ping struct {
+	Pong *pong `ws:"point_to_pong"`
+}
+
+type pong struct {
+	Ping *ping `ws:"point_to_ping"`
+}
+
+func (s *Zuite) TestStructScan_refsCircularIndirect() {
+	pingWs := s.defs.MustNewWorksheet("ping")
+	pongWs := s.defs.MustNewWorksheet("pong")
+
+	pongWs.MustSet("point_to_ping", pingWs)
+	pingWs.MustSet("point_to_pong", pongWs)
+
+	var ping ping
+	err := pingWs.StructScan(&ping)
+	s.Require().NoError(err)
+
+	s.Equal(ping, *ping.Pong.Ping)
+	s.Equal(ping.Pong, ping.Pong.Ping.Pong)
+}
+
+func (s *Zuite) TestStructScan_refsCircularDirect() {
+	type meAndMyFriends struct {
+		Me      *meAndMyFriends  `ws:"point_to_me"`
+		MyPeeps []meAndMyFriends `ws:"point_to_my_friends"`
+	}
+
+	joey := s.defs.MustNewWorksheet("with_refs_and_cycles")
+	phoebe := s.defs.MustNewWorksheet("with_refs_and_cycles")
+	russ := s.defs.MustNewWorksheet("with_refs_and_cycles")
+
+	// know thyself
+	joey.MustSet("point_to_me", joey)
+	phoebe.MustSet("point_to_me", phoebe)
+	russ.MustSet("point_to_me", russ)
+
+	// everyone is friends (except russ is too cool to reciprocate)
+	phoebe.MustAppend("point_to_my_friends", joey)
+	phoebe.MustAppend("point_to_my_friends", russ)
+	joey.MustAppend("point_to_my_friends", phoebe)
+	joey.MustAppend("point_to_my_friends", russ)
+
+	// normally: f1 = joey, f2 = phoebe, and f3 = russ
+	var f1 meAndMyFriends
+	err := joey.StructScan(&f1)
+	s.Require().NoError(err)
+
+	s.Require().Equal(2, len(f1.MyPeeps))
+	f2 := f1.MyPeeps[0]
+	f3 := f1.MyPeeps[1]
+	s.Equal(f1, *f1.Me)
+	s.Equal(f1.MyPeeps[0], f2)
+	s.Equal(f1.MyPeeps[1], f3)
+	s.Require().Equal(2, len(f2.MyPeeps))
+	s.Equal(f2.MyPeeps[0], f1)
+	s.Equal(f2.MyPeeps[1], f3)
+	s.Zero(len(f3.MyPeeps))
+}
+
+func (s *Zuite) TestStructScan_refsRepeat() {
+	type thing struct {
+		Name string `ws:"name"`
+	}
+
+	type pedantic struct {
+		ThatThing      thing   `ws:"point_to_something"`
+		JustMakingSure *thing  `ws:"point_to_the_same_thing"`
+		KeepItSafe     []thing `ws:"and_again"`
+	}
+
+	t := s.defs.MustNewWorksheet("simple")
+	t.MustSet("name", NewText("hi look at me"))
+
+	ws := s.defs.MustNewWorksheet("with_repeat_refs")
+	ws.MustSet("point_to_something", t)
+	ws.MustSet("point_to_the_same_thing", t)
+	ws.MustAppend("and_again", t)
+
+	var p pedantic
+	err := ws.StructScan(&p)
+	s.Require().NoError(err)
+
+	s.Require().Equal(1, len(p.KeepItSafe))
+	s.Equal(p.ThatThing, *p.JustMakingSure)
+	s.Equal(p.ThatThing, p.KeepItSafe[0])
 }
 
 type special struct {
-	helloText string
+	HelloText string `ws:"xyz"` // this mapping should be totally ignored because converters kick in
 }
 
 var _ WorksheetConverter = &special{}
 
 func (sp *special) WorksheetConvert(value Value) error {
 	if text, ok := value.(*Text); ok {
-		sp.helloText = "hello, " + text.value
+		sp.HelloText = "hello, " + text.value
+		return nil
+	} else if ws, ok := value.(*Worksheet); ok {
+		ht := ws.MustGet("text").(*Text)
+		sp.HelloText = "hello! " + ht.value
 		return nil
 	}
 
-	return fmt.Errorf("can only convert text, was %s", value)
+	return fmt.Errorf("can only convert text and worksheet, was %s", value)
+}
+
+type specialSlice []special
+
+var _ WorksheetConverter = &specialSlice{}
+
+func (sps *specialSlice) WorksheetConvert(value Value) error {
+	if wsSlice, ok := value.(*Slice); ok {
+		for _, e := range wsSlice.Elements() {
+			newSp := &special{}
+			newSp.WorksheetConvert(e)
+			*sps = append(*sps, *newSp)
+		}
+		return nil
+	}
+
+	return fmt.Errorf("can only convert slice, was %s", value)
 }
 
 func (s *Zuite) TestStructScan_worksheetConverter() {
 	ws := s.defs.MustNewWorksheet("all_types")
 	ws.MustSet("text", NewText("world!"))
+	ws.MustAppend("slice_t", NewText("friend"))
+	ws.MustAppend("slice_t", NewText("other friend"))
+	childWs := s.defs.MustNewWorksheet("all_types")
+	childWs.MustSet("text", NewText("parent"))
+	ws.MustSet("ws", childWs)
 
 	var data struct {
-		Special    special  `ws:"text"`
-		SpecialPtr *special `ws:"text"`
+		Special         special       `ws:"text"`
+		SpecialPtr      *special      `ws:"text"`
+		SpecialSlice    specialSlice  `ws:"slice_t"`
+		SpecialSlicePtr *specialSlice `ws:"slice_t"`
+		SpecialWs       special       `ws:"ws"`
+		SpecialWsPtr    *special      `ws:"ws"`
 	}
 	err := ws.StructScan(&data)
-	require.NoError(s.T(), err)
-	require.Equal(s.T(), "hello, world!", data.Special.helloText)
-	require.NotNil(s.T(), data.SpecialPtr)
-	require.Equal(s.T(), "hello, world!", data.SpecialPtr.helloText)
+	s.Require().NoError(err)
+
+	s.Equal("hello, world!", data.Special.HelloText)
+
+	s.Require().NotNil(data.SpecialPtr)
+	s.Equal("hello, world!", data.SpecialPtr.HelloText)
+
+	s.Require().Len(data.SpecialSlice, 2)
+	s.Equal("hello, friend", data.SpecialSlice[0].HelloText)
+	s.Equal("hello, other friend", data.SpecialSlice[1].HelloText)
+
+	s.Require().NotNil(data.SpecialSlicePtr)
+	spSlice := *data.SpecialSlicePtr
+	s.Require().Len(spSlice, 2)
+	s.Equal("hello, friend", spSlice[0].HelloText)
+	s.Equal("hello, other friend", spSlice[1].HelloText)
+
+	s.Equal("hello! parent", data.SpecialWs.HelloText)
+
+	s.Require().NotNil(data.SpecialWsPtr)
+	s.Equal("hello! parent", data.SpecialWsPtr.HelloText)
 }
 
 func (s *Zuite) TestStructScan_worksheetConverterWithUndefined() {
@@ -378,7 +613,7 @@ func (s *Zuite) TestStructScan_convert() {
 			destFieldName:   "Dest",
 			destType:        ex.dest,
 		}
-		actual, err := convert(ctx, ex.source)
+		actual, err := convert(nil, ctx, ex.source)
 		require.NoError(s.T(), err)
 		assert.Equal(s.T(), ex.expected, actual.Interface())
 	}
@@ -433,7 +668,7 @@ func (s *Zuite) TestStructScan_convertErrors() {
 			destFieldName:   "Dest",
 			destType:        ex.dest,
 		}
-		_, err := convert(ctx, ex.source)
+		_, err := convert(nil, ctx, ex.source)
 		assert.EqualErrorf(s.T(), err, "field source to struct field Dest: cannot convert "+ex.expected,
 			"converting %s to %s", ex.source, ex.dest)
 	}
