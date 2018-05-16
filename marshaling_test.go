@@ -383,14 +383,14 @@ type ping struct {
 }
 
 type pong struct {
-	Ping *ping `ws:"point_to_ping"`
+	Ping *ping `ws:"point_to_Ping"`
 }
 
 func (s *Zuite) TestStructScan_refsCircularIndirect() {
-	pingWs := s.defs.MustNewWorksheet("ping")
+	pingWs := s.defs.MustNewWorksheet("Ping")
 	pongWs := s.defs.MustNewWorksheet("pong")
 
-	pongWs.MustSet("point_to_ping", pingWs)
+	pongWs.MustSet("point_to_Ping", pingWs)
 	pingWs.MustSet("point_to_pong", pongWs)
 
 	var ping ping

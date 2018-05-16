@@ -78,13 +78,13 @@ type with_repeat_refs worksheet {
 	113:and_again               []simple
 }
 
-type ping worksheet {
+type Ping worksheet {
 	123:point_to_pong pong
-	124:slice_of_ping []ping
+	124:slice_of_Ping []Ping
 }
 
 type pong worksheet {
-	321:point_to_ping ping
+	321:point_to_Ping Ping
 }`
 
 func forciblySetId(ws *Worksheet, id string) {
