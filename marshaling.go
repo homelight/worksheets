@@ -139,7 +139,7 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 
 	// dests stores refs to any worksheets that we have already scanned
 	// for reuse (and cycle termination)
-	dests := map[string]*deferredSet{
+	dests := wsDestinationMap{
 		ws.Id(): {
 			dest,
 			nil,
@@ -151,16 +151,12 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 		return err
 	}
 
-	for _, v := range dests {
-		for _, fn := range v.sets {
-			fn(v.dest)
-		}
-	}
+	dests.setAllDestinations()
 
 	return nil
 }
 
-func structScan(dests map[string]*deferredSet, ws *Worksheet) error {
+func structScan(dests wsDestinationMap, ws *Worksheet) error {
 	v := reflect.ValueOf(dests[ws.Id()].dest)
 	v = v.Elem()
 	t := v.Type()
@@ -202,12 +198,9 @@ func structScan(dests map[string]*deferredSet, ws *Worksheet) error {
 	return nil
 }
 
-func setOrDeferSet(dests map[string]*deferredSet, f, v reflect.Value, wsValue Value, targetKind reflect.Kind) {
+func setOrDeferSet(dests wsDestinationMap, f, v reflect.Value, wsValue Value, targetKind reflect.Kind) {
 	if childWs, ok := wsValue.(*Worksheet); ok && targetKind != reflect.Ptr {
-		dests[childWs.Id()].sets = append(dests[childWs.Id()].sets, func(dest interface{}) {
-			destPtrValue := reflect.ValueOf(dest)
-			f.Set(destPtrValue.Elem())
-		})
+		dests.addLocus(childWs.Id(), f)
 	} else {
 		f.Set(v)
 	}
@@ -222,7 +215,7 @@ type convertCtx struct {
 	destType        reflect.Type
 }
 
-func convert(dests map[string]*deferredSet, ctx convertCtx, value Value) (reflect.Value, error) {
+func convert(dests wsDestinationMap, ctx convertCtx, value Value) (reflect.Value, error) {
 	// this needs to be inside convert to make sure we check for elems in slices.
 	// we need to do it before pointer logic to make sure we return the same pointer.
 	if ws, ok := value.(*Worksheet); ok {
@@ -264,7 +257,7 @@ func convert(dests map[string]*deferredSet, ctx convertCtx, value Value) (reflec
 	return value.structScanConvert(dests, ctx)
 }
 
-func (value *Undefined) structScanConvert(_ map[string]*deferredSet, ctx convertCtx) (reflect.Value, error) {
+func (value *Undefined) structScanConvert(_ wsDestinationMap, ctx convertCtx) (reflect.Value, error) {
 	if ctx.destType.Kind() != reflect.Ptr {
 		ctx.sourceType = value.Type()
 		return ctx.cannotConvert(fmt.Sprintf("dest must be a *%s", ctx.destType.Name()))
@@ -272,14 +265,14 @@ func (value *Undefined) structScanConvert(_ map[string]*deferredSet, ctx convert
 	return reflect.Zero(ctx.destType), nil
 }
 
-func (value *Text) structScanConvert(_ map[string]*deferredSet, ctx convertCtx) (reflect.Value, error) {
+func (value *Text) structScanConvert(_ wsDestinationMap, ctx convertCtx) (reflect.Value, error) {
 	if ctx.destType.Kind() == reflect.String {
 		return reflect.ValueOf(value.value), nil
 	}
 	return ctx.cannotConvert()
 }
 
-func (value *Bool) structScanConvert(_ map[string]*deferredSet, ctx convertCtx) (reflect.Value, error) {
+func (value *Bool) structScanConvert(_ wsDestinationMap, ctx convertCtx) (reflect.Value, error) {
 	if ctx.destType.Kind() == reflect.Bool {
 		return reflect.ValueOf(value.value), nil
 	} else if ctx.destType.Kind() == reflect.String {
@@ -288,7 +281,7 @@ func (value *Bool) structScanConvert(_ map[string]*deferredSet, ctx convertCtx) 
 	return ctx.cannotConvert()
 }
 
-func (value *Number) structScanConvert(_ map[string]*deferredSet, ctx convertCtx) (reflect.Value, error) {
+func (value *Number) structScanConvert(_ wsDestinationMap, ctx convertCtx) (reflect.Value, error) {
 	// to string
 	if ctx.destType.Kind() == reflect.String {
 		return reflect.ValueOf(value.String()), nil
@@ -380,16 +373,13 @@ func (value *Number) structScanConvert(_ map[string]*deferredSet, ctx convertCtx
 	return ctx.cannotConvert()
 }
 
-func (value *Worksheet) structScanConvert(dests map[string]*deferredSet, ctx convertCtx) (reflect.Value, error) {
+func (value *Worksheet) structScanConvert(dests wsDestinationMap, ctx convertCtx) (reflect.Value, error) {
 	if ctx.destType.Kind() != reflect.Struct {
 		return ctx.cannotConvert("dest must be a struct")
 	}
 
 	newVal := reflect.New(ctx.destType)
-	dests[value.Id()] = &deferredSet{
-		newVal.Interface(),
-		nil,
-	}
+	dests.newDestination(value.Id(), newVal.Interface())
 	err := structScan(dests, value)
 	if err != nil {
 		return reflect.Value{}, err
@@ -397,7 +387,7 @@ func (value *Worksheet) structScanConvert(dests map[string]*deferredSet, ctx con
 	return newVal.Elem(), nil
 }
 
-func (value *Slice) structScanConvert(dests map[string]*deferredSet, ctx convertCtx) (reflect.Value, error) {
+func (value *Slice) structScanConvert(dests wsDestinationMap, ctx convertCtx) (reflect.Value, error) {
 	if ctx.destType.Kind() != reflect.Slice {
 		return ctx.cannotConvert("dest must be a slice")
 	}

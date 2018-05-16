@@ -37,10 +37,37 @@ const (
 	ModeHalf              = "half"
 )
 
-// deferredSet is used during marshaling to properly populate reused non-pointer struct references
-type deferredSet struct {
+// wsDestination is used during structScan to properly populate reused non-pointer struct references
+type wsDestination struct {
 	dest interface{}
-	sets []func(interface{})
+	loci []reflect.Value
+}
+
+func (wsd *wsDestination) setAll() {
+	for _, locus := range wsd.loci {
+		destPtr := reflect.ValueOf(wsd.dest)
+		// dests are stored as pointers but we are setting non-pointer destinations
+		locus.Set(destPtr.Elem())
+	}
+}
+
+type wsDestinationMap map[string]*wsDestination
+
+func (wsdm wsDestinationMap) setAllDestinations() {
+	for _, d := range wsdm {
+		d.setAll()
+	}
+}
+
+func (wsdm wsDestinationMap) newDestination(destId string, dest interface{}) {
+	if _, ok := wsdm[destId]; ok {
+		panic("incorrect usage: cannot add new destination multiple times")
+	}
+	wsdm[destId] = &wsDestination{dest, nil}
+}
+
+func (wsdm wsDestinationMap) addLocus(destId string, locus reflect.Value) {
+	wsdm[destId].loci = append(wsdm[destId].loci, locus)
 }
 
 // Value represents a runtime value.
@@ -57,7 +84,7 @@ type Value interface {
 	expression
 	dbWriteValue() string
 	jsonMarshalValue(m *marshaler, b *bytes.Buffer)
-	structScanConvert(dests map[string]*deferredSet, ctx convertCtx) (reflect.Value, error)
+	structScanConvert(dests wsDestinationMap, ctx convertCtx) (reflect.Value, error)
 
 	// assignableTo returns whether this value is assignable to type typ.
 	//
