@@ -189,6 +189,12 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 		`max(1, slice(2, 3), -4)`:   `3`,
 		`max(slice(-1.008, -5.32))`: `-1.008`,
 		`max(1, 2, 3) round down 2`: `3.00`,
+
+		// avg
+		`avg(1, 1, 1, 1, 1, 1, 5) round half 0`: `2`,
+		`avg(1, 1, 1, 1, 1, 1, 5) round half 1`: `1.6`,
+		`avg(1, 1, 1, 1, 1, 1, 5) round half 2`: `1.57`,
+		`avg(1, 1, 1, 1, 1, 1, 5) round half 3`: `1.571`,
 	}
 	for input, output := range cases {
 		// fixture
@@ -229,24 +235,34 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 
 func (s *Zuite) TestRuntime_parseAndEvalExprExpectingFailure() {
 	cases := map[string]string{
-		`no_such_func()`:   `unknown function no_such_func`,
-		`no.such.func()`:   `unknown function no.such.func`,
-		`len(1, 2)`:        `len: 1 argument(s) expected but 2 found`,
-		`len(1)`:           `len: argument #1 expected to be text, or slice`,
-		`sum()`:            `sum: at least 1 argument(s) expected but none found`,
-		`sum("a")`:         `sum: encountered non-numerical argument`,
-		`sum(slice_t)`:     `sum: encountered non-numerical argument`,
-		`if(1)`:            `if: at least 2 argument(s) expected but only 1 found`,
-		`if(1,2,3,4)`:      `if: at most 3 argument(s) expected but 4 found`,
-		`first_of()`:       `first_of: at least 1 argument(s) expected but none found`,
-		`slice()`:          `slice: at least 1 argument(s) expected but none found`,
-		`slice(undefined)`: `slice: unable to infer slice type, only undefined values encountered`,
-		`slice(1, "one")`:  `slice: cannot mix incompatible types number[0] and text in slice`,
-		`slice("one", 1)`:  `slice: cannot mix incompatible types text and number[0] in slice`,
-		`min()`:            `min: at least 1 argument(s) expected but none found`,
-		`min("one")`:       `min: encountered non-numerical argument`,
-		`max()`:            `max: at least 1 argument(s) expected but none found`,
-		`max("one")`:       `max: encountered non-numerical argument`,
+		`no_such_func()`:     `unknown function no_such_func`,
+		`no.such.func()`:     `unknown function no.such.func`,
+		`len(1, 2)`:          `len: 1 argument(s) expected but 2 found`,
+		`len(1)`:             `len: argument #1 expected to be text, or slice`,
+		`sum()`:              `sum: at least 1 argument(s) expected but none found`,
+		`sum("a")`:           `sum: encountered non-numerical argument`,
+		`sum(slice_t)`:       `sum: encountered non-numerical argument`,
+		`if(1)`:              `if: at least 2 argument(s) expected but only 1 found`,
+		`if(1,2,3,4)`:        `if: at most 3 argument(s) expected but 4 found`,
+		`first_of()`:         `first_of: at least 1 argument(s) expected but none found`,
+		`slice()`:            `slice: at least 1 argument(s) expected but none found`,
+		`slice(undefined)`:   `slice: unable to infer slice type, only undefined values encountered`,
+		`slice(1, "one")`:    `slice: cannot mix incompatible types number[0] and text in slice`,
+		`slice("one", 1)`:    `slice: cannot mix incompatible types text and number[0] in slice`,
+		`min()`:              `min: at least 1 argument(s) expected but none found`,
+		`min("one")`:         `min: encountered non-numerical argument`,
+		`max()`:              `max: at least 1 argument(s) expected but none found`,
+		`max("one")`:         `max: encountered non-numerical argument`,
+		`avg()`:              `avg: missing rounding mode`,
+		`avg() round down 8`: `avg: at least 1 argument(s) expected but none found`,
+		`avg(1)`:             `avg: missing rounding mode`,
+
+		// incorrect roundings
+		// TODO(pascal): these two should really be the same... but because we
+		// currently convert the first one into `"no" + 0 rounding`, the error
+		// message differs.
+		`"no" round down 0`:        `op on non-number`,
+		`slice("no") round down 0`: `unable to round non-numerical value`,
 	}
 	for input, output := range cases {
 		// fixture
@@ -315,7 +331,7 @@ func (s *Zuite) TestRuntime_rSlice() {
 		},
 	}
 	for _, ex := range cases {
-		result, err := rSlice(newFnArgs(nil, ex.args))
+		result, err := rSlice(newFnArgs(nil, nil, ex.args))
 		if s.NoError(err) {
 			actual := result.(*Slice)
 			s.Equal(ex.args, actual.Elements(), "%v", ex.args)

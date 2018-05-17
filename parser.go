@@ -414,7 +414,15 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 					p.next()
 				}
 			}
-			first = &tCall{selector, args}
+			var round *tRound
+			if p.peek(pRound) {
+				var err error
+				round, err = p.parseRound()
+				if err != nil {
+					return nil, err
+				}
+			}
+			first = &tCall{selector, args, round}
 		}
 
 	case "paren":

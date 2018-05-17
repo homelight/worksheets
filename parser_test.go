@@ -138,6 +138,7 @@ func (s *Zuite) TestParser_parseExpression() {
 		`len(something)`: &tCall{
 			tSelector([]string{"len"}),
 			[]expression{tSelector([]string{"something"})},
+			nil,
 		},
 		`first_of(undefined, 6, "Alice")`: &tCall{
 			tSelector([]string{"first_of"}),
@@ -146,9 +147,11 @@ func (s *Zuite) TestParser_parseExpression() {
 				&Number{6, &NumberType{0}},
 				&Text{"Alice"},
 			},
+			nil,
 		},
 		`foo.len()`: &tCall{
 			tSelector([]string{"foo", "len"}),
+			nil,
 			nil,
 		},
 		`sum(len(foo))`: &tCall{
@@ -159,8 +162,10 @@ func (s *Zuite) TestParser_parseExpression() {
 					[]expression{
 						tSelector([]string{"foo"}),
 					},
+					nil,
 				},
 			},
+			nil,
 		},
 		`sum(len(foo),8)`: &tCall{
 			tSelector([]string{"sum"}),
@@ -170,9 +175,11 @@ func (s *Zuite) TestParser_parseExpression() {
 					[]expression{
 						tSelector([]string{"foo"}),
 					},
+					nil,
 				},
 				&Number{8, &NumberType{0}},
 			},
+			nil,
 		},
 
 		// calls -- allow trailing comma
@@ -181,6 +188,7 @@ func (s *Zuite) TestParser_parseExpression() {
 			[]expression{
 				&Number{5, &NumberType{0}},
 			},
+			nil,
 		},
 		`first_of(1,2,3,)`: &tCall{
 			tSelector([]string{"first_of"}),
@@ -189,6 +197,7 @@ func (s *Zuite) TestParser_parseExpression() {
 				&Number{2, &NumberType{0}},
 				&Number{3, &NumberType{0}},
 			},
+			nil,
 		},
 		`sum(len(5,),)`: &tCall{
 			tSelector([]string{"sum"}),
@@ -198,8 +207,48 @@ func (s *Zuite) TestParser_parseExpression() {
 					[]expression{
 						&Number{5, &NumberType{0}},
 					},
+					nil,
 				},
 			},
+			nil,
+		},
+
+		// calls -- with rounding
+		`avg(7, 11) round half 4`: &tCall{
+			tSelector([]string{"avg"}),
+			[]expression{
+				&Number{7, &NumberType{0}},
+				&Number{11, &NumberType{0}},
+			},
+			&tRound{"half", 4},
+		},
+		`sum(1, avg(7, 11) round half 4) round up 7`: &tCall{
+			tSelector([]string{"sum"}),
+			[]expression{
+				&Number{1, &NumberType{0}},
+				&tCall{
+					tSelector([]string{"avg"}),
+					[]expression{
+						&Number{7, &NumberType{0}},
+						&Number{11, &NumberType{0}},
+					},
+					&tRound{"half", 4},
+				},
+			},
+			&tRound{"up", 7},
+		},
+		`avg(7, 11) round half 4 round up 7`: &tBinop{
+			opPlus,
+			&tCall{
+				tSelector([]string{"avg"}),
+				[]expression{
+					&Number{7, &NumberType{0}},
+					&Number{11, &NumberType{0}},
+				},
+				&tRound{"half", 4},
+			},
+			vZero,
+			&tRound{"up", 7},
 		},
 
 		// unop and binop
