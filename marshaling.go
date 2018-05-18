@@ -137,31 +137,27 @@ type wsDestination struct {
 	loci []reflect.Value
 }
 
-func (wsd *wsDestination) setAll() {
-	for _, locus := range wsd.loci {
-		destPtr := reflect.ValueOf(wsd.dest)
-		// dests are stored as pointers but we are setting non-pointer destinations
-		locus.Set(destPtr.Elem())
-	}
-}
-
 type wsDestinationMap map[string]*wsDestination
 
 func (wsdm wsDestinationMap) setAllDestinations() {
 	for _, d := range wsdm {
-		d.setAll()
+		for _, locus := range d.loci {
+			destPtr := reflect.ValueOf(d.dest)
+			// dests are stored as pointers but we are setting non-pointer destinations
+			locus.Set(destPtr.Elem())
+		}
 	}
 }
 
-func (wsdm wsDestinationMap) newDestination(destId string, dest interface{}) {
-	if _, ok := wsdm[destId]; ok {
+func (wsdm wsDestinationMap) addDestination(ws *Worksheet, dest interface{}) {
+	if _, ok := wsdm[ws.Id()]; ok {
 		panic("incorrect usage: cannot add new destination multiple times")
 	}
-	wsdm[destId] = &wsDestination{dest, nil}
+	wsdm[ws.Id()] = &wsDestination{dest, nil}
 }
 
-func (wsdm wsDestinationMap) addLocus(destId string, locus reflect.Value) {
-	wsdm[destId].loci = append(wsdm[destId].loci, locus)
+func (wsdm wsDestinationMap) addLocus(ws *Worksheet, locus reflect.Value) {
+	wsdm[ws.Id()].loci = append(wsdm[ws.Id()].loci, locus)
 }
 
 // StructScanner stores state allowing overrides for scanning of registered types.
@@ -202,7 +198,7 @@ func (ss *StructScanner) StructScan(ws *Worksheet, dest interface{}) error {
 		dests:      make(wsDestinationMap),
 	}
 
-	ctx.dests.newDestination(ws.Id(), dest)
+	ctx.dests.addDestination(ws, dest)
 
 	err := ctx.structScan(ws)
 	if err != nil {
@@ -284,7 +280,7 @@ func (ctx *structScanCtx) structScan(ws *Worksheet) error {
 
 func setOrDeferSet(dests wsDestinationMap, f, v reflect.Value, wsValue Value, targetKind reflect.Kind) {
 	if childWs, ok := wsValue.(*Worksheet); ok && targetKind != reflect.Ptr {
-		dests.addLocus(childWs.Id(), f)
+		dests.addLocus(childWs, f)
 	} else {
 		f.Set(v)
 	}
@@ -345,7 +341,7 @@ func (ctx *structScanCtx) convert(fieldCtx structScanFieldCtx, value Value) (ref
 			return reflect.Value{}, err
 		}
 		if ws, ok := value.(*Worksheet); ok {
-			ctx.dests.newDestination(ws.Id(), exporter)
+			ctx.dests.addDestination(ws, exporter)
 		}
 		return reflect.ValueOf(exporter).Elem(), nil
 	}
@@ -475,7 +471,7 @@ func (value *Worksheet) structScanConvert(ctx *structScanCtx, fieldCtx structSca
 	}
 
 	newVal := reflect.New(fieldCtx.destType)
-	ctx.dests.newDestination(value.Id(), newVal.Interface())
+	ctx.dests.addDestination(value, newVal.Interface())
 	err := ctx.structScan(value)
 	if err != nil {
 		return reflect.Value{}, err
