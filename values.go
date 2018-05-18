@@ -51,7 +51,7 @@ type Value interface {
 	expression
 	dbWriteValue() string
 	jsonMarshalValue(m *marshaler, b *bytes.Buffer)
-	structScanConvert(ss *StructScanner, ctx convertCtx) (reflect.Value, error)
+	structScanConvert(ctx *structScanCtx, fieldCtx structScanFieldCtx) (reflect.Value, error)
 
 	// assignableTo returns whether this value is assignable to type typ.
 	//

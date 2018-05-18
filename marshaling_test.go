@@ -638,7 +638,7 @@ func (s *Zuite) TestStructScanner_overrideTypes() {
 		{
 			converters:     nil,
 			expectedError:  "field age to struct field AgeButReallyATime: cannot convert number[0] to time.Time",
-			expectedStruct: simple{Name: "json", AgeButReallyATime: time.Time{}},
+			expectedStruct: simple{},
 		},
 		{
 			converters: map[reflect.Type]func(Value) (interface{}, error){
@@ -665,6 +665,10 @@ func (s *Zuite) TestStructScanner_overrideTypes() {
 		}
 		err := ss.StructScan(ws, &data)
 		if tc.expectedError == "" {
+			s.NoError(err)
+			s.Equal(tc.expectedStruct, data)
+			// while we are here, test that a scanner can be used multiple times on the same ws without issues
+			err = ss.StructScan(ws, &data)
 			s.NoError(err)
 			s.Equal(tc.expectedStruct, data)
 		} else {
@@ -744,13 +748,14 @@ func (s *Zuite) TestStructScan_convert() {
 		// {NewNumberFromUint64(18446744073709551615), uint64Typ, uint64(18446744073709551615)},
 	}
 	for _, ex := range cases {
-		ctx := convertCtx{
+		ctx := &structScanCtx{}
+		fieldCtx := structScanFieldCtx{
 			sourceFieldName: "source",
 			sourceType:      ex.source.Type(),
 			destFieldName:   "Dest",
 			destType:        ex.dest,
 		}
-		actual, err := convert(nil, ctx, ex.source)
+		actual, err := ctx.convert(fieldCtx, ex.source)
 		require.NoError(s.T(), err)
 		assert.Equal(s.T(), ex.expected, actual.Interface())
 	}
@@ -799,13 +804,14 @@ func (s *Zuite) TestStructScan_convertErrors() {
 		// {MustParseLiteral("18_446_744_073_709_551_616"), uint32Typ, "number[0] to int64, value out of range"},
 	}
 	for _, ex := range cases {
-		ctx := convertCtx{
+		ctx := &structScanCtx{}
+		fieldCtx := structScanFieldCtx{
 			sourceFieldName: "source",
 			sourceType:      ex.source.Type(),
 			destFieldName:   "Dest",
 			destType:        ex.dest,
 		}
-		_, err := convert(nil, ctx, ex.source)
+		_, err := ctx.convert(fieldCtx, ex.source)
 		assert.EqualErrorf(s.T(), err, "field source to struct field Dest: cannot convert "+ex.expected,
 			"converting %s to %s", ex.source, ex.dest)
 	}
