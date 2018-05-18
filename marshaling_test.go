@@ -16,6 +16,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -606,6 +608,88 @@ func (s *Zuite) TestStructScan_worksheetConverterWithUndefined() {
 	err := ws.StructScan(&data)
 	require.NoError(s.T(), err)
 	require.Nil(s.T(), data.SpecialPtr)
+}
+
+func (s *Zuite) TestStructScanner_overrideTypes() {
+	type simple struct {
+		Name              string    `ws:"name"`
+		AgeButReallyATime time.Time `ws:"age"`
+	}
+
+	ws := s.defs.MustNewWorksheet("simple")
+	ws.MustSet("name", NewText("json"))
+	u := 1526671232
+	ws.MustSet("age", NewNumberFromInt(u))
+
+	var (
+		timeConverter = func(v Value) (interface{}, error) {
+			return time.Unix(v.(*Number).value, 0), nil
+		}
+		stringConverter = func(v Value) (interface{}, error) {
+			return "yaml", nil
+		}
+	)
+
+	testCases := []struct {
+		converters     map[reflect.Type]func(Value) (interface{}, error)
+		expectedError  string
+		expectedStruct simple
+	}{
+		{
+			converters:     nil,
+			expectedError:  "field age to struct field AgeButReallyATime: cannot convert number[0] to time.Time",
+			expectedStruct: simple{Name: "json", AgeButReallyATime: time.Time{}},
+		},
+		{
+			converters: map[reflect.Type]func(Value) (interface{}, error){
+				reflect.TypeOf(time.Time{}): timeConverter,
+			},
+			expectedError:  "",
+			expectedStruct: simple{Name: "json", AgeButReallyATime: time.Unix(int64(u), 0)},
+		},
+		{
+			converters: map[reflect.Type]func(Value) (interface{}, error){
+				reflect.TypeOf(time.Time{}): timeConverter,
+				reflect.TypeOf(""):          stringConverter,
+			},
+			expectedError:  "",
+			expectedStruct: simple{Name: "yaml", AgeButReallyATime: time.Unix(int64(u), 0)},
+		},
+	}
+
+	for _, tc := range testCases {
+		var data simple
+		ss := NewStructScanner()
+		for t, f := range tc.converters {
+			ss.RegisterConverter(t, f)
+		}
+		err := ss.StructScan(ws, &data)
+		if tc.expectedError == "" {
+			s.NoError(err)
+			s.Equal(tc.expectedStruct, data)
+		} else {
+			s.EqualError(err, tc.expectedError)
+		}
+	}
+}
+
+func (s *Zuite) TestStructScanner_precedenceOverWorksheetConverter() {
+	ws := s.defs.MustNewWorksheet("simple")
+	ws.MustSet("name", NewText("wework"))
+
+	specialConverter := func(v Value) (interface{}, error) {
+		return special{HelloText: "hello, " + strings.ToUpper(v.(*Text).value)}, nil
+	}
+
+	var data struct {
+		Special special `ws:"name"`
+	}
+	ss := NewStructScanner()
+	ss.RegisterConverter(reflect.TypeOf(data.Special), specialConverter)
+	err := ss.StructScan(ws, &data)
+	s.Require().NoError(err)
+
+	s.Equal("hello, WEWORK", data.Special.HelloText)
 }
 
 var (

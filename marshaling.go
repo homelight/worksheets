@@ -131,7 +131,68 @@ type WorksheetConverter interface {
 
 var worksheetConverterType = reflect.TypeOf((*WorksheetConverter)(nil)).Elem()
 
-func (ws *Worksheet) StructScan(dest interface{}) error {
+// wsDestination is used during structScan to properly populate reused non-pointer struct references
+type wsDestination struct {
+	dest interface{}
+	loci []reflect.Value
+}
+
+func (wsd *wsDestination) setAll() {
+	for _, locus := range wsd.loci {
+		destPtr := reflect.ValueOf(wsd.dest)
+		// dests are stored as pointers but we are setting non-pointer destinations
+		locus.Set(destPtr.Elem())
+	}
+}
+
+type wsDestinationMap map[string]*wsDestination
+
+func (wsdm wsDestinationMap) setAllDestinations() {
+	for _, d := range wsdm {
+		d.setAll()
+	}
+}
+
+func (wsdm wsDestinationMap) newDestination(destId string, dest interface{}) {
+	if _, ok := wsdm[destId]; ok {
+		panic("incorrect usage: cannot add new destination multiple times")
+	}
+	wsdm[destId] = &wsDestination{dest, nil}
+}
+
+func (wsdm wsDestinationMap) addLocus(destId string, locus reflect.Value) {
+	wsdm[destId].loci = append(wsdm[destId].loci, locus)
+}
+
+// StructScanner stores state allowing to reuse references and to override scanning of registered types.
+type StructScanner struct {
+	dests      wsDestinationMap
+	converters map[reflect.Type]func(Value) (interface{}, error)
+}
+
+func NewStructScanner() *StructScanner {
+	return &StructScanner{
+		dests:      make(wsDestinationMap),
+		converters: make(map[reflect.Type]func(Value) (interface{}, error)),
+	}
+}
+
+func (ss *StructScanner) RegisterConverter(t reflect.Type, converterFn func(Value) (interface{}, error)) {
+	if _, ok := ss.converters[t]; ok {
+		panic("incorrect usage: cannot add converter for type multiple times")
+	}
+	ss.converters[t] = converterFn
+}
+
+func (ss *StructScanner) getConverter(t reflect.Type) (func(Value) (interface{}, error), bool) {
+	if ss == nil {
+		return nil, false
+	}
+	f, ok := ss.converters[t]
+	return f, ok
+}
+
+func (ss *StructScanner) StructScan(ws *Worksheet, dest interface{}) error {
 	v := reflect.ValueOf(dest)
 	if v.Type().Kind() != reflect.Ptr || v.Type().Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("dest must be a *struct")
@@ -139,21 +200,21 @@ func (ws *Worksheet) StructScan(dest interface{}) error {
 
 	// dests stores refs to any worksheets that we have already scanned
 	// for reuse (and cycle termination)
-	dests := wsDestinationMap{
-		ws.Id(): {
-			dest,
-			nil,
-		},
-	}
+	ss.dests.newDestination(ws.Id(), dest)
 
-	err := structScan(dests, ws)
+	err := ss.structScan(ws)
 	if err != nil {
 		return err
 	}
 
-	dests.setAllDestinations()
+	ss.dests.setAllDestinations()
 
 	return nil
+}
+
+func (ws *Worksheet) StructScan(dest interface{}) error {
+	ss := NewStructScanner()
+	return ss.StructScan(ws, dest)
 }
 
 // getWsField allows us to get the ws field from either a ws tag
@@ -184,8 +245,8 @@ func getWsField(ws *Worksheet, ft reflect.StructField) (*Field, bool, error) {
 	}
 }
 
-func structScan(dests wsDestinationMap, ws *Worksheet) error {
-	v := reflect.ValueOf(dests[ws.Id()].dest)
+func (ss *StructScanner) structScan(ws *Worksheet) error {
+	v := reflect.ValueOf(ss.dests[ws.Id()].dest)
 	v = v.Elem()
 	t := v.Type()
 	for i := 0; i < t.NumField(); i++ {
@@ -208,12 +269,12 @@ func structScan(dests wsDestinationMap, ws *Worksheet) error {
 			destFieldName:   ft.Name,
 			destType:        ft.Type,
 		}
-		value, err := convert(dests, ctx, wsValue)
+		value, err := convert(ss, ctx, wsValue)
 		if err != nil {
 			return err
 		}
 
-		setOrDeferSet(dests, f, value, wsValue, ft.Type.Kind())
+		setOrDeferSet(ss.dests, f, value, wsValue, ft.Type.Kind())
 	}
 
 	return nil
@@ -236,11 +297,11 @@ type convertCtx struct {
 	destType        reflect.Type
 }
 
-func convert(dests wsDestinationMap, ctx convertCtx, value Value) (reflect.Value, error) {
+func convert(ss *StructScanner, ctx convertCtx, value Value) (reflect.Value, error) {
 	// this needs to be inside convert to make sure we check for elems in slices.
 	// we need to do it before pointer logic to make sure we return the same pointer.
 	if ws, ok := value.(*Worksheet); ok {
-		if savedDest, ok := dests[ws.Id()]; ok {
+		if savedDest, ok := ss.dests[ws.Id()]; ok {
 			// we have seen this before, just return the saved dest ptr to struct or struct
 			if ctx.destType.Kind() == reflect.Ptr {
 				return reflect.ValueOf(savedDest.dest), nil
@@ -257,13 +318,22 @@ func convert(dests wsDestinationMap, ctx convertCtx, value Value) (reflect.Value
 			return reflect.Zero(ctx.destType), nil
 		}
 		ctx.destType = ctx.destType.Elem()
-		v, err := convert(dests, ctx, value)
+		v, err := convert(ss, ctx, value)
 		if err != nil {
 			return v, err
 		}
 		locus := reflect.New(ctx.destType)
 		locus.Elem().Set(v)
 		return locus, nil
+	}
+
+	// check to see if the caller specified an override for a type, and if so, apply it
+	if converterFn, ok := ss.getConverter(ctx.destType); ok {
+		vInterface, err := converterFn(value)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		return reflect.ValueOf(vInterface), nil
 	}
 
 	// if we have a type that uses a custom converter, use it instead of standard conversion
@@ -273,15 +343,15 @@ func convert(dests wsDestinationMap, ctx convertCtx, value Value) (reflect.Value
 			return reflect.Value{}, err
 		}
 		if ws, ok := value.(*Worksheet); ok {
-			dests.newDestination(ws.Id(), exporter)
+			ss.dests.newDestination(ws.Id(), exporter)
 		}
 		return reflect.ValueOf(exporter).Elem(), nil
 	}
 
-	return value.structScanConvert(dests, ctx)
+	return value.structScanConvert(ss, ctx)
 }
 
-func (value *Undefined) structScanConvert(_ wsDestinationMap, ctx convertCtx) (reflect.Value, error) {
+func (value *Undefined) structScanConvert(_ *StructScanner, ctx convertCtx) (reflect.Value, error) {
 	if ctx.destType.Kind() != reflect.Ptr {
 		ctx.sourceType = value.Type()
 		return ctx.cannotConvert(fmt.Sprintf("dest must be a *%s", ctx.destType.Name()))
@@ -289,14 +359,14 @@ func (value *Undefined) structScanConvert(_ wsDestinationMap, ctx convertCtx) (r
 	return reflect.Zero(ctx.destType), nil
 }
 
-func (value *Text) structScanConvert(_ wsDestinationMap, ctx convertCtx) (reflect.Value, error) {
+func (value *Text) structScanConvert(_ *StructScanner, ctx convertCtx) (reflect.Value, error) {
 	if ctx.destType.Kind() == reflect.String {
 		return reflect.ValueOf(value.value), nil
 	}
 	return ctx.cannotConvert()
 }
 
-func (value *Bool) structScanConvert(_ wsDestinationMap, ctx convertCtx) (reflect.Value, error) {
+func (value *Bool) structScanConvert(_ *StructScanner, ctx convertCtx) (reflect.Value, error) {
 	if ctx.destType.Kind() == reflect.Bool {
 		return reflect.ValueOf(value.value), nil
 	} else if ctx.destType.Kind() == reflect.String {
@@ -305,7 +375,7 @@ func (value *Bool) structScanConvert(_ wsDestinationMap, ctx convertCtx) (reflec
 	return ctx.cannotConvert()
 }
 
-func (value *Number) structScanConvert(_ wsDestinationMap, ctx convertCtx) (reflect.Value, error) {
+func (value *Number) structScanConvert(_ *StructScanner, ctx convertCtx) (reflect.Value, error) {
 	// to string
 	if ctx.destType.Kind() == reflect.String {
 		return reflect.ValueOf(value.String()), nil
@@ -397,21 +467,21 @@ func (value *Number) structScanConvert(_ wsDestinationMap, ctx convertCtx) (refl
 	return ctx.cannotConvert()
 }
 
-func (value *Worksheet) structScanConvert(dests wsDestinationMap, ctx convertCtx) (reflect.Value, error) {
+func (value *Worksheet) structScanConvert(ss *StructScanner, ctx convertCtx) (reflect.Value, error) {
 	if ctx.destType.Kind() != reflect.Struct {
 		return ctx.cannotConvert("dest must be a struct")
 	}
 
 	newVal := reflect.New(ctx.destType)
-	dests.newDestination(value.Id(), newVal.Interface())
-	err := structScan(dests, value)
+	ss.dests.newDestination(value.Id(), newVal.Interface())
+	err := ss.structScan(value)
 	if err != nil {
 		return reflect.Value{}, err
 	}
 	return newVal.Elem(), nil
 }
 
-func (value *Slice) structScanConvert(dests wsDestinationMap, ctx convertCtx) (reflect.Value, error) {
+func (value *Slice) structScanConvert(ss *StructScanner, ctx convertCtx) (reflect.Value, error) {
 	if ctx.destType.Kind() != reflect.Slice {
 		return ctx.cannotConvert("dest must be a slice")
 	}
@@ -423,11 +493,11 @@ func (value *Slice) structScanConvert(dests wsDestinationMap, ctx convertCtx) (r
 	ctx.destType = ctx.destType.Elem()
 	for i, wsElem := range value.Elements() {
 		ctx.sourceType = wsElem.Type()
-		newVal, err := convert(dests, ctx, wsElem)
+		newVal, err := convert(ss, ctx, wsElem)
 		if err != nil {
 			return reflect.Value{}, err
 		}
-		setOrDeferSet(dests, locus.Elem().Index(i), newVal, wsElem, ctx.destType.Kind())
+		setOrDeferSet(ss.dests, locus.Elem().Index(i), newVal, wsElem, ctx.destType.Kind())
 	}
 	return locus.Elem(), nil
 }
