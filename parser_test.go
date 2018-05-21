@@ -222,19 +222,24 @@ func (s *Zuite) TestParser_parseExpression() {
 			},
 			&tRound{"half", 4},
 		},
-		`sum(1, avg(7, 11) round half 4) round up 7`: &tCall{
-			tSelector([]string{"sum"}),
-			[]expression{
-				&Number{1, &NumberType{0}},
-				&tCall{
-					tSelector([]string{"avg"}),
-					[]expression{
-						&Number{7, &NumberType{0}},
-						&Number{11, &NumberType{0}},
+		`sum(1, avg(7, 11) round half 4) round up 7`: &tBinop{
+			opPlus,
+			&tCall{
+				tSelector([]string{"sum"}),
+				[]expression{
+					&Number{1, &NumberType{0}},
+					&tCall{
+						tSelector([]string{"avg"}),
+						[]expression{
+							&Number{7, &NumberType{0}},
+							&Number{11, &NumberType{0}},
+						},
+						&tRound{"half", 4},
 					},
-					&tRound{"half", 4},
 				},
+				nil,
 			},
+			vZero,
 			&tRound{"up", 7},
 		},
 		`avg(7, 11) round half 4 round up 7`: &tBinop{
@@ -249,6 +254,19 @@ func (s *Zuite) TestParser_parseExpression() {
 			},
 			vZero,
 			&tRound{"up", 7},
+		},
+		`sum(1, 2) / 3 round half 4`: &tBinop{
+			opDiv,
+			&tCall{
+				tSelector([]string{"sum"}),
+				[]expression{
+					&Number{1, &NumberType{0}},
+					&Number{2, &NumberType{0}},
+				},
+				nil,
+			},
+			&Number{3, &NumberType{0}},
+			&tRound{"half", 4},
 		},
 
 		// unop and binop

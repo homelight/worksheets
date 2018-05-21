@@ -414,14 +414,22 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 					p.next()
 				}
 			}
+
+			// rounding?
+			// Note: while we need to know at parse time whether to associate
+			// the rounding mode with the `tCall`, verifying whether a rounding
+			// mode was indeed provided is a runtime check. We may want to
+			// change this, but would need to do so for other operators (such
+			// as division `/`) in the same time for consistency.
 			var round *tRound
-			if p.peek(pRound) {
+			if functionsRequiringRound[selector[0]] && p.peek(pRound) {
 				var err error
 				round, err = p.parseRound()
 				if err != nil {
 					return nil, err
 				}
 			}
+
 			first = &tCall{selector, args, round}
 		}
 

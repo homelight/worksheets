@@ -385,6 +385,14 @@ func (args *fnArgs) get(index int) (Value, error) {
 	return args.values[index], args.errs[index]
 }
 
+// functionsRequiringRound indicates whether the specific function requires
+// a rounding mode to be well formed. For instance, the average function
+// (`avg`) needs a rounding mode to know the precision needed for the average
+// to calculate.
+var functionsRequiringRound = map[string]bool{
+	"avg": true,
+}
+
 var functions = map[string]func(args *fnArgs) (Value, error){
 	"len": func(args *fnArgs) (Value, error) {
 		if err := args.checkArgsNum(1); err != nil {
@@ -675,14 +683,6 @@ func (e *tCall) compute(ws *Worksheet) (Value, error) {
 	value, err := fn(newLazyFnArgs(ws, e.round, e.args))
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", e.name, err)
-	}
-
-	if e.round != nil {
-		nValue, ok := value.(*Number)
-		if !ok {
-			return nil, fmt.Errorf("unable to round non-numerical value")
-		}
-		value = nValue.Round(e.round.mode, e.round.scale)
 	}
 
 	return value, nil
