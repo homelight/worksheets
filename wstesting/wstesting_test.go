@@ -55,8 +55,8 @@ func (s *Zuite) TestStepToCommand() {
 			step(`set some_ws.some_field 5`),
 			cSet{
 				ws: "some_ws",
-				values: map[string]worksheets.Value{
-					"some_field": worksheets.NewNumberFromInt(5),
+				values: map[string]expr{
+					"some_field": expr{input: "5"},
 				},
 			},
 		},
@@ -68,10 +68,30 @@ func (s *Zuite) TestStepToCommand() {
 			),
 			cSet{
 				ws: "some_ws",
-				values: map[string]worksheets.Value{
-					"some_field1": worksheets.NewBool(true),
-					"some_field2": worksheets.NewText("hello"),
-					"some_field3": worksheets.NewNumberFromFloat64(9.99),
+				values: map[string]expr{
+					"some_field1": expr{input: "true"},
+					"some_field2": expr{input: `"hello"`},
+					"some_field3": expr{input: "9.99"},
+				},
+			},
+		},
+		{
+			step(`set some_ws.some_field not_bad`),
+			cSet{
+				ws: "some_ws",
+				values: map[string]expr{
+					"some_field": expr{input: "not_bad"},
+				},
+			},
+		},
+		{
+			step(`set some_ws`,
+				[]string{"some_field", "not_bad"},
+			),
+			cSet{
+				ws: "some_ws",
+				values: map[string]expr{
+					"some_field": expr{input: "not_bad"},
 				},
 			},
 		},
@@ -81,8 +101,8 @@ func (s *Zuite) TestStepToCommand() {
 			step(`unset some_ws.some_field`),
 			cSet{
 				ws: "some_ws",
-				values: map[string]worksheets.Value{
-					"some_field": worksheets.NewUndefined(),
+				values: map[string]expr{
+					"some_field": expr{constant: worksheets.NewUndefined()},
 				},
 			},
 		},
@@ -94,10 +114,10 @@ func (s *Zuite) TestStepToCommand() {
 			),
 			cSet{
 				ws: "some_ws",
-				values: map[string]worksheets.Value{
-					"some_field1": worksheets.NewUndefined(),
-					"some_field2": worksheets.NewUndefined(),
-					"some_field3": worksheets.NewUndefined(),
+				values: map[string]expr{
+					"some_field1": expr{constant: worksheets.NewUndefined()},
+					"some_field2": expr{constant: worksheets.NewUndefined()},
+					"some_field3": expr{constant: worksheets.NewUndefined()},
 				},
 			},
 		},
@@ -108,8 +128,8 @@ func (s *Zuite) TestStepToCommand() {
 			cAppend{
 				ws:    "some_ws",
 				field: "some_field",
-				values: []worksheets.Value{
-					worksheets.NewNumberFromInt(666),
+				values: []expr{
+					{input: "666"},
 				},
 			},
 		},
@@ -122,10 +142,34 @@ func (s *Zuite) TestStepToCommand() {
 			cAppend{
 				ws:    "some_ws",
 				field: "some_field",
-				values: []worksheets.Value{
-					worksheets.NewNumberFromInt(1),
-					worksheets.NewNumberFromInt(2),
-					worksheets.NewNumberFromInt(3),
+				values: []expr{
+					{input: "1"},
+					{input: "2"},
+					{input: "3"},
+				},
+			},
+		},
+		{
+			step(`append some_ws.some_field not_bad`),
+			cAppend{
+				ws:    "some_ws",
+				field: "some_field",
+				values: []expr{
+					{input: "not_bad"},
+				},
+			},
+		},
+		{
+			step(`append some_ws.some_field`,
+				[]string{"not"},
+				[]string{"bad"},
+			),
+			cAppend{
+				ws:    "some_ws",
+				field: "some_field",
+				values: []expr{
+					{input: "not"},
+					{input: "bad"},
 				},
 			},
 		},
@@ -162,8 +206,8 @@ func (s *Zuite) TestStepToCommand() {
 			cAssert{
 				ws:      "some_ws",
 				partial: true,
-				expected: map[string]worksheets.Value{
-					"some_field": worksheets.NewNumberFromInt(6),
+				expected: map[string]expr{
+					"some_field": expr{input: "6"},
 				},
 			},
 		},
@@ -176,10 +220,10 @@ func (s *Zuite) TestStepToCommand() {
 			cAssert{
 				ws:      "some_ws",
 				partial: false,
-				expected: map[string]worksheets.Value{
-					"some_field1": worksheets.NewBool(true),
-					"some_field2": worksheets.NewText("hello"),
-					"some_field3": worksheets.NewNumberFromFloat64(9.99),
+				expected: map[string]expr{
+					"some_field1": expr{input: "true"},
+					"some_field2": expr{input: `"hello"`},
+					"some_field3": expr{input: "9.99"},
 				},
 			},
 		},
@@ -192,9 +236,19 @@ func (s *Zuite) TestStepToCommand() {
 			cAssert{
 				ws:      "some_ws",
 				partial: true,
-				expected: map[string]worksheets.Value{
-					"some_field1": worksheets.NewBool(true),
-					"some_field2": worksheets.NewText("hello"),
+				expected: map[string]expr{
+					"some_field1": expr{input: "true"},
+					"some_field2": expr{input: `"hello"`},
+				},
+			},
+		},
+		{
+			step(`assert some_ws.field not_bad`),
+			cAssert{
+				ws:      "some_ws",
+				partial: true,
+				expected: map[string]expr{
+					"field": expr{input: "not_bad"},
 				},
 			},
 		},
@@ -264,16 +318,6 @@ func (s *Zuite) TestStepToCommand_errors() {
 			`set some_ws 6: expecting <ws>.<field>`,
 		},
 		{
-			step(`set some_ws.some_field bad`),
-			`set some_ws.some_field bad: unknown literal, found bad`,
-		},
-		{
-			step(`set some_ws`,
-				[]string{"some_field", "bad"},
-			),
-			`set some_ws: unknown literal, found bad`,
-		},
-		{
 			step(`set some_ws`,
 				[]string{"some_field", "5"},
 				[]string{"-", ""},
@@ -311,16 +355,6 @@ func (s *Zuite) TestStepToCommand_errors() {
 		{
 			step(`append some_ws.some_field`),
 			`append some_ws.some_field: must provide a value table`,
-		},
-		{
-			step(`append some_ws.some_field bad`),
-			`append some_ws.some_field bad: unknown literal, found bad`,
-		},
-		{
-			step(`append some_ws.some_field`,
-				[]string{"bad"},
-			),
-			`append some_ws.some_field: unknown literal, found bad`,
 		},
 		{
 			step(`append some_ws.some_field 5 too_many`),
@@ -363,10 +397,6 @@ func (s *Zuite) TestStepToCommand_errors() {
 		{
 			step(`assert ws.field`),
 			`assert ws.field: missing value`,
-		},
-		{
-			step(`assert ws.field bad`),
-			`assert ws.field bad: unknown literal, found bad`,
 		},
 		{
 			step(`assert too many here`),
@@ -461,6 +491,33 @@ Scenario: the_name_here_2
 				actual[i].steps = nil
 			}
 			assert.Equal(s.T(), ex.expected, actual, ex.doc)
+		}
+	}
+}
+
+func (s *Zuite) TestExpr() {
+	// context
+	someWs := &worksheets.Worksheet{}
+	ctx := &Context{
+		sheets: map[string]*worksheets.Worksheet{
+			"some_ws": someWs,
+		},
+	}
+
+	// cases
+	cases := map[expr]worksheets.Value{
+		{constant: worksheets.NewNumberFromInt(6)}: worksheets.NewNumberFromInt(6),
+		{constant: worksheets.NewUndefined()}:      worksheets.NewUndefined(),
+		{input: "6"}:                               worksheets.NewNumberFromInt(6),
+		{input: `"hello"`}:                         worksheets.NewText("hello"),
+		{input: "  6  "}:                           worksheets.NewNumberFromInt(6),
+		{input: ` "hello"  `}:                      worksheets.NewText("hello"),
+		{input: `some_ws`}:                         someWs,
+	}
+	for expr, expected := range cases {
+		actual, err := expr.eval(ctx)
+		if s.NoError(err) {
+			s.Equal(expected, actual)
 		}
 	}
 }

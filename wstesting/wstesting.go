@@ -51,12 +51,12 @@ type cCreate struct {
 
 type cSet struct {
 	ws     string
-	values map[string]worksheets.Value
+	values map[string]expr
 }
 
 type cAppend struct {
 	ws, field string
-	values    []worksheets.Value
+	values    []expr
 }
 
 type cDel struct {
@@ -67,7 +67,7 @@ type cDel struct {
 type cAssert struct {
 	ws       string
 	partial  bool
-	expected map[string]worksheets.Value
+	expected map[string]expr
 }
 
 func stepToCommand(step *gherkin.Step) (command, error) {
@@ -113,12 +113,8 @@ func stepToCommand(step *gherkin.Step) (command, error) {
 				return nil, fmt.Errorf("%s: expecting <ws>.<field>", step.Text)
 			}
 			set.ws = ws
-			value, err := worksheets.NewValue(parts[2])
-			if err != nil {
-				return nil, fmt.Errorf("%s: %s", step.Text, err)
-			}
-			set.values = map[string]worksheets.Value{
-				field: value,
+			set.values = map[string]expr{
+				field: expr{input: parts[2]},
 			}
 		default:
 			return nil, fmt.Errorf("%s: expecting <ws> with data table or <ws.field> with value", step.Text)
@@ -135,9 +131,9 @@ func stepToCommand(step *gherkin.Step) (command, error) {
 			if err != nil {
 				return nil, fmt.Errorf("%s: %s", step.Text, err)
 			}
-			set.values = make(map[string]worksheets.Value)
+			set.values = make(map[string]expr)
 			for _, field := range fields {
-				set.values[field] = worksheets.NewUndefined()
+				set.values[field] = expr{constant: worksheets.NewUndefined()}
 			}
 		} else {
 			ws, field, ok := splitWsAndField(parts[1])
@@ -145,8 +141,8 @@ func stepToCommand(step *gherkin.Step) (command, error) {
 				return nil, fmt.Errorf("%s: expecting <ws>.<field>", step.Text)
 			}
 			set.ws = ws
-			set.values = map[string]worksheets.Value{
-				field: worksheets.NewUndefined(),
+			set.values = map[string]expr{
+				field: expr{constant: worksheets.NewUndefined()},
 			}
 		}
 		return set, nil
@@ -169,12 +165,8 @@ func stepToCommand(step *gherkin.Step) (command, error) {
 			}
 			app.values = values
 		case 3:
-			value, err := worksheets.NewValue(parts[2])
-			if err != nil {
-				return nil, fmt.Errorf("%s: %s", step.Text, err)
-			}
-			app.values = []worksheets.Value{
-				value,
+			app.values = []expr{
+				expr{input: parts[2]},
 			}
 		}
 		return app, nil
@@ -232,12 +224,8 @@ func stepToCommand(step *gherkin.Step) (command, error) {
 			}
 			assert.ws = ws
 			assert.partial = true
-			value, err := worksheets.NewValue(parts[2])
-			if err != nil {
-				return nil, fmt.Errorf("%s: %s", step.Text, err)
-			}
-			assert.expected = map[string]worksheets.Value{
-				field: value,
+			assert.expected = map[string]expr{
+				field: expr{input: parts[2]},
 			}
 		default:
 			return nil, fmt.Errorf("%s: expecting <ws> with data table or <ws.field> with value", step.Text)
@@ -305,7 +293,9 @@ func (cmd cSet) run(ctx *Context) error {
 		return fmt.Errorf("worksheet %s not yet created", cmd.ws)
 	}
 	for field, value := range cmd.values {
-		if err := ws.Set(field, value); err != nil {
+		if v, err := value.eval(ctx); err != nil {
+			return err
+		} else if err := ws.Set(field, v); err != nil {
 			return err
 		}
 	}
@@ -318,7 +308,9 @@ func (cmd cAppend) run(ctx *Context) error {
 		return fmt.Errorf("worksheet %s not yet created", cmd.ws)
 	}
 	for _, value := range cmd.values {
-		if err := ws.Append(cmd.field, value); err != nil {
+		if v, err := value.eval(ctx); err != nil {
+			return err
+		} else if err := ws.Append(cmd.field, v); err != nil {
 			return err
 		}
 	}
@@ -349,7 +341,9 @@ func (cmd cAssert) run(ctx *Context) error {
 		if err != nil {
 			return err
 		}
-		if !expected.Equal(actual) {
+		if e, err := expected.eval(ctx); err != nil {
+			return err
+		} else if !e.Equal(actual) {
 			diffs = append(diffs, fmt.Sprintf("%s: expected <%s>, was <%s>", field, expected, actual))
 		}
 	}
@@ -396,6 +390,35 @@ type Context struct {
 	// provide `nil`, or to provide a fresh copy for each and every scenario
 	// run.
 	sheets map[string]*worksheets.Worksheet
+}
+
+type expr struct {
+	constant worksheets.Value
+	input    string
+}
+
+func (e expr) eval(ctx *Context) (worksheets.Value, error) {
+	// constant
+	if e.constant != nil {
+		return e.constant, nil
+	}
+
+	// lookup
+	ws, ok := ctx.sheets[e.input]
+	if ok {
+		return ws, nil
+	}
+
+	// literal
+	return worksheets.NewValue(e.input)
+}
+
+func (e expr) String() string {
+	if e.constant != nil {
+		return e.constant.String()
+	} else {
+		return e.input
+	}
 }
 
 // Scenario represents a single scenario from a .feature.
@@ -518,13 +541,13 @@ func docToScenarios(doc *gherkin.GherkinDocument, source string) ([]Scenario, er
 	return scenarios, nil
 }
 
-func tableToContents(extra interface{}) (map[string]worksheets.Value, bool, error) {
+func tableToContents(extra interface{}) (map[string]expr, bool, error) {
 	table, ok := extra.(*gherkin.DataTable)
 	if !ok {
 		return nil, false, fmt.Errorf("must provide a data table")
 	}
 
-	contents := make(map[string]worksheets.Value)
+	contents := make(map[string]expr)
 	partial := false
 	for _, row := range table.Rows {
 		if len(row.Cells) != 2 {
@@ -535,11 +558,7 @@ func tableToContents(extra interface{}) (map[string]worksheets.Value, bool, erro
 			partial = true
 			continue
 		}
-		value, err := worksheets.NewValue(row.Cells[1].Value)
-		if err != nil {
-			return nil, false, err
-		}
-		contents[key] = value
+		contents[key] = expr{input: row.Cells[1].Value}
 	}
 
 	return contents, partial, nil
@@ -583,22 +602,18 @@ func tableToFields(extra interface{}) ([]string, error) {
 	return fields, nil
 }
 
-func tableToValues(extra interface{}) ([]worksheets.Value, error) {
+func tableToValues(extra interface{}) ([]expr, error) {
 	table, ok := extra.(*gherkin.DataTable)
 	if !ok {
 		return nil, fmt.Errorf("must provide a value table")
 	}
 
-	var values []worksheets.Value
+	var values []expr
 	for _, row := range table.Rows {
 		if len(row.Cells) != 1 {
 			return nil, fmt.Errorf("must provide a table with one column on every row")
 		}
-		value, err := worksheets.NewValue(row.Cells[0].Value)
-		if err != nil {
-			return nil, err
-		}
-		values = append(values, value)
+		values = append(values, expr{input: row.Cells[0].Value})
 	}
 
 	return values, nil
