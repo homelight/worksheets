@@ -257,12 +257,10 @@ func (s *Zuite) TestRuntime_parseAndEvalExprExpectingFailure() {
 		`avg() round down 8`: `avg: at least 1 argument(s) expected but none found`,
 		`avg(1)`:             `avg: missing rounding mode`,
 
-		// incorrect roundings
-		// TODO(pascal): these two should really be the same... but because we
-		// currently convert the first one into `"no" + 0 rounding`, the error
-		// message differs.
+		// TODO(pascal): would be much nicer to have the message
+		// `unable to round non-numerical value`.
 		`"no" round down 0`:        `op on non-number`,
-		`slice("no") round down 0`: `unable to round non-numerical value`,
+		`slice("no") round down 0`: `op on non-number`,
 	}
 	for input, output := range cases {
 		// fixture
