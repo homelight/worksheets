@@ -845,6 +845,6 @@ func (s *Zuite) TestStructScan_convertibleTypes() {
 	s.Equal(altTypes{
 		Text: "abc",
 		Bool: true,
-		Num:  myInt64(8765),
+		Num:  8765,
 	}, data)
 }
