@@ -323,7 +323,7 @@ func (ctx *structScanCtx) convert(fieldCtx structScanFieldCtx, value Value) (ref
 			return v, err
 		}
 		locus := reflect.New(fieldCtx.destType)
-		locus.Elem().Set(v)
+		locus.Elem().Set(v.Convert(fieldCtx.destType))
 		return locus, nil
 	}
 

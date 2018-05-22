@@ -835,16 +835,27 @@ func (s *Zuite) TestStructScan_convertibleTypes() {
 	ws.MustSet("num_0", NewNumberFromInt64(8765))
 
 	type altTypes struct {
-		Text myString `ws:"text"`
-		Bool myBool   `ws:"bool"`
-		Num  myInt64  `ws:"num_0"`
+		Text    myString  `ws:"text"`
+		Bool    myBool    `ws:"bool"`
+		Num     myInt64   `ws:"num_0"`
+		TextPtr *myString `ws:"text"`
+		BoolPtr *myBool   `ws:"bool"`
+		NumPtr  *myInt64  `ws:"num_0"`
 	}
 	var data altTypes
 	err := ws.StructScan(&data)
 	s.Require().NoError(err)
+	var (
+		textResult = myString("abc")
+		boolResult = myBool(true)
+		numResult  = myInt64(8765)
+	)
 	s.Equal(altTypes{
-		Text: "abc",
-		Bool: true,
-		Num:  8765,
+		Text:    "abc",
+		Bool:    true,
+		Num:     8765,
+		TextPtr: &textResult,
+		BoolPtr: &boolResult,
+		NumPtr:  &numResult,
 	}, data)
 }
