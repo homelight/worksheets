@@ -272,17 +272,19 @@ func (ctx *structScanCtx) structScan(ws *Worksheet) error {
 			return err
 		}
 
-		setOrDeferSet(ctx.dests, f, value, wsValue, ft.Type.Kind())
+		setOrDeferSet(ctx.dests, f, value, wsValue, ft.Type)
 	}
 
 	return nil
 }
 
-func setOrDeferSet(dests wsDestinationMap, f, v reflect.Value, wsValue Value, targetKind reflect.Kind) {
-	if childWs, ok := wsValue.(*Worksheet); ok && targetKind != reflect.Ptr {
+func setOrDeferSet(dests wsDestinationMap, f, v reflect.Value, wsValue Value, destType reflect.Type) {
+	if childWs, ok := wsValue.(*Worksheet); ok && destType.Kind() != reflect.Ptr {
 		dests.addLocus(childWs, f)
 	} else {
-		f.Set(v)
+		// since we allowed structScanConvert on the kind of types,
+		// make sure we convert in case it's necessary
+		f.Set(v.Convert(destType))
 	}
 }
 
@@ -321,7 +323,7 @@ func (ctx *structScanCtx) convert(fieldCtx structScanFieldCtx, value Value) (ref
 			return v, err
 		}
 		locus := reflect.New(fieldCtx.destType)
-		locus.Elem().Set(v)
+		locus.Elem().Set(v.Convert(fieldCtx.destType))
 		return locus, nil
 	}
 
@@ -495,7 +497,7 @@ func (value *Slice) structScanConvert(ctx *structScanCtx, fieldCtx structScanFie
 		if err != nil {
 			return reflect.Value{}, err
 		}
-		setOrDeferSet(ctx.dests, locus.Elem().Index(i), newVal, wsElem, fieldCtx.destType.Kind())
+		setOrDeferSet(ctx.dests, locus.Elem().Index(i), newVal, wsElem, fieldCtx.destType)
 	}
 	return locus.Elem(), nil
 }

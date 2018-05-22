@@ -696,21 +696,28 @@ func (s *Zuite) TestStructScanner_precedenceOverWorksheetConverter() {
 	s.Equal("hello, WEWORK", data.Special.HelloText)
 }
 
+type myString string
+type myInt64 int64
+type myBool bool
+
 var (
-	stringTyp  = reflect.TypeOf(string(""))
-	intTyp     = reflect.TypeOf(int(0))
-	int8Typ    = reflect.TypeOf(int8(0))
-	int16Typ   = reflect.TypeOf(int16(0))
-	int32Typ   = reflect.TypeOf(int32(0))
-	int64Typ   = reflect.TypeOf(int64(0))
-	uintTyp    = reflect.TypeOf(uint(0))
-	uint8Typ   = reflect.TypeOf(uint8(0))
-	uint16Typ  = reflect.TypeOf(uint16(0))
-	uint32Typ  = reflect.TypeOf(uint32(0))
-	uint64Typ  = reflect.TypeOf(uint64(0))
-	float32Typ = reflect.TypeOf(float32(0))
-	float64Typ = reflect.TypeOf(float64(0))
-	boolTyp    = reflect.TypeOf(bool(true))
+	stringTyp   = reflect.TypeOf(string(""))
+	intTyp      = reflect.TypeOf(int(0))
+	int8Typ     = reflect.TypeOf(int8(0))
+	int16Typ    = reflect.TypeOf(int16(0))
+	int32Typ    = reflect.TypeOf(int32(0))
+	int64Typ    = reflect.TypeOf(int64(0))
+	uintTyp     = reflect.TypeOf(uint(0))
+	uint8Typ    = reflect.TypeOf(uint8(0))
+	uint16Typ   = reflect.TypeOf(uint16(0))
+	uint32Typ   = reflect.TypeOf(uint32(0))
+	uint64Typ   = reflect.TypeOf(uint64(0))
+	float32Typ  = reflect.TypeOf(float32(0))
+	float64Typ  = reflect.TypeOf(float64(0))
+	boolTyp     = reflect.TypeOf(bool(true))
+	myStringTyp = reflect.TypeOf(myString(""))
+	myInt64Typ  = reflect.TypeOf(myInt64(0))
+	myBoolTyp   = reflect.TypeOf(myBool(true))
 )
 
 func (s *Zuite) TestStructScan_convert() {
@@ -746,6 +753,10 @@ func (s *Zuite) TestStructScan_convert() {
 		{NewNumberFromUint32(4294967295), uint32Typ, uint32(4294967295)},
 		// TODO: See issue #29: support for arbitrary precision numbers
 		// {NewNumberFromUint64(18446744073709551615), uint64Typ, uint64(18446744073709551615)},
+
+		{NewText("hello"), myStringTyp, "hello"},
+		{NewBool(true), myBoolTyp, true},
+		{NewNumberFromInt64(33), myInt64Typ, int64(33)},
 	}
 	for _, ex := range cases {
 		ctx := &structScanCtx{}
@@ -815,4 +826,36 @@ func (s *Zuite) TestStructScan_convertErrors() {
 		assert.EqualErrorf(s.T(), err, "field source to struct field Dest: cannot convert "+ex.expected,
 			"converting %s to %s", ex.source, ex.dest)
 	}
+}
+
+func (s *Zuite) TestStructScan_convertibleTypes() {
+	ws := s.defs.MustNewWorksheet("all_types")
+	ws.MustSet("text", NewText("abc"))
+	ws.MustSet("bool", NewBool(true))
+	ws.MustSet("num_0", NewNumberFromInt64(8765))
+
+	type altTypes struct {
+		Text    myString  `ws:"text"`
+		Bool    myBool    `ws:"bool"`
+		Num     myInt64   `ws:"num_0"`
+		TextPtr *myString `ws:"text"`
+		BoolPtr *myBool   `ws:"bool"`
+		NumPtr  *myInt64  `ws:"num_0"`
+	}
+	var data altTypes
+	err := ws.StructScan(&data)
+	s.Require().NoError(err)
+	var (
+		textResult = myString("abc")
+		boolResult = myBool(true)
+		numResult  = myInt64(8765)
+	)
+	s.Equal(altTypes{
+		Text:    "abc",
+		Bool:    true,
+		Num:     8765,
+		TextPtr: &textResult,
+		BoolPtr: &boolResult,
+		NumPtr:  &numResult,
+	}, data)
 }
