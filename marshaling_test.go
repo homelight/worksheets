@@ -522,6 +522,38 @@ func (s *Zuite) TestStructScan_refsRepeat() {
 	s.Equal(p.ThatThing, p.KeepItSafe[0])
 }
 
+func (s *Zuite) TestStructScan_refsNestedMoreThanOnce() {
+	type level3 struct {
+		S string `ws:"text"`
+	}
+
+	type level2 struct {
+		S  string `ws:"text"`
+		L3 level3 `ws:"ws"`
+	}
+
+	type level1 struct {
+		L2 level2 `ws:"ws"`
+	}
+
+	l3 := s.defs.MustNewWorksheet("all_types")
+	l3.MustSet("text", NewText("we all fall down"))
+
+	l2 := s.defs.MustNewWorksheet("all_types")
+	l2.MustSet("text", NewText("ring around the rosie"))
+	l2.MustSet("ws", l3)
+
+	l1 := s.defs.MustNewWorksheet("all_types")
+	l1.MustSet("ws", l2)
+
+	var t level1
+	err := l1.StructScan(&t)
+	s.Require().NoError(err)
+
+	s.Equal("ring around the rosie", t.L2.S)
+	s.Equal("we all fall down", t.L2.L3.S)
+}
+
 type special struct {
 	HelloText string `ws:"xyz"` // this mapping should be totally ignored because converters kick in
 }
