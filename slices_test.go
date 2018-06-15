@@ -550,14 +550,14 @@ func (s *Zuite) TestSliceOfRefs_saveLoad() {
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Rank:        1,
-			Value:       fmt.Sprintf("*:%s", simple1Id),
+			Value:       fmt.Sprintf(`*:%s@1`, simple1Id),
 		},
 		{
 			SliceId:     wsSliceId,
 			FromVersion: 1,
 			ToVersion:   math.MaxInt32,
 			Rank:        2,
-			Value:       fmt.Sprintf("*:%s", simple2Id),
+			Value:       fmt.Sprintf(`*:%s@1`, simple2Id),
 		},
 	}, snap.sliceElementsRecs)
 

@@ -15,6 +15,7 @@ package worksheets
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -168,7 +169,7 @@ func (s *Session) Load(id string) (*Worksheet, error) {
 	loader := &loader{
 		s:               s,
 		graph:           make(map[string]*Worksheet),
-		slicesToHydrate: make(map[string]*Slice),
+		slicesToHydrate: make(map[string]slicepair),
 	}
 	return loader.loadWorksheet(id)
 }
@@ -206,10 +207,15 @@ func (s *Session) Update(ws *Worksheet) (string, error) {
 	return p.editId, nil
 }
 
+type slicepair struct {
+	orig *Slice
+	data *Slice
+}
+
 type loader struct {
 	s               *Session
 	graph           map[string]*Worksheet
-	slicesToHydrate map[string]*Slice
+	slicesToHydrate map[string]slicepair
 }
 
 func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
@@ -263,14 +269,14 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 
 		// load, and potentially defer hydration of value
 		if valueRec.Value != nil {
-			value, err := l.dbReadValue(field.typ, valueRec.Value)
+			orig, current, err := l.dbReadValue(field.typ, valueRec.Value)
 			if err != nil {
 				return nil, err
 			}
 
 			// set orig and data
-			ws.orig[index] = value
-			ws.data[index] = value
+			ws.orig[index] = orig
+			ws.data[index] = current
 		}
 	}
 
@@ -281,8 +287,8 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 			break
 		}
 		slicesIds := make([]interface{}, len(slicesToHydrate))
-		for _, slice := range slicesToHydrate {
-			slicesIds = append(slicesIds, slice.id)
+		for sliceId, _ := range slicesToHydrate {
+			slicesIds = append(slicesIds, sliceId)
 		}
 		var sliceElementsRecs []rSliceElement
 		err = l.s.tx.
@@ -296,14 +302,22 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 			return nil, err
 		}
 		for _, sliceElementsRec := range sliceElementsRecs {
-			slice := slicesToHydrate[sliceElementsRec.SliceId]
-			value, err := l.dbReadValue(slice.typ.elementType, sliceElementsRec.Value)
+			origAndDataSlices := slicesToHydrate[sliceElementsRec.SliceId]
+			origSlice := origAndDataSlices.orig
+			dataSlice := origAndDataSlices.data
+			// TODO: we need to keep the orig, and hydrate it into the orig
+			// slice.
+			orig, data, err := l.dbReadValue(dataSlice.typ.elementType, sliceElementsRec.Value)
 			if err != nil {
 				return nil, err
 			}
-			slice.elements = append(slice.elements, sliceElement{
+			origSlice.elements = append(origSlice.elements, sliceElement{
 				rank:  sliceElementsRec.Rank,
-				value: value,
+				value: orig,
+			})
+			dataSlice.elements = append(dataSlice.elements, sliceElement{
+				rank:  sliceElementsRec.Rank,
+				value: data,
 			})
 		}
 	}
@@ -328,75 +342,110 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 	return ws, nil
 }
 
-func (l *loader) dbReadValue(typ Type, optValue *string) (Value, error) {
+func (l *loader) dbReadValue(typ Type, optValue *string) (Value, Value, error) {
 	if optValue == nil {
-		return vUndefined, nil
+		return vUndefined, vUndefined, nil
 	}
 	return typ.dbReadValue(l, *optValue)
 }
 
-func (typ *UndefinedType) dbReadValue(l *loader, value string) (Value, error) {
+func (typ *UndefinedType) dbReadValue(l *loader, value string) (Value, Value, error) {
 	panic("should never be called")
 }
 
-func (typ *TextType) dbReadValue(l *loader, value string) (Value, error) {
-	return NewText(value), nil
+func (typ *TextType) dbReadValue(l *loader, value string) (Value, Value, error) {
+	text := NewText(value)
+	return text, text, nil
 }
 
-func (typ *BoolType) dbReadValue(l *loader, value string) (Value, error) {
+func (typ *BoolType) dbReadValue(l *loader, value string) (Value, Value, error) {
 	switch value {
 	case "true":
-		return NewBool(true), nil
+		return vTrue, vTrue, nil
 	case "false":
-		return NewBool(false), nil
+		return vFalse, vFalse, nil
 	default:
-		return nil, fmt.Errorf("unreadable value for bool %s", value)
+		return nil, nil, fmt.Errorf("unreadable value for bool %s", value)
 	}
 }
 
-func (typ *NumberType) dbReadValue(l *loader, value string) (Value, error) {
-	return NewNumberFromString(value)
-}
-
-func (typ *SliceType) dbReadValue(l *loader, value string) (Value, error) {
-	if !strings.HasPrefix(value, "[:") {
-		return nil, fmt.Errorf("unreadable value for slice %s", value)
-	}
-	parts := strings.Split(value, ":")
-	if len(parts) != 3 {
-		return nil, fmt.Errorf("unreadable value for slice %s", value)
-	}
-	lastRank, err := strconv.Atoi(parts[1])
+func (typ *NumberType) dbReadValue(l *loader, value string) (Value, Value, error) {
+	num, err := NewNumberFromString(value)
 	if err != nil {
-		return nil, fmt.Errorf("unreadable value for slice %s", value)
+		return nil, nil, err
 	}
-	slice := newSliceWithIdAndLastRank(typ, parts[2], lastRank)
-	l.slicesToHydrate[slice.id] = slice
-	return slice, nil
+	return num, num, nil
 }
 
-func (typ *Definition) dbReadValue(l *loader, value string) (Value, error) {
-	if !strings.HasPrefix(value, "*:") {
-		return nil, fmt.Errorf("unreadable value for ref %s", value)
+// Slices ref syntax
+//
+//     [:<rank>:<slice_uuid>
+var sliceRefRegex = regexp.MustCompile(`\[\:([0-9]+)\:(.*)`)
+
+func (typ *SliceType) dbReadValue(l *loader, value string) (Value, Value, error) {
+	match := sliceRefRegex.FindStringSubmatch(value)
+	if len(match) != 3 {
+		return nil, nil, fmt.Errorf("unreadable value for slice %s", value)
 	}
-	parts := strings.Split(value, ":")
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("unreadable value for ref %s", value)
-	}
-	ws, err := l.loadWorksheet(parts[1])
+
+	lastRank, err := strconv.Atoi(match[1])
 	if err != nil {
-		return nil, fmt.Errorf("unable to load referenced worksheet %s: %s", parts[1], err)
+		panic(fmt.Sprintf("unexpected: %s", match[2]))
 	}
-	return ws, nil
+	sliceId := match[2]
+
+	orig := newSliceWithIdAndLastRank(typ, sliceId, lastRank)
+	data := newSliceWithIdAndLastRank(typ, sliceId, lastRank)
+	l.slicesToHydrate[sliceId] = slicepair{
+		orig: orig,
+		data: data,
+	}
+
+	return orig, data, nil
 }
 
-func (typ *EnumType) dbReadValue(l *loader, value string) (Value, error) {
+// Worksheet ref syntax
+//
+//     *:<ws_uuid>
+//     *:<ws_uuid>@<version>
+var wsRefRegex = regexp.MustCompile(`\*\:([^@]*)(@([0-9]+))?`)
+
+func (typ *Definition) dbReadValue(l *loader, value string) (Value, Value, error) {
+	match := wsRefRegex.FindStringSubmatch(value)
+	if len(match) != 4 {
+		return nil, nil, fmt.Errorf("unreadable value for ref %s", value)
+	}
+
+	wsId := match[1]
+
+	// TODO: this should really be a "please hydrate", so that worksheets can be
+	// loaded in batch.
+	ws, err := l.loadWorksheet(wsId)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to load referenced worksheet %s: %s", match[0], err)
+	}
+
+	var wsVersion int
+	if match[3] != "" {
+		var err error
+		wsVersion, err = strconv.Atoi(match[3])
+		if err != nil {
+			panic("unexpected")
+		}
+	} else {
+		wsVersion = -1 // i.e. unknown, will force the ref to be updated
+	}
+
+	return &wsRefAtVersion{ws, wsVersion}, ws, nil
+}
+
+func (typ *EnumType) dbReadValue(l *loader, value string) (Value, Value, error) {
 	return (&TextType{}).dbReadValue(l, value)
 }
 
-func (l *loader) nextSlicesToHydrate() map[string]*Slice {
+func (l *loader) nextSlicesToHydrate() map[string]slicepair {
 	slicesToHydrate := l.slicesToHydrate
-	l.slicesToHydrate = make(map[string]*Slice)
+	l.slicesToHydrate = make(map[string]slicepair)
 	return slicesToHydrate
 }
 
@@ -546,7 +595,7 @@ func (p *persister) save(ws *Worksheet) error {
 
 	// now we can update ws itself to reflect the save
 	for index, value := range ws.data {
-		ws.orig[index] = value
+		ws.orig[index] = toOrig(value)
 	}
 
 	return nil
@@ -652,11 +701,29 @@ func (p *persister) update(ws *Worksheet) error {
 						}
 					}
 				}
+			} else {
+				panic("unexpected: changing slice id not supported yet")
 			}
 		}
 		if shouldUpdateValueRecord {
 			valuesToUpdate = append(valuesToUpdate, index)
 		}
+	}
+
+	// no change, i.e. only the version would change
+	//
+	// Right now, we have to redo this check after going through full diffing
+	// for the case where the only diff was a slice change, optimized away
+	// because the rank and id didn't change. Doing this late check, and in a
+	// relatively special purpose way, will make adding additional features
+	// (e.g.bag, maps) harder. Instead, we should push more logic to the diffing
+	// algorithm, so that operations at the store level are a more straighforward
+	// application of recording those diffs (vs computing them). Something to
+	// refactor soon!
+	if len(valuesToUpdate) == 1 &&
+		len(slicesElementsAdded) == 0 &&
+		len(slicesElementsDeleted) == 0 {
+		return nil
 	}
 
 	// insert rEdit
@@ -776,11 +843,22 @@ func (p *persister) update(ws *Worksheet) error {
 
 	// now we can update ws itself to reflect the store
 	for index, value := range ws.data {
-		ws.orig[index] = value
+		ws.orig[index] = toOrig(value)
 	}
 
 	hasFailed = false
 	return nil
+}
+
+// TODO: move this to be a func on Value interface, needs to be recursive to
+// deal with slices for instance.
+func toOrig(value Value) Value {
+	switch v := value.(type) {
+	case *Worksheet:
+		return &wsRefAtVersion{v, v.Version()}
+	default:
+		return value
+	}
 }
 
 func dbWriteValue(value Value) *string {
@@ -813,7 +891,7 @@ func (value *Slice) dbWriteValue() string {
 }
 
 func (value *Worksheet) dbWriteValue() string {
-	return fmt.Sprintf("*:%s", value.Id())
+	return fmt.Sprintf("*:%s@%d", value.Id(), value.Version())
 }
 
 func inClause(column string, num int) string {

@@ -26,6 +26,8 @@ import (
 var (
 	vUndefined = &Undefined{}
 	vZero      = &Number{0, &NumberType{0}}
+	vTrue      = NewBool(true)
+	vFalse     = NewBool(false)
 )
 
 // RoundingMode describes the rounding mode to be used in an operation.
@@ -42,7 +44,12 @@ type Value interface {
 	// Type returns this value's type.
 	Type() Type
 
-	// Equal returns a comparison on this value against that value.
+	// Equal returns whether this value is equal to that value. Value equality
+	// is defined by 'being the same value' inasmuch that you can replace this
+	// value in an expression by that value, and have the same result.
+	//
+	// One could formally define equality by saying that any expression with a
+	// hole E[?] would evaluate to the same value with E[this] or E[that].
 	Equal(that Value) bool
 
 	// String returns a string representation of the value.
@@ -62,6 +69,12 @@ type Value interface {
 	// values contained in the slice. This has runtime impact, which we are
 	// comfortable paying right now.
 	assignableTo(typ Type) bool
+
+	// diffCompare returns whether this value is similar to that when persisted
+	// to a store. In particular, worksheets can be represented by `Worksheet`
+	// or the internal value type `wsRefAtVersion` which could be represented
+	// when stored similarly, though are different values from a semantic sense.
+	diffCompare(that Value) bool
 }
 
 var _ = []Value{

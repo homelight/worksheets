@@ -773,6 +773,8 @@ func extractChildWs(value Value) []*Worksheet {
 	switch v := value.(type) {
 	case *Worksheet:
 		return []*Worksheet{v}
+	case *wsRefAtVersion:
+		return []*Worksheet{v.ws}
 	case *Slice:
 		var result []*Worksheet
 		for _, element := range v.elements {
@@ -782,81 +784,4 @@ func extractChildWs(value Value) []*Worksheet {
 	default:
 		return nil
 	}
-}
-
-type change struct {
-	before, after Value
-}
-
-func (ws *Worksheet) diff() map[int]change {
-	allIndexes := make(map[int]bool)
-	for index := range ws.orig {
-		allIndexes[index] = true
-	}
-	for index := range ws.data {
-		allIndexes[index] = true
-	}
-
-	diff := make(map[int]change)
-	for index := range allIndexes {
-		orig, hasOrig := ws.orig[index]
-		data, hasData := ws.data[index]
-		if hasOrig && !hasData {
-			diff[index] = change{
-				before: orig,
-				after:  vUndefined,
-			}
-		} else if !hasOrig && hasData {
-			diff[index] = change{
-				before: vUndefined,
-				after:  data,
-			}
-		} else if !orig.Equal(data) {
-			diff[index] = change{
-				before: orig,
-				after:  data,
-			}
-		}
-	}
-
-	return diff
-}
-
-type sliceChange struct {
-	deleted []sliceElement
-	added   []sliceElement
-}
-
-func diffSlices(before, after *Slice) sliceChange {
-	var (
-		b, a            int
-		elementsDeleted []sliceElement
-		elementsAdded   []sliceElement
-	)
-	for b < len(before.elements) && a < len(after.elements) {
-		bElement, aElement := before.elements[b], after.elements[a]
-		if bElement.rank == aElement.rank {
-			if !bElement.value.Equal(aElement.value) {
-				// we've replaced the value at this rank
-				// represent as a delete and an add
-				elementsDeleted = append(elementsDeleted, bElement)
-				elementsAdded = append(elementsAdded, aElement)
-			}
-			b++
-			a++
-		} else if bElement.rank < aElement.rank {
-			elementsDeleted = append(elementsDeleted, bElement)
-			b++
-		} else if aElement.rank < bElement.rank {
-			elementsAdded = append(elementsAdded, aElement)
-			a++
-		}
-	}
-	for ; b < len(before.elements); b++ {
-		elementsDeleted = append(elementsDeleted, before.elements[b])
-	}
-	for ; a < len(after.elements); a++ {
-		elementsAdded = append(elementsAdded, after.elements[a])
-	}
-	return sliceChange{elementsDeleted, elementsAdded}
 }
