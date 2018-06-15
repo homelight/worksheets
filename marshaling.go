@@ -139,23 +139,6 @@ type wsDestination struct {
 
 type wsDestinationMap map[string]*wsDestination
 
-func (wsdm wsDestinationMap) setAllDestinations() {
-	for _, d := range wsdm {
-		for _, locus := range d.loci {
-			destPtr := reflect.ValueOf(d.dest)
-			// dests are stored as pointers but we are setting non-pointer destinations
-			locus.Set(destPtr.Elem())
-		}
-	}
-}
-
-func (wsdm wsDestinationMap) addDestination(ws *Worksheet, dest interface{}) {
-	if _, ok := wsdm[ws.Id()]; ok {
-		panic("incorrect usage: cannot add new destination multiple times")
-	}
-	wsdm[ws.Id()] = &wsDestination{dest, nil}
-}
-
 func (wsdm wsDestinationMap) addLocus(ws *Worksheet, locus reflect.Value) {
 	wsdm[ws.Id()].loci = append(wsdm[ws.Id()].loci, locus)
 }
@@ -183,8 +166,31 @@ type structScanCtx struct {
 	// dests stores refs to any worksheets that we have already scanned
 	// for reuse (and cycle termination)
 	dests wsDestinationMap
+	// need to know order in which we deferred sets; we must go in reverse order to make sure
+	// the leaves are resolved first, so they are fully populated when it's their parents' turn.
+	// not a concern for pointers, as those are not deferred.
+	wsIdVisitingOrder []string
 	// copy map from global registry for this run
 	converters map[reflect.Type]func(Value) (interface{}, error)
+}
+
+func (ctx *structScanCtx) addDestination(ws *Worksheet, dest interface{}) {
+	if _, ok := ctx.dests[ws.Id()]; ok {
+		panic("incorrect usage: cannot add new destination multiple times")
+	}
+	ctx.dests[ws.Id()] = &wsDestination{dest, nil}
+	ctx.wsIdVisitingOrder = append(ctx.wsIdVisitingOrder, ws.Id())
+}
+
+func (ctx *structScanCtx) setAllDestinations() {
+	for i := len(ctx.wsIdVisitingOrder) - 1; i >= 0; i-- {
+		d := ctx.dests[ctx.wsIdVisitingOrder[i]]
+		for _, locus := range d.loci {
+			destPtr := reflect.ValueOf(d.dest)
+			// dests are stored as pointers but we are setting non-pointer destinations
+			locus.Set(destPtr.Elem())
+		}
+	}
 }
 
 func (ss *StructScanner) StructScan(ws *Worksheet, dest interface{}) error {
@@ -198,14 +204,14 @@ func (ss *StructScanner) StructScan(ws *Worksheet, dest interface{}) error {
 		dests:      make(wsDestinationMap),
 	}
 
-	ctx.dests.addDestination(ws, dest)
+	ctx.addDestination(ws, dest)
 
 	err := ctx.structScan(ws)
 	if err != nil {
 		return err
 	}
 
-	ctx.dests.setAllDestinations()
+	ctx.setAllDestinations()
 
 	return nil
 }
@@ -343,7 +349,7 @@ func (ctx *structScanCtx) convert(fieldCtx structScanFieldCtx, value Value) (ref
 			return reflect.Value{}, err
 		}
 		if ws, ok := value.(*Worksheet); ok {
-			ctx.dests.addDestination(ws, exporter)
+			ctx.addDestination(ws, exporter)
 		}
 		return reflect.ValueOf(exporter).Elem(), nil
 	}
@@ -473,7 +479,7 @@ func (value *Worksheet) structScanConvert(ctx *structScanCtx, fieldCtx structSca
 	}
 
 	newVal := reflect.New(fieldCtx.destType)
-	ctx.dests.addDestination(value, newVal.Interface())
+	ctx.addDestination(value, newVal.Interface())
 	err := ctx.structScan(value)
 	if err != nil {
 		return reflect.Value{}, err
