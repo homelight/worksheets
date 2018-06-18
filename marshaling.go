@@ -183,8 +183,8 @@ func (ctx *structScanCtx) addLocus(ws *Worksheet, locus reflect.Value) {
 func (ctx *structScanCtx) setAllDestinations() {
 	for i := len(ctx.wsIdVisitingOrder) - 1; i >= 0; i-- {
 		d := ctx.dests[ctx.wsIdVisitingOrder[i]]
+		destPtr := reflect.ValueOf(d.dest)
 		for _, locus := range d.loci {
-			destPtr := reflect.ValueOf(d.dest)
 			// dests are stored as pointers but we are setting non-pointer destinations
 			locus.Set(destPtr.Elem())
 		}
