@@ -58,7 +58,7 @@ workflows:
   version: 2
   build:
     jobs:
-# 6/17/18: circleci/golang:1.8 not available
+# 6/17/18: circleci/golang:1.8 not available, ticket https://discuss.circleci.com/t/circleci-golang-1-8-docker-tag-not-available/23031
 #      - buildGo1.8
       - buildGo1.9
       - buildGo1.10
