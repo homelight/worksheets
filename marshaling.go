@@ -137,29 +137,6 @@ type wsDestination struct {
 	loci []reflect.Value
 }
 
-type wsDestinationMap map[string]*wsDestination
-
-func (wsdm wsDestinationMap) setAllDestinations() {
-	for _, d := range wsdm {
-		for _, locus := range d.loci {
-			destPtr := reflect.ValueOf(d.dest)
-			// dests are stored as pointers but we are setting non-pointer destinations
-			locus.Set(destPtr.Elem())
-		}
-	}
-}
-
-func (wsdm wsDestinationMap) addDestination(ws *Worksheet, dest interface{}) {
-	if _, ok := wsdm[ws.Id()]; ok {
-		panic("incorrect usage: cannot add new destination multiple times")
-	}
-	wsdm[ws.Id()] = &wsDestination{dest, nil}
-}
-
-func (wsdm wsDestinationMap) addLocus(ws *Worksheet, locus reflect.Value) {
-	wsdm[ws.Id()].loci = append(wsdm[ws.Id()].loci, locus)
-}
-
 // StructScanner stores state allowing overrides for scanning of registered types.
 type StructScanner struct {
 	converterRegistry map[reflect.Type]func(Value) (interface{}, error)
@@ -182,9 +159,36 @@ func (ss *StructScanner) RegisterConverter(t reflect.Type, converterFn func(Valu
 type structScanCtx struct {
 	// dests stores refs to any worksheets that we have already scanned
 	// for reuse (and cycle termination)
-	dests wsDestinationMap
+	dests map[string]*wsDestination
+	// need to know order in which we deferred sets; we must go in reverse order to make sure
+	// the leaves are resolved first, so they are fully populated when it's their parents' turn.
+	// not a concern for pointers, as those are not deferred.
+	wsIdVisitingOrder []string
 	// copy map from global registry for this run
 	converters map[reflect.Type]func(Value) (interface{}, error)
+}
+
+func (ctx *structScanCtx) addDestination(ws *Worksheet, dest interface{}) {
+	if _, ok := ctx.dests[ws.Id()]; ok {
+		panic("incorrect usage: cannot add new destination multiple times")
+	}
+	ctx.dests[ws.Id()] = &wsDestination{dest, nil}
+	ctx.wsIdVisitingOrder = append(ctx.wsIdVisitingOrder, ws.Id())
+}
+
+func (ctx *structScanCtx) addLocus(ws *Worksheet, locus reflect.Value) {
+	ctx.dests[ws.Id()].loci = append(ctx.dests[ws.Id()].loci, locus)
+}
+
+func (ctx *structScanCtx) setAllDestinations() {
+	for i := len(ctx.wsIdVisitingOrder) - 1; i >= 0; i-- {
+		d := ctx.dests[ctx.wsIdVisitingOrder[i]]
+		destPtr := reflect.ValueOf(d.dest)
+		for _, locus := range d.loci {
+			// dests are stored as pointers but we are setting non-pointer destinations
+			locus.Set(destPtr.Elem())
+		}
+	}
 }
 
 func (ss *StructScanner) StructScan(ws *Worksheet, dest interface{}) error {
@@ -195,17 +199,17 @@ func (ss *StructScanner) StructScan(ws *Worksheet, dest interface{}) error {
 
 	ctx := &structScanCtx{
 		converters: ss.converterRegistry,
-		dests:      make(wsDestinationMap),
+		dests:      make(map[string]*wsDestination),
 	}
 
-	ctx.dests.addDestination(ws, dest)
+	ctx.addDestination(ws, dest)
 
 	err := ctx.structScan(ws)
 	if err != nil {
 		return err
 	}
 
-	ctx.dests.setAllDestinations()
+	ctx.setAllDestinations()
 
 	return nil
 }
@@ -272,15 +276,15 @@ func (ctx *structScanCtx) structScan(ws *Worksheet) error {
 			return err
 		}
 
-		setOrDeferSet(ctx.dests, f, value, wsValue, ft.Type)
+		ctx.setOrDeferSet(f, value, wsValue, ft.Type)
 	}
 
 	return nil
 }
 
-func setOrDeferSet(dests wsDestinationMap, f, v reflect.Value, wsValue Value, destType reflect.Type) {
+func (ctx *structScanCtx) setOrDeferSet(f, v reflect.Value, wsValue Value, destType reflect.Type) {
 	if childWs, ok := wsValue.(*Worksheet); ok && destType.Kind() != reflect.Ptr {
-		dests.addLocus(childWs, f)
+		ctx.addLocus(childWs, f)
 	} else {
 		// since we allowed structScanConvert on the kind of types,
 		// make sure we convert in case it's necessary
@@ -343,7 +347,7 @@ func (ctx *structScanCtx) convert(fieldCtx structScanFieldCtx, value Value) (ref
 			return reflect.Value{}, err
 		}
 		if ws, ok := value.(*Worksheet); ok {
-			ctx.dests.addDestination(ws, exporter)
+			ctx.addDestination(ws, exporter)
 		}
 		return reflect.ValueOf(exporter).Elem(), nil
 	}
@@ -473,7 +477,7 @@ func (value *Worksheet) structScanConvert(ctx *structScanCtx, fieldCtx structSca
 	}
 
 	newVal := reflect.New(fieldCtx.destType)
-	ctx.dests.addDestination(value, newVal.Interface())
+	ctx.addDestination(value, newVal.Interface())
 	err := ctx.structScan(value)
 	if err != nil {
 		return reflect.Value{}, err
@@ -497,7 +501,7 @@ func (value *Slice) structScanConvert(ctx *structScanCtx, fieldCtx structScanFie
 		if err != nil {
 			return reflect.Value{}, err
 		}
-		setOrDeferSet(ctx.dests, locus.Elem().Index(i), newVal, wsElem, fieldCtx.destType)
+		ctx.setOrDeferSet(locus.Elem().Index(i), newVal, wsElem, fieldCtx.destType)
 	}
 	return locus.Elem(), nil
 }
