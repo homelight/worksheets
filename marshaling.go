@@ -162,7 +162,6 @@ type structScanCtx struct {
 	dests map[string]*wsDestination
 	// need to know order in which we deferred sets; we must go in reverse order to make sure
 	// the leaves are resolved first, so they are fully populated when it's their parents' turn.
-	// not a concern for pointers, as those are not deferred.
 	wsIdVisitingOrder []string
 	// copy map from global registry for this run
 	converters map[reflect.Type]func(Value) (interface{}, error)
