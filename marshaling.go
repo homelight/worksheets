@@ -162,7 +162,6 @@ type structScanCtx struct {
 	dests map[string]*wsDestination
 	// need to know order in which we deferred sets; we must go in reverse order to make sure
 	// the leaves are resolved first, so they are fully populated when it's their parents' turn.
-	// not a concern for pointers, as those are not deferred.
 	wsIdVisitingOrder []string
 	// copy map from global registry for this run
 	converters map[reflect.Type]func(Value) (interface{}, error)
@@ -185,8 +184,14 @@ func (ctx *structScanCtx) setAllDestinations() {
 		d := ctx.dests[ctx.wsIdVisitingOrder[i]]
 		destPtr := reflect.ValueOf(d.dest)
 		for _, locus := range d.loci {
-			// dests are stored as pointers but we are setting non-pointer destinations
-			locus.Set(destPtr.Elem())
+			// dests are stored as pointers
+			// but we are setting both pointer and non-pointer destinations
+			// deref if needed
+			if locus.Kind() == reflect.Ptr {
+				locus.Set(destPtr)
+			} else {
+				locus.Set(destPtr.Elem())
+			}
 		}
 	}
 }
@@ -283,7 +288,7 @@ func (ctx *structScanCtx) structScan(ws *Worksheet) error {
 }
 
 func (ctx *structScanCtx) setOrDeferSet(f, v reflect.Value, wsValue Value, destType reflect.Type) {
-	if childWs, ok := wsValue.(*Worksheet); ok && destType.Kind() != reflect.Ptr {
+	if childWs, ok := wsValue.(*Worksheet); ok {
 		ctx.addLocus(childWs, f)
 	} else {
 		// since we allowed structScanConvert on the kind of types,

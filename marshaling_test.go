@@ -524,20 +524,24 @@ func (s *Zuite) TestStructScan_refsRepeat() {
 
 func (s *Zuite) TestStructScan_refsNestedMoreThanOnce() {
 	type level3 struct {
-		S string `ws:"text"`
+		S  string `ws:"text"`
+		IP *int   `ws:"num_0"`
 	}
 
 	type level2 struct {
-		S  string `ws:"text"`
-		L3 level3 `ws:"ws"`
+		S     string `ws:"text"`
+		L3    level3 `ws:"ws"`
+		L3Ptr level3 `ws:"ws"` // relies on multiple struct fields mapping to a single ws field
 	}
 
 	type level1 struct {
-		L2 level2 `ws:"ws"`
+		L2    level2  `ws:"ws"`
+		L2Ptr *level2 `ws:"ws"` // relies on multiple struct fields mapping to a single ws field
 	}
 
 	l3 := s.defs.MustNewWorksheet("all_types")
 	l3.MustSet("text", NewText("we all fall down"))
+	l3.MustSet("num_0", NewNumberFromInt(123))
 
 	l2 := s.defs.MustNewWorksheet("all_types")
 	l2.MustSet("text", NewText("ring around the rosie"))
@@ -550,8 +554,17 @@ func (s *Zuite) TestStructScan_refsNestedMoreThanOnce() {
 	err := l1.StructScan(&t)
 	s.Require().NoError(err)
 
+	// test non-pointer paths for values
 	s.Equal("ring around the rosie", t.L2.S)
 	s.Equal("we all fall down", t.L2.L3.S)
+	s.Require().NotNil(t.L2.L3.IP)
+	s.Equal(123, *(t.L2.L3.IP))
+
+	// test pointer paths for values
+	s.Equal("ring around the rosie", t.L2Ptr.S)
+	s.Equal("we all fall down", t.L2Ptr.L3Ptr.S)
+	s.Require().NotNil(t.L2Ptr.L3Ptr.IP)
+	s.Equal(123, *(t.L2Ptr.L3Ptr.IP))
 }
 
 type special struct {
