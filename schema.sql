@@ -45,6 +45,16 @@ create table worksheet_values (
   unique(id)
 );
 
+-- To select all values of a worksheet for a given revision.
+--
+-- Benchmarking has shown that adding from_version, and to_version to the index
+-- performs worst. This is however on the belief that there are relatively few
+-- versions, and we may want to revisit this choice with more realistic dataset.
+create index worksheet_values_idx on worksheet_values (
+  worksheet_id,
+  from_version
+);
+
 drop table if exists worksheet_parents;
 create table worksheet_parents (
   child_id           uuid,
@@ -64,4 +74,18 @@ create table worksheet_slice_elements (
   value          varchar,
 
   unique(id)
+);
+
+-- To select all slice elements of a worksheet for a given revision, which we
+-- want ordered by rank. Since we only expect a few slice elements (tens), the
+-- sorting can be done without the use of an index, and we are therefore not
+-- including the rank.
+--
+-- Benchmarking has shown that including from_version performed better than
+-- only having slice_id, and better than also including to_version. However,
+-- this is however on the belief that there are relatively few
+-- versions, and we may want to revisit this choice with more realistic dataset.
+create index worksheet_slice_elements_idx on worksheet_slice_elements (
+  slice_id,
+  from_version
 );

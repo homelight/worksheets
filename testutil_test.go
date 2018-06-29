@@ -170,8 +170,8 @@ func TestRunAllTheTests(t *testing.T) {
 	suite.Run(t, new(Zuite))
 }
 
-func (s *Zuite) RunTransaction(fn func(tx *runner.Tx) error) error {
-	tx, err := s.db.Begin()
+func RunTransaction(db *runner.DB, fn func(tx *runner.Tx) error) error {
+	tx, err := db.Begin()
 	if err != nil {
 		return err
 	}
@@ -183,6 +183,10 @@ func (s *Zuite) RunTransaction(fn func(tx *runner.Tx) error) error {
 	}
 
 	return tx.Commit()
+}
+
+func (s *Zuite) RunTransaction(fn func(tx *runner.Tx) error) error {
+	return RunTransaction(s.db, fn)
 }
 
 func (s *Zuite) MustRunTransaction(fn func(tx *runner.Tx) error) {

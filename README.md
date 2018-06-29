@@ -35,7 +35,9 @@ And retrieve the worksheet
 
 	joey, err := worksheet.Unmarshal("borrower", bytes)
 
-# Running Tests
+# Contributing
+
+## Running Tests
 
 If you want to contribute, you can get tests running locally as follows:
 
@@ -52,6 +54,18 @@ or `$ go test -v ./... -testify.m <TestName>` for individual tests.
 To update your schema, you can simply re-run
 
 	psql -U ws_user ws_test -f schema.sql
+
+## Running Benchmarks
+
+For benchmarks to be interesting, we need to have a primed database with lots of data. The more the better.
+
+In `bench_test.go`, the start of each benchmark has priming code, e.g. `b.prime(100000)`. You'll want to run benchmarks in two steps: 1. put a high number to prime the databse with lots of data, then run the benchmark
+
+	 go test -v -run=NOTHING -bench=. -benchtime=15s
+
+This will take a long time, since before running, the benchmark will first write a lot of data in the local db. Once that completes, you can comment out or change the priming to `0`, and run the benchmark again
+
+	 go test -v -run=NOTHING -bench=. -benchtime=15s
 
 # Worksheet Definition
 
