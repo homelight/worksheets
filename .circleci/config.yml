@@ -56,8 +56,20 @@ jobs:
 
 workflows:
   version: 2
-  build:
+  build_on_git_push:
     jobs:
       - buildGo1.8
       - buildGo1.9
       - buildGo1.10
+  build_nightly:
+    jobs:
+      - buildGo1.8
+      - buildGo1.9
+      - buildGo1.10
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - master
