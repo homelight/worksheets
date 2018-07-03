@@ -372,13 +372,6 @@ func (s *Zuite) TestSliceUpdate_appendsThenDelThenAppendAgain() {
 			WorksheetId: wsId,
 			Index:       42,
 			FromVersion: 1,
-			ToVersion:   1,
-			Value:       fmt.Sprintf(`[:2:%s`, theSliceId),
-		},
-		{
-			WorksheetId: wsId,
-			Index:       42,
-			FromVersion: 2,
 			ToVersion:   2,
 			Value:       fmt.Sprintf(`[:2:%s`, theSliceId),
 		},
