@@ -606,7 +606,7 @@ func (p *persister) update(ws *Worksheet) error {
 		adoptedChildren       = make(map[int][]string)
 	)
 	for index, change := range diff {
-		valuesToUpdate = append(valuesToUpdate, index)
+		shouldUpdateValueRecord := true
 
 		// non-slice values
 		if _, ok := change.before.(*Slice); !ok {
@@ -631,6 +631,8 @@ func (p *persister) update(ws *Worksheet) error {
 				panic(fmt.Sprintf("unexpected: before=%s, after%s", change.before, change.after))
 			}
 			if sliceBefore.id == sliceAfter.id {
+				shouldUpdateValueRecord = sliceBefore.lastRank != sliceAfter.lastRank
+
 				sliceChange := diffSlices(sliceBefore, sliceAfter)
 
 				sliceId := sliceBefore.id
@@ -651,6 +653,9 @@ func (p *persister) update(ws *Worksheet) error {
 					}
 				}
 			}
+		}
+		if shouldUpdateValueRecord {
+			valuesToUpdate = append(valuesToUpdate, index)
 		}
 	}
 
