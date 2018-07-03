@@ -414,8 +414,6 @@ func (typ *Definition) dbReadValue(l *loader, value string) (Value, Value, error
 
 	wsId := match[1]
 
-	// TODO: this should really be a "please hydrate", so that worksheets can be
-	// loaded in batch.
 	ws, err := l.loadWorksheet(wsId)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to load referenced worksheet %s: %s", match[0], err)
@@ -846,9 +844,12 @@ func (p *persister) update(ws *Worksheet) error {
 	return nil
 }
 
-// TODO: move this to be a func on Value interface, needs to be recursive to
-// deal with slices for instance.
 func toOrig(value Value) Value {
+	// TODO(pascal): We need to recursively convert, e.g. handle slices. Not
+	// doing this today simplifies the persistence code, at the cost of missing
+	// some ref updates.
+	//
+	// See also slices' diffCompare.
 	switch v := value.(type) {
 	case *Worksheet:
 		return &wsRefAtVersion{v, v.Version()}

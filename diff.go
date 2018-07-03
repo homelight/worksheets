@@ -14,6 +14,7 @@ package worksheets
 
 import (
 	"bytes"
+	"fmt"
 	"reflect"
 )
 
@@ -34,6 +35,12 @@ func (value *Text) diffCompare(that Value) bool {
 }
 
 func (value *Slice) diffCompare(that Value) bool {
+	// TODO(pascal): We should diffCompare every single element, rather than
+	// rely on semantic equality. Right now, this shortcut simplifies slice
+	// handling with refs, at the cost of missing some ref updates in certain
+	// situations.
+	//
+	// See also toOrig.
 	return value.Equal(that)
 }
 
@@ -75,8 +82,8 @@ func (_ *wsRefAtVersion) Equal(other Value) bool {
 	panic("wsRefAtVersion: marker value for diffing only")
 }
 
-func (_ *wsRefAtVersion) String() string {
-	panic("wsRefAtVersion: marker value for diffing only")
+func (ref *wsRefAtVersion) String() string {
+	return fmt.Sprintf("ref[%s@%d]", ref.ws.Id(), ref.version)
 }
 
 func (_ *wsRefAtVersion) dbWriteValue() string {
