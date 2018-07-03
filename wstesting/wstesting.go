@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cucumber/cucumber-messages-go"
 	"github.com/cucumber/gherkin-go"
 
 	"github.com/helloeave/worksheets"
@@ -70,7 +71,7 @@ type cAssert struct {
 	expected map[string]expr
 }
 
-func stepToCommand(step *gherkin.Step) (command, error) {
+func stepToCommand(step *messages.Step) (command, error) {
 	parts := strings.Split(strings.TrimSpace(step.Text), " ")
 	switch parts[0] {
 	case "load":
@@ -427,7 +428,7 @@ type Scenario struct {
 	Name string
 
 	source   string
-	steps    []*gherkin.Step
+	steps    []*messages.Step
 	commands []command
 }
 
@@ -442,7 +443,7 @@ func (s Scenario) Run(ctx Context) error {
 	return nil
 }
 
-func niceErr(source string, step *gherkin.Step, err error) error {
+func niceErr(source string, step *messages.Step, err error) error {
 	return fmt.Errorf("%s:%d:%d: %s: %s",
 		source, step.Location.Line, step.Location.Column,
 		step.Text, err)
@@ -498,17 +499,18 @@ func RunFeature(t *testing.T, filename string, opts ...Context) {
 	}
 }
 
-func docToScenarios(doc *gherkin.GherkinDocument, source string) ([]Scenario, error) {
+func docToScenarios(doc *messages.GherkinDocument, source string) ([]Scenario, error) {
 	var (
-		bgSteps    []*gherkin.Step
+		bgSteps    []*messages.Step
 		bgCommands []command
 		scenarios  []Scenario
 	)
-	for _, untypedChild := range doc.Feature.Children {
-		switch child := untypedChild.(type) {
-		case *gherkin.Scenario:
+	for _, child := range doc.Feature.Children {
+		switch childValue := child.Value.(type) {
+		case *messages.FeatureChild_Scenario:
+			scenario := childValue.Scenario
 			var commands []command
-			for _, step := range child.Steps {
+			for _, step := range scenario.Steps {
 				cmd, err := stepToCommand(step)
 				if err != nil {
 					return nil, niceErr(source, step, err)
@@ -516,19 +518,20 @@ func docToScenarios(doc *gherkin.GherkinDocument, source string) ([]Scenario, er
 				commands = append(commands, cmd)
 			}
 			scenarios = append(scenarios, Scenario{
-				Name:     child.Name,
-				steps:    child.Steps,
+				Name:     scenario.Name,
+				steps:    scenario.Steps,
 				commands: commands,
 			})
-		case *gherkin.Background:
-			for _, step := range child.Steps {
+		case *messages.FeatureChild_Background:
+			background := childValue.Background
+			for _, step := range background.Steps {
 				cmd, err := stepToCommand(step)
 				if err != nil {
 					return nil, niceErr(source, step, err)
 				}
 				bgCommands = append(bgCommands, cmd)
 			}
-			bgSteps = child.Steps
+			bgSteps = background.Steps
 		default:
 			return nil, fmt.Errorf("%s: unknwon child type %T\n", source, child)
 		}
@@ -542,8 +545,8 @@ func docToScenarios(doc *gherkin.GherkinDocument, source string) ([]Scenario, er
 }
 
 func tableToContents(extra interface{}) (map[string]expr, bool, error) {
-	table, ok := extra.(*gherkin.DataTable)
-	if !ok {
+	table := mustGetDataTable(extra)
+	if table == nil {
 		return nil, false, fmt.Errorf("must provide a data table")
 	}
 
@@ -565,8 +568,8 @@ func tableToContents(extra interface{}) (map[string]expr, bool, error) {
 }
 
 func tableToIndexes(extra interface{}) ([]int, error) {
-	table, ok := extra.(*gherkin.DataTable)
-	if !ok {
+	table := mustGetDataTable(extra)
+	if table == nil {
 		return nil, fmt.Errorf("must provide an index table")
 	}
 
@@ -586,8 +589,8 @@ func tableToIndexes(extra interface{}) ([]int, error) {
 }
 
 func tableToFields(extra interface{}) ([]string, error) {
-	table, ok := extra.(*gherkin.DataTable)
-	if !ok {
+	table := mustGetDataTable(extra)
+	if table == nil {
 		return nil, fmt.Errorf("must provide a field table")
 	}
 
@@ -603,8 +606,8 @@ func tableToFields(extra interface{}) ([]string, error) {
 }
 
 func tableToValues(extra interface{}) ([]expr, error) {
-	table, ok := extra.(*gherkin.DataTable)
-	if !ok {
+	table := mustGetDataTable(extra)
+	if table == nil {
 		return nil, fmt.Errorf("must provide a value table")
 	}
 
@@ -617,4 +620,12 @@ func tableToValues(extra interface{}) ([]expr, error) {
 	}
 
 	return values, nil
+}
+
+func mustGetDataTable(extra interface{}) *messages.DataTable {
+	if sdt, ok := extra.(*messages.Step_DataTable); !ok {
+		return nil
+	} else {
+		return sdt.DataTable
+	}
 }

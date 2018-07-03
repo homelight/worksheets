@@ -16,6 +16,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cucumber/cucumber-messages-go"
 	"github.com/cucumber/gherkin-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,7 +31,7 @@ type Zuite struct {
 
 func (s *Zuite) TestStepToCommand() {
 	cases := []struct {
-		step     *gherkin.Step
+		step     *messages.Step
 		expected command
 	}{
 		// load
@@ -263,7 +264,7 @@ func (s *Zuite) TestStepToCommand() {
 
 func (s *Zuite) TestStepToCommand_errors() {
 	cases := []struct {
-		step        *gherkin.Step
+		step        *messages.Step
 		expectedErr string
 	}{
 		// misc
@@ -526,20 +527,20 @@ func TestRunAllTheTests(t *testing.T) {
 	suite.Run(t, new(Zuite))
 }
 
-func step(text string, data ...[]string) *gherkin.Step {
-	step := gherkin.Step{
+func step(text string, data ...[]string) *messages.Step {
+	step := messages.Step{
 		Text: text,
 	}
 	if len(data) != 0 {
-		table := &gherkin.DataTable{Rows: make([]*gherkin.TableRow, 0)}
+		table := &messages.DataTable{Rows: make([]*messages.TableRow, 0)}
 		for _, r := range data {
-			row := &gherkin.TableRow{Cells: make([]*gherkin.TableCell, 0)}
+			row := &messages.TableRow{Cells: make([]*messages.TableCell, 0)}
 			for _, c := range r {
-				row.Cells = append(row.Cells, &gherkin.TableCell{Value: c})
+				row.Cells = append(row.Cells, &messages.TableCell{Value: c})
 			}
 			table.Rows = append(table.Rows, row)
 		}
-		step.Argument = table
+		step.Argument = &messages.Step_DataTable{table}
 	}
 	return &step
 }
