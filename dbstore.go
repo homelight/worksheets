@@ -302,20 +302,16 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 			return nil, err
 		}
 		for _, sliceElementsRec := range sliceElementsRecs {
-			origAndDataSlices := slicesToHydrate[sliceElementsRec.SliceId]
-			origSlice := origAndDataSlices.orig
-			dataSlice := origAndDataSlices.data
-			// TODO: we need to keep the orig, and hydrate it into the orig
-			// slice.
-			orig, data, err := l.dbReadValue(dataSlice.typ.elementType, sliceElementsRec.Value)
+			slices := slicesToHydrate[sliceElementsRec.SliceId]
+			orig, data, err := l.dbReadValue(slices.data.typ.elementType, sliceElementsRec.Value)
 			if err != nil {
 				return nil, err
 			}
-			origSlice.elements = append(origSlice.elements, sliceElement{
+			slices.orig.elements = append(slices.orig.elements, sliceElement{
 				rank:  sliceElementsRec.Rank,
 				value: orig,
 			})
-			dataSlice.elements = append(dataSlice.elements, sliceElement{
+			slices.data.elements = append(slices.data.elements, sliceElement{
 				rank:  sliceElementsRec.Rank,
 				value: data,
 			})
