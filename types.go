@@ -21,7 +21,14 @@ type Type interface {
 	// String returns a string representation of the type.
 	String() string
 
-	dbReadValue(l *loader, value string) (Value, error)
+	// dbReadValue reads the value at "head", and returns the historical value,
+	// the value at head, or possibly an error.
+	//
+	// For instance, for worksheet references, the historical value is a
+	// `wsRefAtVersion` meant for tracking purposes, whereas the value is
+	// the actual worksheet (which will be registered to be properly hydrated by
+	// the laoder).
+	dbReadValue(l *loader, value string) (Value, Value, error)
 }
 
 // NamedType represents types which are uniquely identified by their names, such
