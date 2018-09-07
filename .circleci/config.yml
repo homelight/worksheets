@@ -8,7 +8,7 @@ shared: &run_steps
         timeout: 5
 
     # postgres
-    - run: sudo apt install postgresql-client-9.6
+    - run: sudo apt install postgresql-client
     - run: psql ws_test ws_user -h localhost -p 5432 -f /go/src/github.com/helloeave/worksheets/schema.sql
 
     # golang
@@ -18,18 +18,6 @@ shared: &run_steps
     - run: go build -tags=gofuzz ./fuzz
 
 jobs:
-  buildGo1.8:
-    docker:
-      - image: circleci/golang:1.8
-      - image: circleci/postgres:9.6-alpine
-        environment:
-          POSTGRES_USER: ws_user
-          POSTGRES_DB: ws_test
-          POSTGRES_PASSWORD: ""
-
-    working_directory: /go/src/github.com/helloeave/worksheets
-    <<: *run_steps
-
   buildGo1.9:
     docker:
       - image: circleci/golang:1.9
@@ -54,18 +42,30 @@ jobs:
     working_directory: /go/src/github.com/helloeave/worksheets
     <<: *run_steps
 
+  buildGo1.11:
+    docker:
+    - image: circleci/golang:1.11
+    - image: circleci/postgres:9.6-alpine
+      environment:
+        POSTGRES_USER: ws_user
+        POSTGRES_DB: ws_test
+        POSTGRES_PASSWORD: ""
+
+    working_directory: /go/src/github.com/helloeave/worksheets
+    <<: *run_steps
+
 workflows:
   version: 2
   build_on_git_push:
     jobs:
-      - buildGo1.8
       - buildGo1.9
       - buildGo1.10
+      - buildGo1.11
   build_nightly:
     jobs:
-      - buildGo1.8
       - buildGo1.9
       - buildGo1.10
+      - buildGo1.11
     triggers:
       - schedule:
           cron: "0 0 * * *"
