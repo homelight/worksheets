@@ -139,7 +139,8 @@ type wsDestination struct {
 
 // StructScanner stores state allowing overrides for scanning of registered types.
 type StructScanner struct {
-	converterRegistry map[reflect.Type]func(Value) (interface{}, error)
+	converterRegistry          map[reflect.Type]func(Value) (interface{}, error)
+	AllowUndefinedToNonPointer bool // relax conversion, can populate with zero value
 }
 
 func NewStructScanner() *StructScanner {
@@ -164,7 +165,8 @@ type structScanCtx struct {
 	// the leaves are resolved first, so they are fully populated when it's their parents' turn.
 	wsIdVisitingOrder []string
 	// copy map from global registry for this run
-	converters map[reflect.Type]func(Value) (interface{}, error)
+	converters                 map[reflect.Type]func(Value) (interface{}, error)
+	allowUndefinedToNonPointer bool
 }
 
 func (ctx *structScanCtx) addDestination(ws *Worksheet, dest interface{}) {
@@ -205,6 +207,7 @@ func (ss *StructScanner) StructScan(ws *Worksheet, dest interface{}) error {
 	ctx := &structScanCtx{
 		converters: ss.converterRegistry,
 		dests:      make(map[string]*wsDestination),
+		allowUndefinedToNonPointer: ss.AllowUndefinedToNonPointer,
 	}
 
 	ctx.addDestination(ws, dest)
@@ -360,56 +363,56 @@ func (ctx *structScanCtx) convert(fieldCtx structScanFieldCtx, value Value) (ref
 	return value.structScanConvert(ctx, fieldCtx)
 }
 
-func (value *Undefined) structScanConvert(_ *structScanCtx, ctx structScanFieldCtx) (reflect.Value, error) {
-	if ctx.destType.Kind() != reflect.Ptr {
-		ctx.sourceType = value.Type()
-		return ctx.cannotConvert(fmt.Sprintf("dest must be a *%s", ctx.destType.Name()))
+func (value *Undefined) structScanConvert(ctx *structScanCtx, fieldCtx structScanFieldCtx) (reflect.Value, error) {
+	if !ctx.allowUndefinedToNonPointer && fieldCtx.destType.Kind() != reflect.Ptr {
+		fieldCtx.sourceType = value.Type()
+		return fieldCtx.cannotConvert(fmt.Sprintf("dest must be a *%s", fieldCtx.destType.Name()))
 	}
-	return reflect.Zero(ctx.destType), nil
+	return reflect.Zero(fieldCtx.destType), nil
 }
 
-func (value *Text) structScanConvert(_ *structScanCtx, ctx structScanFieldCtx) (reflect.Value, error) {
-	if ctx.destType.Kind() == reflect.String {
+func (value *Text) structScanConvert(_ *structScanCtx, fieldCtx structScanFieldCtx) (reflect.Value, error) {
+	if fieldCtx.destType.Kind() == reflect.String {
 		return reflect.ValueOf(value.value), nil
 	}
-	return ctx.cannotConvert()
+	return fieldCtx.cannotConvert()
 }
 
-func (value *Bool) structScanConvert(_ *structScanCtx, ctx structScanFieldCtx) (reflect.Value, error) {
-	if ctx.destType.Kind() == reflect.Bool {
+func (value *Bool) structScanConvert(_ *structScanCtx, fieldCtx structScanFieldCtx) (reflect.Value, error) {
+	if fieldCtx.destType.Kind() == reflect.Bool {
 		return reflect.ValueOf(value.value), nil
-	} else if ctx.destType.Kind() == reflect.String {
+	} else if fieldCtx.destType.Kind() == reflect.String {
 		return reflect.ValueOf(value.String()), nil
 	}
-	return ctx.cannotConvert()
+	return fieldCtx.cannotConvert()
 }
 
-func (value *Number) structScanConvert(_ *structScanCtx, ctx structScanFieldCtx) (reflect.Value, error) {
+func (value *Number) structScanConvert(_ *structScanCtx, fieldCtx structScanFieldCtx) (reflect.Value, error) {
 	// to string
-	if ctx.destType.Kind() == reflect.String {
+	if fieldCtx.destType.Kind() == reflect.String {
 		return reflect.ValueOf(value.String()), nil
 	}
 
 	// to floats
-	if ctx.destType.Kind() == reflect.Float32 {
+	if fieldCtx.destType.Kind() == reflect.Float32 {
 		if f, err := strconv.ParseFloat(value.String(), 32); err == nil {
 			return reflect.ValueOf(float32(f)), nil
 		}
-		return ctx.valueOutOfRange()
-	} else if ctx.destType.Kind() == reflect.Float64 {
+		return fieldCtx.valueOutOfRange()
+	} else if fieldCtx.destType.Kind() == reflect.Float64 {
 		if f, err := strconv.ParseFloat(value.String(), 64); err == nil {
 			return reflect.ValueOf(f), nil
 		}
-		return ctx.valueOutOfRange()
+		return fieldCtx.valueOutOfRange()
 	}
 
 	// to ints
-	if t, ok := ctx.sourceType.(*NumberType); ok && t.scale == 0 {
+	if t, ok := fieldCtx.sourceType.(*NumberType); ok && t.scale == 0 {
 		var (
 			i   int64
 			err error
 		)
-		switch ctx.destType.Kind() {
+		switch fieldCtx.destType.Kind() {
 		case reflect.Int:
 			if i, err = strconv.ParseInt(value.String(), 0, 0); err == nil {
 				return reflect.ValueOf(int(i)), nil
@@ -432,21 +435,21 @@ func (value *Number) structScanConvert(_ *structScanCtx, ctx structScanFieldCtx)
 			}
 		}
 		if err != nil {
-			return ctx.valueOutOfRange()
+			return fieldCtx.valueOutOfRange()
 		}
 	}
 
 	// to uints
-	if t, ok := ctx.sourceType.(*NumberType); ok && t.scale == 0 {
+	if t, ok := fieldCtx.sourceType.(*NumberType); ok && t.scale == 0 {
 		if value.value < 0 {
-			return ctx.valueOutOfRange()
+			return fieldCtx.valueOutOfRange()
 		}
 
 		var (
 			i   uint64
 			err error
 		)
-		switch ctx.destType.Kind() {
+		switch fieldCtx.destType.Kind() {
 		case reflect.Uint:
 			if i, err = strconv.ParseUint(value.String(), 0, 0); err == nil {
 				return reflect.ValueOf(uint(i)), nil
@@ -469,11 +472,11 @@ func (value *Number) structScanConvert(_ *structScanCtx, ctx structScanFieldCtx)
 			}
 		}
 		if err != nil {
-			return ctx.valueOutOfRange()
+			return fieldCtx.valueOutOfRange()
 		}
 	}
 
-	return ctx.cannotConvert()
+	return fieldCtx.cannotConvert()
 }
 
 func (value *Worksheet) structScanConvert(ctx *structScanCtx, fieldCtx structScanFieldCtx) (reflect.Value, error) {
