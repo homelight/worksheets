@@ -269,6 +269,19 @@ func (s *Zuite) TestStructScan_notOptionalYetUndefined() {
 	require.EqualError(s.T(), err, "field text to struct field Text: cannot convert undefined to string, dest must be a *string")
 }
 
+func (s *Zuite) TestStructScan_notOptionalYetUndefinedYetRelaxed() {
+	ws := s.defs.MustNewWorksheet("all_types")
+
+	var data struct {
+		Text string `ws:"text"`
+	}
+	ss := NewStructScanner()
+	ss.AllowUndefinedToNonPointer = true
+	err := ss.StructScan(ws, &data)
+	s.Require().NoError(err)
+	s.Require().Zero(data.Text)
+}
+
 func (s *Zuite) TestStructScan_optionalWithUndefined() {
 	ws := s.defs.MustNewWorksheet("all_types")
 
