@@ -16,7 +16,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cucumber/cucumber-messages-go"
+	"github.com/cucumber/cucumber-messages-go/v2"
 	"github.com/cucumber/gherkin-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
