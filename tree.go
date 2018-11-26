@@ -71,6 +71,10 @@ func (f *Field) String() string {
 	return fmt.Sprintf("field(%s.%s, %s)", f.def.name, f.name, f.typ)
 }
 
+func (f *Field) IsComputedBy() bool {
+	return f.computedBy != nil
+}
+
 type tOp string
 
 const (
