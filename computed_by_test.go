@@ -14,11 +14,12 @@ package worksheets
 
 import (
 	"fmt"
+	"math"
+	"strings"
+
 	"github.com/helloeave/dat/sqlx-runner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"math"
-	"strings"
 )
 
 func (s *Zuite) TestComputedBy_IsComputedBy() {
