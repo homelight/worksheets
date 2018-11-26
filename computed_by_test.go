@@ -22,6 +22,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func (s *Zuite) TestComputedBy_IsComputedBy() {
+	defs := MustNewDefinitions(strings.NewReader(`
+		type test_ws worksheet {
+			1: some_number number[0]
+			2: is_computed number[0] computed_by {return some_number + 1}
+		}`))
+	testWsDef := defs.defs["test_ws"].(*Definition)
+	require.False(s.T(), testWsDef.FieldByName("some_number").IsComputedBy())
+	require.True(s.T(), testWsDef.FieldByName("is_computed").IsComputedBy())
+}
+
 func (s *Zuite) TestComputedBy_externalComputedBy() {
 	cases := []struct {
 		def         string
