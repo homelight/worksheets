@@ -55,7 +55,7 @@ func (s *Zuite) TestNewDefinitionsErrors() {
 		`not a worksheet`: `syntax error: non-type declaration`,
 		`work sheet`:      `syntax error: non-type declaration`,
 		`type {`:          `expected name, found {`,
-		`type simple {`:   `expected worksheet, or enum`,
+		`type simple {`:   "expected worksheet, or enum: `{` did not match patterns",
 
 		// worksheet semantics
 		`type simple worksheet {

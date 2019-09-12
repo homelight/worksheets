@@ -413,17 +413,17 @@ func (s *Zuite) TestParser_parseAndEvalExprToCheckOperatorPrecedence() {
 
 func (s *Zuite) TestParser_parseExpressionErrors() {
 	cases := map[string]string{
-		`_1_234`:    `number cannot start with underscore`,
-		`1_234_`:    `number cannot terminate with underscore`,
-		`1_234.`:    `number cannot terminate with dot`,
-		`1_234._67`: `number fraction cannot start with underscore`,
-		`1_234.+7`:  `number cannot terminate with dot`,
+		`_1_234`:    "expecting expression: `_1_234` did not match patterns",
+		`1_234_`:    "expecting expression: `1_234_` did not match patterns",
+		`1_234.`:    "expecting expression: `1_234.` did not match patterns",
+		`1_234._67`: "expecting expression: `1_234._67` did not match patterns",
+		`1_234.+7`:  "expecting expression: `1_234.` did not match patterns",
 
-		`5 round down 33`:                                                `scale cannot be greater than 32`,
+		`5 round down 33`: `scale cannot be greater than 32`,
 		`5 round down 9999999999999999999999999999999999999999999999999`: `scale cannot be greater than 32`,
 
-		`len(5,`: `expecting expression`,
-		`len(5!`: `expecting , or )`,
+		`len(5,`: "expecting expression: `` did not match patterns",
+		`len(5!`: "expecting , or ): `!` did not match patterns",
 
 		// will need to revisit when we implement mod operator
 		`4%0`:     `number must terminate with percent if present`,
@@ -432,9 +432,11 @@ func (s *Zuite) TestParser_parseExpressionErrors() {
 		`-3%.625`: `number must terminate with percent if present`,
 	}
 	for input, expected := range cases {
-		p := newParser(strings.NewReader(input))
-		_, err := p.parseExpression(true)
-		assert.EqualError(s.T(), err, expected, input)
+		s.T().Run(input, func(t *testing.T) {
+			p := newParser(strings.NewReader(input))
+			_, err := p.parseExpression(true)
+			assert.EqualError(t, err, expected, input)
+		})
 	}
 }
 
@@ -479,10 +481,12 @@ func (s *Zuite) TestParser_parseLiteral() {
 		`true`: &Bool{true},
 	}
 	for input, expected := range cases {
-		p := newParser(strings.NewReader(input))
-		actual, err := p.parseLiteral()
-		require.NoError(s.T(), err)
-		assert.Equal(s.T(), expected, actual, input)
+		s.T().Run(input, func(t *testing.T) {
+			p := newParser(strings.NewReader(input))
+			actual, err := p.parseLiteral()
+			require.NoError(t, err)
+			assert.Equal(t, expected, actual, input)
+		})
 	}
 }
 
@@ -556,30 +560,26 @@ func (s *Zuite) TestTokenizer() {
 			"}",
 		},
 		`1_2___4.6_78___+_1_2`: {
-			"1",
-			"_2___4",
-			".6",
-			"_78___",
+			"1_2___4.6_78___",
 			"+",
 			"_1_2",
 		},
 		`1_2__6+7`: {
-			"1",
-			"_2__6",
+			"1_2__6",
 			"+",
 			"7",
 		},
 		`1_000*8%`: {
-			"1", "_000", "*", "8%",
+			"1_000", "*", "8%",
 		},
 		`5.75%*100`: {
 			"5.75%", "*", "100",
 		},
 		`50_000 / 1.375%`: {
-			"50", "_000", "/", "1.375%",
+			"50_000", "/", "1.375%",
 		},
 		`0.000_100%`: {
-			"0.000", "_100%",
+			"0.000_100%",
 		},
 		`1!=2!3! =4==5=6= =7&&8&9& &0||1|2| |done`: {
 			"1", "!=",

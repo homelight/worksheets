@@ -3,6 +3,12 @@
 [![CircleCI](https://circleci.com/gh/helloeave/worksheets.svg?style=svg&circle-token=273512d656713e7f4a7ed0d464aa297999c54f0b)](https://circleci.com/gh/helloeave/worksheets)
 [![GoDoc](https://godoc.org/github.com/helloeave/worksheets?status.svg)](https://godoc.org/github.com/helloeave/worksheets)
 
+## Prerequisites
+
+This release of worksheets is compatible with go1.13. For previous Go versions refer to release 1.0.0.
+
+## Description
+
 Let's start with a motivating example, easily representing a borrower's legal name, date of birth, and determining if they are of legal age to get a mortgage.
 
 We start by giving the definition for what data describe a `borrower` worksheet
@@ -133,12 +139,12 @@ This `version` field is set to `1` upon creation, and incremented on every edit.
 
 The various base types are
 
-| Type        | Represents |
-|-------------|------------|
-| `bool`      | Booleans. |
-| `text`      | Text of arbitrary length. |
-| `number[n]` | Numbers with precision of _n_ decimal places. |
-| `time`      | Instant in time. (Time zone independent.) |
+| Type        | Represents                                           |
+| ----------- | ---------------------------------------------------- |
+| `bool`      | Booleans.                                            |
+| `text`      | Text of arbitrary length.                            |
+| `number[n]` | Numbers with precision of _n_ decimal places.        |
+| `time`      | Instant in time. (Time zone independent.)            |
 | `date`      | Specific date like 7/20/1969. (Time zone dependent.) |
 
 All base types represent optional values, i.e. `bool` covers three values `true`, `false`, and `undefined`.

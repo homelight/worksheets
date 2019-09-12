@@ -13,10 +13,10 @@
 package wstesting
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/cucumber/cucumber-messages-go/v2"
 	"github.com/cucumber/gherkin-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +31,7 @@ type Zuite struct {
 
 func (s *Zuite) TestStepToCommand() {
 	cases := []struct {
-		step     *messages.Step
+		step     *gherkin.Step
 		expected command
 	}{
 		// load
@@ -264,7 +264,7 @@ func (s *Zuite) TestStepToCommand() {
 
 func (s *Zuite) TestStepToCommand_errors() {
 	cases := []struct {
-		step        *messages.Step
+		step        *gherkin.Step
 		expectedErr string
 	}{
 		// misc
@@ -404,9 +404,11 @@ func (s *Zuite) TestStepToCommand_errors() {
 			`assert too many here: expecting <ws> with data table or <ws.field> with value`,
 		},
 	}
-	for _, ex := range cases {
-		_, err := stepToCommand(ex.step)
-		assert.EqualError(s.T(), err, ex.expectedErr, ex.step.Text)
+	for i, ex := range cases {
+		s.T().Run(strconv.Itoa(i), func(t *testing.T) {
+			_, err := stepToCommand(ex.step)
+			assert.EqualError(t, err, ex.expectedErr, ex.step.Text)
+		})
 	}
 }
 
@@ -527,20 +529,20 @@ func TestRunAllTheTests(t *testing.T) {
 	suite.Run(t, new(Zuite))
 }
 
-func step(text string, data ...[]string) *messages.Step {
-	step := messages.Step{
+func step(text string, data ...[]string) *gherkin.Step {
+	step := gherkin.Step{
 		Text: text,
 	}
 	if len(data) != 0 {
-		table := &messages.DataTable{Rows: make([]*messages.TableRow, 0)}
+		table := gherkin.DataTable{Rows: make([]*gherkin.TableRow, 0)}
 		for _, r := range data {
-			row := &messages.TableRow{Cells: make([]*messages.TableCell, 0)}
+			row := &gherkin.TableRow{Cells: make([]*gherkin.TableCell, 0)}
 			for _, c := range r {
-				row.Cells = append(row.Cells, &messages.TableCell{Value: c})
+				row.Cells = append(row.Cells, &gherkin.TableCell{Value: c})
 			}
 			table.Rows = append(table.Rows, row)
 		}
-		step.Argument = &messages.Step_DataTable{table}
+		step.Argument = &table
 	}
 	return &step
 }

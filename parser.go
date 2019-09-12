@@ -80,9 +80,8 @@ var (
 	pIndex = newTokenPattern("index", "[0-9]+")
 	pText  = newTokenPattern("text", "\".*\"")
 
-	pNumber               = newTokenPattern("number", "[0-9]+(\\.[0-9]+)?(\\%)?")
-	pNumberWithUnderscore = newTokenPattern("number", "[_0-9]+(\\%)?")
-	pNumberWithDot        = newTokenPattern("number", "\\.[0-9]*(\\%)?")
+	pNumber           = newTokenPattern("number", `[0-9]+(_[0-9]+)*(\.[0-9]+(_[0-9]+)*)?(\%)?`)
+	pNumberIncomplete = newTokenPattern("number", `[\._]?[0-9]+`)
 )
 
 func (p *parser) parseDefinitions() ([]NamedType, error) {
@@ -105,15 +104,15 @@ func (p *parser) parseDefinitions() ([]NamedType, error) {
 		}
 
 		// worksheet, enum
-		choice, ok := p.peekWithChoice([]*tokenPattern{
+		choice, err := p.peekWithChoice([]*tokenPattern{
 			pWorksheet,
 			pEnum,
 		}, []string{
 			"worksheet",
 			"enum",
 		})
-		if !ok {
-			return nil, fmt.Errorf("expected worksheet, or enum")
+		if err != nil {
+			return nil, fmt.Errorf("expected worksheet, or enum: %s", err)
 		}
 		p.next()
 
@@ -213,7 +212,7 @@ func (p *parser) parseField() (*Field, error) {
 		typ:   typ,
 	}
 
-	choice, ok := p.peekWithChoice([]*tokenPattern{
+	choice, err := p.peekWithChoice([]*tokenPattern{
 		pComputedBy,
 		pConstrainedBy,
 	}, []string{
@@ -221,7 +220,7 @@ func (p *parser) parseField() (*Field, error) {
 		"constrained",
 	})
 
-	if ok {
+	if err == nil {
 		p.next()
 
 		_, err = p.nextAndCheck(pLacco)
@@ -294,15 +293,15 @@ func (p *parser) parseEnum(name string) (*EnumType, error) {
 //  := 'external'
 //   | return parseExpression
 func (p *parser) parseStatement() (expression, error) {
-	choice, ok := p.peekWithChoice([]*tokenPattern{
+	choice, err := p.peekWithChoice([]*tokenPattern{
 		pExternal,
 		pReturn,
 	}, []string{
 		"external",
 		"return",
 	})
-	if !ok {
-		return nil, fmt.Errorf("expecting statement")
+	if err != nil {
+		return nil, fmt.Errorf("expecting statement: %s", err)
 	}
 	switch choice {
 	case "external":
@@ -328,13 +327,13 @@ func (p *parser) parseStatement() (expression, error) {
 //   | var
 //   | exp (+ - * /) exp
 func (p *parser) parseExpression(withOp bool) (expression, error) {
-	choice, ok := p.peekWithChoice([]*tokenPattern{
+	choice, err := p.peekWithChoice([]*tokenPattern{
 		pUndefined,
 		pTrue,
 		pFalse,
 		pNumber,
-		pNumberWithDot,
-		pNumberWithUnderscore,
+		pNumberIncomplete,
+		// pNumberWithUnderscore,
 		pMinus,
 		pText,
 		pName,
@@ -346,15 +345,15 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 		"literal",
 		"literal",
 		"literal",
-		"literal",
+		// "literal",
 		"literal",
 		"literal",
 		"ident",
 		"paren",
 		"unop",
 	})
-	if !ok {
-		return nil, fmt.Errorf("expecting expression")
+	if err != nil {
+		return nil, fmt.Errorf("expecting expression: %s", err)
 	}
 
 	// first
@@ -397,15 +396,15 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 					return nil, err
 				}
 				args = append(args, exp)
-				choice, ok := p.peekWithChoice([]*tokenPattern{
+				choice, err := p.peekWithChoice([]*tokenPattern{
 					pRparen,
 					pComma,
 				}, []string{
 					"done",
 					"more",
 				})
-				if !ok {
-					return nil, fmt.Errorf("expecting , or )")
+				if err != nil {
+					return nil, fmt.Errorf("expecting , or ): %s", err)
 				}
 				p.next()
 				moreArgs = choice == "more"
@@ -447,13 +446,13 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 		}
 
 	case "unop":
-		op, ok := p.peekWithChoice([]*tokenPattern{
+		op, err := p.peekWithChoice([]*tokenPattern{
 			pNot,
 		}, []string{
 			string(opNot),
 		})
-		if !ok {
-			panic("should not be in unop")
+		if err != nil {
+			panic(fmt.Sprintf("should not be in unop: %s", err))
 		}
 		p.next()
 
@@ -486,7 +485,7 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 		rounds [][]*tRound
 	)
 	for {
-		op, ok := p.peekWithChoice([]*tokenPattern{
+		op, err := p.peekWithChoice([]*tokenPattern{
 			pPlus,
 			pMinus,
 			pMult,
@@ -513,7 +512,7 @@ func (p *parser) parseExpression(withOp bool) (expression, error) {
 			string(opAnd),
 			string(opOr),
 		})
-		if !ok {
+		if err != nil {
 			if exprs == nil {
 				return first, nil
 			} else {
@@ -625,7 +624,7 @@ func (p *parser) parseRound() (*tRound, error) {
 		return nil, err
 	}
 
-	mode, ok := p.peekWithChoice([]*tokenPattern{
+	mode, err := p.peekWithChoice([]*tokenPattern{
 		pUp,
 		pDown,
 		pHalf,
@@ -634,8 +633,8 @@ func (p *parser) parseRound() (*tRound, error) {
 		string(ModeDown),
 		string(ModeHalf),
 	})
-	if !ok {
-		return nil, fmt.Errorf("expecting rounding mode (up, down, or half)")
+	if err != nil {
+		return nil, fmt.Errorf("expecting rounding mode (up, down, or half): %s", err)
 	}
 	p.next()
 
@@ -648,15 +647,15 @@ func (p *parser) parseRound() (*tRound, error) {
 }
 
 func (p *parser) parseTypeLiteral() (Type, error) {
-	choice, ok := p.peekWithChoice([]*tokenPattern{
+	choice, err := p.peekWithChoice([]*tokenPattern{
 		pName,
 		pLbracket,
 	}, []string{
 		"base",
 		"slice",
 	})
-	if !ok {
-		return nil, fmt.Errorf("expecting type")
+	if err != nil {
+		return nil, fmt.Errorf("expecting type: %s", err)
 	}
 
 	switch choice {
@@ -749,23 +748,14 @@ func (p *parser) parseLiteral() (Value, error) {
 			return nil, err
 		}
 	}
+
 	if pNumber.re.MatchString(token) {
-		for p.peek(pNumberWithUnderscore) || p.peek(pNumberWithDot) {
-			addToken := p.next()
-			if strings.HasSuffix(addToken, "_") {
-				return nil, fmt.Errorf("number cannot terminate with underscore")
-			}
-			if strings.HasSuffix(addToken, ".") {
-				if p.peek(pNumberWithUnderscore) {
-					return nil, fmt.Errorf("number fraction cannot start with underscore")
-				}
-				return nil, fmt.Errorf("number cannot terminate with dot")
-			}
-			if strings.HasSuffix(token, "%") {
-				return nil, fmt.Errorf("number must terminate with percent if present")
-			}
-			token = token + strings.Replace(addToken, "_", "", -1)
+		for p.peek(pNumberIncomplete) && strings.HasSuffix(token, "%") {
+			return nil, fmt.Errorf("number must terminate with percent if present")
 		}
+
+		// clean up numbers with underscores after go1.13
+		token = strings.Replace(token, "_", "", -1)
 
 		// note whether percent, then remove to keep dot-index calcs correct
 		isPct := strings.HasSuffix(token, "%")
@@ -791,6 +781,7 @@ func (p *parser) parseLiteral() (Value, error) {
 		}
 		return &Number{value, &NumberType{scale}}, nil
 	}
+
 	if pText.re.MatchString(token) {
 		value, err := strconv.Unquote(token)
 		if err != nil {
@@ -798,9 +789,7 @@ func (p *parser) parseLiteral() (Value, error) {
 		}
 		return &Text{value}, nil
 	}
-	if pNumberWithUnderscore.re.MatchString(token) {
-		return nil, fmt.Errorf("number cannot start with underscore")
-	}
+
 	return nil, fmt.Errorf("unknown literal, found %s", token)
 }
 
@@ -893,7 +882,7 @@ func (p *parser) peek(maybe *tokenPattern) bool {
 //
 // We use two arrays here, rather than a map, to guarantee a prioritized
 // selection of the choices.
-func (p *parser) peekWithChoice(maybes []*tokenPattern, choices []string) (string, bool) {
+func (p *parser) peekWithChoice(maybes []*tokenPattern, choices []string) (string, error) {
 	if len(maybes) != len(choices) {
 		panic("peekWithChoice invoked with maybes not equal to choices")
 	}
@@ -903,8 +892,8 @@ func (p *parser) peekWithChoice(maybes []*tokenPattern, choices []string) (strin
 
 	for index, maybe := range maybes {
 		if maybe.re.MatchString(token) {
-			return choices[index], true
+			return choices[index], nil
 		}
 	}
-	return "", false
+	return "", fmt.Errorf("`%s` did not match patterns", token)
 }
