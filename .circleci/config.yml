@@ -18,38 +18,14 @@ shared: &run_steps
     - run: go build -tags=gofuzz ./fuzz
 
 jobs:
-  buildGo1.9:
+  buildGo1.13:
     docker:
-      - image: circleci/golang:1.9
+      - image: circleci/golang:1.13
       - image: circleci/postgres:9.6-alpine
         environment:
           POSTGRES_USER: ws_user
           POSTGRES_DB: ws_test
           POSTGRES_PASSWORD: ""
-
-    working_directory: /go/src/github.com/helloeave/worksheets
-    <<: *run_steps
-
-  buildGo1.10:
-    docker:
-      - image: circleci/golang:1.10
-      - image: circleci/postgres:9.6-alpine
-        environment:
-          POSTGRES_USER: ws_user
-          POSTGRES_DB: ws_test
-          POSTGRES_PASSWORD: ""
-
-    working_directory: /go/src/github.com/helloeave/worksheets
-    <<: *run_steps
-
-  buildGo1.11:
-    docker:
-    - image: circleci/golang:1.11
-    - image: circleci/postgres:9.6-alpine
-      environment:
-        POSTGRES_USER: ws_user
-        POSTGRES_DB: ws_test
-        POSTGRES_PASSWORD: ""
 
     working_directory: /go/src/github.com/helloeave/worksheets
     <<: *run_steps
@@ -58,14 +34,10 @@ workflows:
   version: 2
   build_on_git_push:
     jobs:
-      - buildGo1.9
-      - buildGo1.10
-      - buildGo1.11
+      - buildGo1.13
   build_nightly:
     jobs:
-      - buildGo1.9
-      - buildGo1.10
-      - buildGo1.11
+      - buildGo1.13
     triggers:
       - schedule:
           cron: "0 0 * * *"

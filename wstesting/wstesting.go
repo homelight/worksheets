@@ -22,7 +22,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cucumber/cucumber-messages-go/v2"
 	"github.com/cucumber/gherkin-go"
 
 	"github.com/helloeave/worksheets"
@@ -71,7 +70,7 @@ type cAssert struct {
 	expected map[string]expr
 }
 
-func stepToCommand(step *messages.Step) (command, error) {
+func stepToCommand(step *gherkin.Step) (command, error) {
 	parts := strings.Split(strings.TrimSpace(step.Text), " ")
 	switch parts[0] {
 	case "load":
@@ -428,7 +427,7 @@ type Scenario struct {
 	Name string
 
 	source   string
-	steps    []*messages.Step
+	steps    []*gherkin.Step
 	commands []command
 }
 
@@ -443,7 +442,7 @@ func (s Scenario) Run(ctx Context) error {
 	return nil
 }
 
-func niceErr(source string, step *messages.Step, err error) error {
+func niceErr(source string, step *gherkin.Step, err error) error {
 	return fmt.Errorf("%s:%d:%d: %s: %s",
 		source, step.Location.Line, step.Location.Column,
 		step.Text, err)
@@ -456,7 +455,6 @@ func ReadFeature(reader io.Reader, source string) ([]Scenario, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	scenarios, err := docToScenarios(doc, source)
 	if err != nil {
 		return nil, err
@@ -499,16 +497,16 @@ func RunFeature(t *testing.T, filename string, opts ...Context) {
 	}
 }
 
-func docToScenarios(doc *messages.GherkinDocument, source string) ([]Scenario, error) {
+func docToScenarios(doc *gherkin.GherkinDocument, source string) ([]Scenario, error) {
 	var (
-		bgSteps    []*messages.Step
+		bgSteps    []*gherkin.Step
 		bgCommands []command
 		scenarios  []Scenario
 	)
 	for _, child := range doc.Feature.Children {
-		switch childValue := child.Value.(type) {
-		case *messages.FeatureChild_Scenario:
-			scenario := childValue.Scenario
+		switch childValue := child.(type) {
+		case *gherkin.Scenario:
+			scenario := childValue
 			var commands []command
 			for _, step := range scenario.Steps {
 				cmd, err := stepToCommand(step)
@@ -522,8 +520,8 @@ func docToScenarios(doc *messages.GherkinDocument, source string) ([]Scenario, e
 				steps:    scenario.Steps,
 				commands: commands,
 			})
-		case *messages.FeatureChild_Background:
-			background := childValue.Background
+		case *gherkin.Background:
+			background := childValue
 			for _, step := range background.Steps {
 				cmd, err := stepToCommand(step)
 				if err != nil {
@@ -533,7 +531,7 @@ func docToScenarios(doc *messages.GherkinDocument, source string) ([]Scenario, e
 			}
 			bgSteps = background.Steps
 		default:
-			return nil, fmt.Errorf("%s: unknwon child type %T\n", source, child)
+			return nil, fmt.Errorf("%s: unknown child type %T", source, child)
 		}
 	}
 	for i := range scenarios {
@@ -549,7 +547,6 @@ func tableToContents(extra interface{}) (map[string]expr, bool, error) {
 	if table == nil {
 		return nil, false, fmt.Errorf("must provide a data table")
 	}
-
 	contents := make(map[string]expr)
 	partial := false
 	for _, row := range table.Rows {
@@ -622,10 +619,10 @@ func tableToValues(extra interface{}) ([]expr, error) {
 	return values, nil
 }
 
-func mustGetDataTable(extra interface{}) *messages.DataTable {
-	if sdt, ok := extra.(*messages.Step_DataTable); !ok {
+func mustGetDataTable(extra interface{}) *gherkin.DataTable {
+	if sdt, ok := extra.(*gherkin.DataTable); !ok {
 		return nil
 	} else {
-		return sdt.DataTable
+		return sdt
 	}
 }
