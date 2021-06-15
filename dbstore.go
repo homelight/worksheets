@@ -13,6 +13,7 @@
 package worksheets
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"regexp"
@@ -20,31 +21,37 @@ import (
 	"strings"
 	"time"
 
-	runner "github.com/homelight/dat/sqlx-runner"
 	"github.com/lib/pq"
 	uuid "github.com/satori/go.uuid"
+
+	runner "github.com/homelight/dat/sqlx-runner"
 )
 
 // Store ... TODO(pascal): write about abstraction.
 type Store interface {
 	// Load loads the worksheet with identifier `id` from the store.
 	Load(id string) (*Worksheet, error)
+	LoadContext(ctx context.Context, id string) (*Worksheet, error)
 
 	// SaveOrUpdate saves or updates a worksheet to the store. On success,
 	// returns an edit identifier.
 	SaveOrUpdate(ws *Worksheet) (string, error)
+	SaveOrUpdateContext(ctx context.Context, ws *Worksheet) (string, error)
 
 	// Save saves a new worksheet to the store. On success, returns an edit
 	// identifier.
 	Save(ws *Worksheet) (string, error)
+	SaveContext(ctx context.Context, ws *Worksheet) (string, error)
 
 	// Update updates an existing worksheet in the store. On success, returns an
 	// edit identifier.
 	Update(ws *Worksheet) (string, error)
+	UpdateContext(ctx context.Context, ws *Worksheet) (string, error)
 
-	// Edit returns a specific edit, the time at which the edit occured, and all
+	// Edit returns a specific edit, the time at which the edit occurred, and all
 	// worksheets modified as a map of their ids to the resulting version.
 	Edit(editId string) (time.Time, map[string]int, error)
+	EditContext(ctx context.Context, editId string) (time.Time, map[string]int, error)
 }
 
 type DbStore struct {
@@ -141,6 +148,14 @@ var tableToEntities = map[string]interface{}{
 }
 
 func (s *Session) Edit(editId string) (time.Time, map[string]int, error) {
+	return s.editCommon(context.Background(), editId)
+}
+
+func (s *Session) EditContext(ctx context.Context, editId string) (time.Time, map[string]int, error) {
+	return s.editCommon(ctx, editId)
+}
+
+func (s *Session) editCommon(ctx context.Context, editId string) (time.Time, map[string]int, error) {
 	var editRecs []rEdit
 	if err := s.tx.
 		Select("*").
@@ -166,6 +181,14 @@ func (s *Session) Edit(editId string) (time.Time, map[string]int, error) {
 }
 
 func (s *Session) Load(id string) (*Worksheet, error) {
+	return s.loadCommon(context.Background(), id)
+}
+
+func (s *Session) LoadContext(ctx context.Context, id string) (*Worksheet, error) {
+	return s.loadCommon(ctx, id)
+}
+
+func (s *Session) loadCommon(ctx context.Context, id string) (*Worksheet, error) {
 	loader := &loader{
 		s:               s,
 		graph:           make(map[string]*Worksheet),
@@ -184,24 +207,48 @@ func (s *Session) newPersister() *persister {
 }
 
 func (s *Session) SaveOrUpdate(ws *Worksheet) (string, error) {
+	return s.saveOrUpdateCommon(context.Background(), ws)
+}
+
+func (s *Session) SaveOrUpdateContext(ctx context.Context, ws *Worksheet) (string, error) {
+	return s.saveOrUpdateCommon(ctx, ws)
+}
+
+func (s *Session) saveOrUpdateCommon(ctx context.Context, ws *Worksheet) (string, error) {
 	p := s.newPersister()
-	if err := p.saveOrUpdate(ws); err != nil {
+	if err := p.saveOrUpdate(ctx, ws); err != nil {
 		return "", err
 	}
 	return p.editId, nil
 }
 
 func (s *Session) Save(ws *Worksheet) (string, error) {
+	return s.saveCommon(context.Background(), ws)
+}
+
+func (s *Session) SaveContext(ctx context.Context, ws *Worksheet) (string, error) {
+	return s.saveCommon(ctx, ws)
+}
+
+func (s *Session) saveCommon(ctx context.Context, ws *Worksheet) (string, error) {
 	p := s.newPersister()
-	if err := p.save(ws); err != nil {
+	if err := p.save(ctx, ws); err != nil {
 		return "", err
 	}
 	return p.editId, nil
 }
 
 func (s *Session) Update(ws *Worksheet) (string, error) {
+	return s.updateCommon(context.Background(), ws)
+}
+
+func (s *Session) UpdateContext(ctx context.Context, ws *Worksheet) (string, error) {
+	return s.updateCommon(ctx, ws)
+}
+
+func (s *Session) updateCommon(ctx context.Context, ws *Worksheet) (string, error) {
 	p := s.newPersister()
-	if err := p.update(ws); err != nil {
+	if err := p.update(ctx, ws); err != nil {
 		return "", err
 	}
 	return p.editId, nil
@@ -287,7 +334,7 @@ func (l *loader) loadWorksheet(id string) (*Worksheet, error) {
 			break
 		}
 		slicesIds := make([]interface{}, len(slicesToHydrate))
-		for sliceId, _ := range slicesToHydrate {
+		for sliceId := range slicesToHydrate {
 			slicesIds = append(slicesIds, sliceId)
 		}
 		var sliceElementsRecs []rSliceElement
@@ -450,7 +497,7 @@ type persister struct {
 	graph     map[string]bool
 }
 
-func (p *persister) saveOrUpdate(ws *Worksheet) error {
+func (p *persister) saveOrUpdate(ctx context.Context, ws *Worksheet) error {
 	var count int
 	if err := p.s.tx.
 		Select("count(*)").
@@ -461,13 +508,13 @@ func (p *persister) saveOrUpdate(ws *Worksheet) error {
 	}
 
 	if count == 0 {
-		return p.save(ws)
+		return p.save(ctx, ws)
 	} else {
-		return p.update(ws)
+		return p.update(ctx, ws)
 	}
 }
 
-func (p *persister) save(ws *Worksheet) error {
+func (p *persister) save(ctx context.Context, ws *Worksheet) error {
 	// already done?
 	if _, ok := p.graph[ws.Id()]; ok {
 		return nil
@@ -477,7 +524,7 @@ func (p *persister) save(ws *Worksheet) error {
 	// cascade updates to children and parents
 	for _, value := range ws.data {
 		for _, childWs := range extractChildWs(value) {
-			if err := p.saveOrUpdate(childWs); err != nil {
+			if err := p.saveOrUpdate(ctx, childWs); err != nil {
 				return err
 			}
 		}
@@ -485,7 +532,7 @@ func (p *persister) save(ws *Worksheet) error {
 	for _, byParentFieldIndex := range ws.parents {
 		for _, byParentId := range byParentFieldIndex {
 			for _, parentWs := range byParentId {
-				if err := p.saveOrUpdate(parentWs); err != nil {
+				if err := p.saveOrUpdate(ctx, parentWs); err != nil {
 					return err
 				}
 			}
@@ -501,7 +548,7 @@ func (p *persister) save(ws *Worksheet) error {
 			Version: ws.Version(),
 			Name:    ws.Name(),
 		}).
-		Exec(); err != nil {
+		ExecContext(ctx); err != nil {
 		return err
 	}
 
@@ -515,7 +562,7 @@ func (p *persister) save(ws *Worksheet) error {
 			WorksheetId: ws.Id(),
 			ToVersion:   ws.Version(),
 		}).
-		Exec(); err != nil {
+		ExecContext(ctx); err != nil {
 		return err
 	}
 
@@ -547,7 +594,7 @@ func (p *persister) save(ws *Worksheet) error {
 			}
 		}
 	}
-	if _, err := insertValues.Exec(); err != nil {
+	if _, err := insertValues.ExecContext(ctx); err != nil {
 		return err
 	}
 
@@ -565,7 +612,7 @@ func (p *persister) save(ws *Worksheet) error {
 				})
 			}
 		}
-		if _, err := insertSliceElements.Exec(); err != nil {
+		if _, err := insertSliceElements.ExecContext(ctx); err != nil {
 			return err
 		}
 	}
@@ -582,7 +629,7 @@ func (p *persister) save(ws *Worksheet) error {
 				})
 			}
 		}
-		if _, err := insertParentElements.Exec(); err != nil {
+		if _, err := insertParentElements.ExecContext(ctx); err != nil {
 			return err
 		}
 	}
@@ -595,7 +642,7 @@ func (p *persister) save(ws *Worksheet) error {
 	return nil
 }
 
-func (p *persister) update(ws *Worksheet) error {
+func (p *persister) update(ctx context.Context, ws *Worksheet) error {
 	// already done?
 	if _, ok := p.graph[ws.Id()]; ok {
 		return nil
@@ -605,7 +652,7 @@ func (p *persister) update(ws *Worksheet) error {
 	// cascade updates to children and parents
 	for _, value := range ws.data {
 		for _, childWs := range extractChildWs(value) {
-			if err := p.saveOrUpdate(childWs); err != nil {
+			if err := p.saveOrUpdate(ctx, childWs); err != nil {
 				return err
 			}
 		}
@@ -613,7 +660,7 @@ func (p *persister) update(ws *Worksheet) error {
 	for _, byParentFieldIndex := range ws.parents {
 		for _, byParentId := range byParentFieldIndex {
 			for _, parentWs := range byParentId {
-				if err := p.saveOrUpdate(parentWs); err != nil {
+				if err := p.saveOrUpdate(ctx, parentWs); err != nil {
 					return err
 				}
 			}
@@ -730,7 +777,7 @@ func (p *persister) update(ws *Worksheet) error {
 			WorksheetId: ws.Id(),
 			ToVersion:   newVersion,
 		}).
-		Exec()
+		ExecContext(ctx)
 	if isSpecificUniqueConstraintErr(err, "worksheet_edits_worksheet_id_to_version_key") {
 		return fmt.Errorf("concurrent update detected (%s)", err)
 	} else if err != nil {
@@ -744,7 +791,7 @@ func (p *persister) update(ws *Worksheet) error {
 		Where("worksheet_id = $1", ws.Id()).
 		Where("from_version <= $1 and $1 <= to_version", oldVersion).
 		Where(inClause("index", len(valuesToUpdate)), ughconvert(valuesToUpdate)...).
-		Exec(); err != nil {
+		ExecContext(ctx); err != nil {
 		return err
 	}
 
@@ -760,7 +807,7 @@ func (p *persister) update(ws *Worksheet) error {
 			Value:       dbWriteValue(change.after),
 		})
 	}
-	if _, err := insert.Exec(); err != nil {
+	if _, err := insert.ExecContext(ctx); err != nil {
 		return err
 	}
 
@@ -776,7 +823,7 @@ func (p *persister) update(ws *Worksheet) error {
 			Where("slice_id = $1", sliceId).
 			Where("from_version <= $1 and $1 <= to_version", oldVersion).
 			Where(inClause("rank", len(ranks)), ranks...).
-			Exec(); err != nil {
+			ExecContext(ctx); err != nil {
 			return err
 		}
 	}
@@ -793,7 +840,7 @@ func (p *persister) update(ws *Worksheet) error {
 				Value:       dbWriteValue(add.value),
 			})
 		}
-		if _, err := insert.Exec(); err != nil {
+		if _, err := insert.ExecContext(ctx); err != nil {
 			return err
 		}
 	}
@@ -804,7 +851,7 @@ func (p *persister) update(ws *Worksheet) error {
 			Where("parent_id = $1", ws.Id()).
 			Where("parent_field_index = $1", index).
 			Where(inClause("child_id", len(childrenWsId)), childrenWsId...).
-			Exec(); err != nil {
+			ExecContext(ctx); err != nil {
 			return err
 		}
 	}
@@ -819,7 +866,7 @@ func (p *persister) update(ws *Worksheet) error {
 				})
 			}
 		}
-		if _, err := insertParentElements.Exec(); err != nil {
+		if _, err := insertParentElements.ExecContext(ctx); err != nil {
 			return err
 		}
 	}
@@ -829,7 +876,7 @@ func (p *persister) update(ws *Worksheet) error {
 		Update("worksheets").
 		Set("version", newVersion).
 		Where("id = $1 and version = $2", ws.Id(), oldVersion).
-		Exec(); err != nil {
+		ExecContext(ctx); err != nil {
 		return err
 	} else if result.RowsAffected != 1 {
 		return fmt.Errorf("concurrent update detected")

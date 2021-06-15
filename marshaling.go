@@ -205,8 +205,8 @@ func (ss *StructScanner) StructScan(ws *Worksheet, dest interface{}) error {
 	}
 
 	ctx := &structScanCtx{
-		converters: ss.converterRegistry,
-		dests:      make(map[string]*wsDestination),
+		converters:                 ss.converterRegistry,
+		dests:                      make(map[string]*wsDestination),
 		allowUndefinedToNonPointer: ss.AllowUndefinedToNonPointer,
 	}
 

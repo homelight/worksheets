@@ -159,11 +159,11 @@ func (s *Zuite) TestRuntime_parseAndEvalExpr() {
 		`sumiftrue(slice_n0, undefined)`: `undefined`,
 
 		// if
-		`if(true, 1, 3)`:                                                   `1`,
-		`if(false, 1, 3)`:                                                  `3`,
-		`if(undefined, 1, 3)`:                                              `undefined`,
-		`if(true, 1, 3 / 0 round down 0)`:                                  `1`,
-		`if(false, 1 / 0 round down 0, 3)`:                                 `3`,
+		`if(true, 1, 3)`:                   `1`,
+		`if(false, 1, 3)`:                  `3`,
+		`if(undefined, 1, 3)`:              `undefined`,
+		`if(true, 1, 3 / 0 round down 0)`:  `1`,
+		`if(false, 1 / 0 round down 0, 3)`: `3`,
 		`if(0 < -1, "unused", if("a" == "a", "good", 1 / 0 round down 0))`: `"good"`,
 		`if(true, 1)`:  `1`,
 		`if(false, 1)`: `undefined`,

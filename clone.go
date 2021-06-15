@@ -15,7 +15,7 @@ package worksheets
 import (
 	"fmt"
 
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 )
 
 // Clone duplicates this worksheet, and all worksheets it points to, in order
