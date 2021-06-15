@@ -8,6 +8,7 @@ shared: &run_steps
         timeout: 5
 
     # postgres
+    - run: sudo apt-get update
     - run: sudo apt install postgresql-client
     - run: psql ws_test ws_user -h localhost -p 5432 -f /go/src/github.com/homelight/worksheets/schema.sql
 
@@ -21,6 +22,42 @@ jobs:
   buildGo1.13:
     docker:
       - image: circleci/golang:1.13
+      - image: circleci/postgres:9.6-alpine
+        environment:
+          POSTGRES_USER: ws_user
+          POSTGRES_DB: ws_test
+          POSTGRES_PASSWORD: ""
+
+    working_directory: /go/src/github.com/homelight/worksheets
+    <<: *run_steps
+
+  buildGo1.14:
+    docker:
+      - image: circleci/golang:1.14
+      - image: circleci/postgres:9.6-alpine
+        environment:
+          POSTGRES_USER: ws_user
+          POSTGRES_DB: ws_test
+          POSTGRES_PASSWORD: ""
+
+    working_directory: /go/src/github.com/homelight/worksheets
+    <<: *run_steps
+
+  buildGo1.15:
+    docker:
+      - image: circleci/golang:1.15
+      - image: circleci/postgres:9.6-alpine
+        environment:
+          POSTGRES_USER: ws_user
+          POSTGRES_DB: ws_test
+          POSTGRES_PASSWORD: ""
+
+    working_directory: /go/src/github.com/homelight/worksheets
+    <<: *run_steps
+
+  buildGo1.16:
+    docker:
+      - image: circleci/golang:1.16
       - image: circleci/postgres:9.6-alpine
         environment:
           POSTGRES_USER: ws_user
