@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/helloeave/dat/sqlx-runner"
+	"github.com/homelight/dat/sqlx-runner"
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"

@@ -9,7 +9,7 @@ shared: &run_steps
 
     # postgres
     - run: sudo apt install postgresql-client
-    - run: psql ws_test ws_user -h localhost -p 5432 -f /go/src/github.com/helloeave/worksheets/schema.sql
+    - run: psql ws_test ws_user -h localhost -p 5432 -f /go/src/github.com/homelight/worksheets/schema.sql
 
     # golang
     - run: go get -v -t -d ./...
@@ -27,7 +27,7 @@ jobs:
           POSTGRES_DB: ws_test
           POSTGRES_PASSWORD: ""
 
-    working_directory: /go/src/github.com/helloeave/worksheets
+    working_directory: /go/src/github.com/homelight/worksheets
     <<: *run_steps
 
 workflows:

@@ -15,7 +15,7 @@ package examples
 import (
 	"testing"
 
-	"github.com/helloeave/worksheets/wstesting"
+	"github.com/homelight/worksheets/wstesting"
 )
 
 func TestExampleFeature(t *testing.T) {

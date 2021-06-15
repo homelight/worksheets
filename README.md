@@ -1,7 +1,7 @@
 # Worksheets -- Overview
 
 [![CircleCI](https://circleci.com/gh/helloeave/worksheets.svg?style=svg&circle-token=273512d656713e7f4a7ed0d464aa297999c54f0b)](https://circleci.com/gh/helloeave/worksheets)
-[![GoDoc](https://godoc.org/github.com/helloeave/worksheets?status.svg)](https://godoc.org/github.com/helloeave/worksheets)
+[![GoDoc](https://godoc.org/github.com/homelight/worksheets?status.svg)](https://godoc.org/github.com/homelight/worksheets)
 
 ## Prerequisites
 
@@ -13,33 +13,33 @@ Let's start with a motivating example, easily representing a borrower's legal na
 
 We start by giving the definition for what data describe a `borrower` worksheet
 
-	worksheet borrower {
-		1:first_name text
-		2:last_name text
-		3:dob date
-		4:can_take_mortgage computed {
-			return dob > now + 18 years
-		}
-	}
+    worksheet borrower {
+    	1:first_name text
+    	2:last_name text
+    	3:dob date
+    	4:can_take_mortgage computed {
+    		return dob > now + 18 years
+    	}
+    }
 
 From this definition, we generate Golang hooks to manipulte borrowers' worksheets, store and retrieve them
 
-	joey := worksheet.Create("borrower")
-	joey.SetText("first_name", "Joey")
-	joey.SetText("last_name", "Pizzapie")
-	joey.SetDate("dob", 1980, 5, 23)
+    joey := worksheet.Create("borrower")
+    joey.SetText("first_name", "Joey")
+    joey.SetText("last_name", "Pizzapie")
+    joey.SetDate("dob", 1980, 5, 23)
 
 We can query worksheet
 
-	joey.GetBool("can_take_mortgage")
+    joey.GetBool("can_take_mortgage")
 
 Store the worksheet
 
-	bytes, err := joey.Marshal()
+    bytes, err := joey.Marshal()
 
 And retrieve the worksheet
 
-	joey, err := worksheet.Unmarshal("borrower", bytes)
+    joey, err := worksheet.Unmarshal("borrower", bytes)
 
 # Contributing
 
@@ -47,19 +47,18 @@ And retrieve the worksheet
 
 If you want to contribute, you can get tests running locally as follows:
 
-
-	cd path/to/worksheets
-	createuser --createdb ws_user
-	createdb --username=ws_user ws_test
-	psql -U ws_user ws_test -f schema.sql
-	go get -t ./...
-	go test -v ./...
+    cd path/to/worksheets
+    createuser --createdb ws_user
+    createdb --username=ws_user ws_test
+    psql -U ws_user ws_test -f schema.sql
+    go get -t ./...
+    go test -v ./...
 
 or `$ go test -v ./... -testify.m <TestName>` for individual tests.
 
 To update your schema, you can simply re-run
 
-	psql -U ws_user ws_test -f schema.sql
+    psql -U ws_user ws_test -f schema.sql
 
 ## Running Benchmarks
 
@@ -67,24 +66,24 @@ For benchmarks to be interesting, we need to have a primed database with lots of
 
 In `bench_test.go`, the start of each benchmark has priming code, e.g. `b.prime(100000)`. You'll want to run benchmarks in two steps: 1. put a high number to prime the databse with lots of data, then run the benchmark
 
-	 go test -v -run=NOTHING -bench=. -benchtime=15s
+     go test -v -run=NOTHING -bench=. -benchtime=15s
 
 This will take a long time, since before running, the benchmark will first write a lot of data in the local db. Once that completes, you can comment out or change the priming to `0`, and run the benchmark again
 
-	 go test -v -run=NOTHING -bench=. -benchtime=15s
+     go test -v -run=NOTHING -bench=. -benchtime=15s
 
 # Worksheet Definition
 
 All centers around the concept of a `worksheet` which is constituted of typed named fields
 
-	worksheet person {
-		1:age number[0]
-		2:first_name text
-	}
+    worksheet person {
+    	1:age number[0]
+    	2:first_name text
+    }
 
 The general syntax for a field is
 
-	index:name type [extras]
+    index:name type [extras]
 
 (We explain the need for the index in the storage section. Those familiar with Thrift or Protocol Buffers can see the parralel with these data representation tools.)
 
@@ -96,11 +95,11 @@ The simplest fields we have are there to store values. In the example above, bot
 
 Input fields can also be constrained
 
-	3:social_security_number number[0] constrained_by {
-		ok := 100_00_0000 <= social_security_number
-		ok = ok && social_security_number <= 999_99_9999
-		return ok
-	}
+    3:social_security_number number[0] constrained_by {
+    	ok := 100_00_0000 <= social_security_number
+    	ok = ok && social_security_number <= 999_99_9999
+    	return ok
+    }
 
 When fields are constrained, edits which do not satisfy the constraint are rejected.
 
@@ -108,10 +107,10 @@ When fields are constrained, edits which do not satisfy the constraint are rejec
 
 We can also derive values from the various inputs. We call these 'output fields' or computed fields
 
-	1:date_of_birth date
-	2:age number[0] computed_by {
-		return (now - date) in years
-	}
+    1:date_of_birth date
+    2:age number[0] computed_by {
+    	return (now - date) in years
+    }
 
 (We discuss the syntax in which expressions can be written in a later section.)
 
@@ -121,7 +120,7 @@ Computed fields are determined when their inputs changes, and then materialized.
 
 All worksheets have a unique identifier
 
-	id text
+    id text
 
 Which is set upon creation, and cannot be ever edited.
 
@@ -129,7 +128,7 @@ Which is set upon creation, and cannot be ever edited.
 
 All worksheets are versionned, with their version number starting at `1`. The version is stored in a field present on all worksheets
 
-	version number[0]
+    version number[0]
 
 This `version` field is set to `1` upon creation, and incremented on every edit. Versions are used to detect concurrent edits, and abort an edit that was done on an older version of the worksheet than the one it would now be applied to. Edits are discussed in greater detail later.
 
@@ -157,35 +156,35 @@ _TODO(pascal): We likely want to support enums in the language to allow introspe
 
 While the language does not have a specific support for enums, these can be described easily with the use of single field worksheets
 
-	worksheet name_suffixes {
-		1:suffix text constrained_by {
-			return suffix in [
-				"Jr.",
-				"Sr."
-				...
-			]
-		}
-	}
+    worksheet name_suffixes {
+    	1:suffix text constrained_by {
+    		return suffix in [
+    			"Jr.",
+    			"Sr."
+    			...
+    		]
+    	}
+    }
 
 Which can then be used
 
-	worksheet borrower {
-		...
+    worksheet borrower {
+    	...
 
-		3:first_name text
-		4:last_name text
-		5:suffix name_suffixes
+    	3:first_name text
+    	4:last_name text
+    	5:suffix name_suffixes
 
-		...
-	}
+    	...
+    }
 
 And the Golang hooks allow handling of single field worksheets in a natural way, by automatically 'boxing'
 
-	borrower.SetText("suffix", "Jr.")
+    borrower.SetText("suffix", "Jr.")
 
 Or 'unboxing'
 
-	borrower.GetText("suffix")
+    borrower.GetText("suffix")
 
 ### Numbers
 
@@ -207,7 +206,7 @@ Loss of precision however needs to be explicitely handled.
 
 For instance, with the field `age number[0]`, the expression
 
-	age, _ = 5.200 round down
+    age, _ = 5.200 round down
 
 would yield `5` in the `age` field.
 
@@ -237,35 +236,35 @@ When dividing, a rounding mode must always be provided such that the syntax for 
 
 For instance, consider the following example. We need to create a `map[repayment]` to represent repayment of $700 in yearly taxes, over a 12 months period. If we were to split in equal parts, we would need to pay $58.33... which is not feasibly. Instead, here we force ourselves to round to cents, i.e. a `number[2]`.
 
-	first_month = month of closing_date + 1
-	total_paid := 0
-	for current_month := first_month; current_month < first_month + 1 year; current_month++ {
-		mp := yearly_taxes / 12 round down
-		total_paid += mp
-		payment_schedule << payment {
-			month = current_month
-			amount = mp
-		}
-	}
+    first_month = month of closing_date + 1
+    total_paid := 0
+    for current_month := first_month; current_month < first_month + 1 year; current_month++ {
+    	mp := yearly_taxes / 12 round down
+    	total_paid += mp
+    	payment_schedule << payment {
+    		month = current_month
+    		amount = mp
+    	}
+    }
 
-	remainder := yearly_taxes - total_paid
-	switch remainder % 2 {
-		case 0:
-			payment_schedule[first_month + 6 months].amount += remainder / 2
-			payment_schedule[first_month + 12 months].amount += remainder / 2
-		case 1:
-			payment_schedule[first_month + 12 months].amount += remainder
-	}
+    remainder := yearly_taxes - total_paid
+    switch remainder % 2 {
+    	case 0:
+    		payment_schedule[first_month + 6 months].amount += remainder / 2
+    		payment_schedule[first_month + 12 months].amount += remainder / 2
+    	case 1:
+    		payment_schedule[first_month + 12 months].amount += remainder
+    }
 
 ### Time and Date
 
 _TODO(pascal) Write this out._
 
-* time as instant in time, timezone less concept, only display (because it can be lossy) needs timezone in some cases
+- time as instant in time, timezone less concept, only display (because it can be lossy) needs timezone in some cases
 
-* date as a timezone depenedent concept, range of time, so 9/1/2017 ET delineates a specific range
+- date as a timezone depenedent concept, range of time, so 9/1/2017 ET delineates a specific range
 
-* date without timezone, to represent input of borrowers, needs to then be interpreted in the context of a timezone to be useful
+- date without timezone, to represent input of borrowers, needs to then be interpreted in the context of a timezone to be useful
 
 also, how do we convert to date objects
 
@@ -277,16 +276,16 @@ some_date.year / .month / .day -> yields sub-component (since date is already tz
 
 ## Slices
 
-* have slices too!
-* describe operations on slices, simplified because we don't really care about pre-allocating, so the simplest `slice = append(slice, value)` is enough, the `len(slice)`, then things like `slice[index]` as well as re-slicing `slice[start:]`, `slice[:end]`, or `slice[start:end]`
-* would be have `undefined` for slices, or only empty? having an unknonw number of middle names is different than no middle name for instance, which would push towards having `undefined`
-* likely same consideration as maps in terms of which values can be placed in a slice
+- have slices too!
+- describe operations on slices, simplified because we don't really care about pre-allocating, so the simplest `slice = append(slice, value)` is enough, the `len(slice)`, then things like `slice[index]` as well as re-slicing `slice[start:]`, `slice[:end]`, or `slice[start:end]`
+- would be have `undefined` for slices, or only empty? having an unknonw number of middle names is different than no middle name for instance, which would push towards having `undefined`
+- likely same consideration as maps in terms of which values can be placed in a slice
 
 ## Keyed Worksheets, Maps, and Tuples
 
 In addition to the structures covered earlier, we have
 
-	map[W]
+    map[W]
 
 which represents a collection of worksheets `W`, indexed by the key of `W`.
 
@@ -294,7 +293,7 @@ which represents a collection of worksheets `W`, indexed by the key of `W`.
 
 As we shall see in the next section, worksheets' keys can be one or multiple values joined together in N-tuples. To represent this, we introduce
 
-	tuple[T1, ..., Tn]
+    tuple[T1, ..., Tn]
 
 NOTE #1: We don't want to allow `tuple[map[foo]]`, so how do we differentiate the simple types, from more complex types like maps? Maps can be the type of fields, but the type which can go in tuples is a subset of that. Maybe 'base type' as `S` and field type `T` is a sufficient distinction? Then maps and tuples would be field types, one over worksheets, the other over only base types.
 
@@ -305,13 +304,13 @@ NOTE #2: It would make sense to have undefindeness defined only over base types,
 Worksheets present in maps must keyed: one or more fields of the worksheet serve as a unique key for the purpose of the mapping
 
     keyed_by {
-		first_name
-		last_name
+    	first_name
+    	last_name
     }
 
 or
 
-	keyed_by identity
+    keyed_by identity
 
 When a worksheet is added in a map for the first time, all the fields covered by the key are frozen and are not allowed to be mutated later. This means that if a computed field is part of a key, all the inputs to this computed fields will be frozen.
 
@@ -331,15 +330,15 @@ when iterating over maps, iteration order is the order in which items were added
 
 have a way to have 'interface' worksheets which expose set of fields, e.g.
 
-	view income {
-		yearly_gross_income number[2]
-	}
+    view income {
+    	yearly_gross_income number[2]
+    }
 
 and then describe certain worksheets as conforming with these views
 
-	worksheet w2_income implements income {
-		...
-	}
+    worksheet w2_income implements income {
+    	...
+    }
 
 # Editing Worksheets
 
@@ -351,23 +350,23 @@ There are a three basic steps to editing a worksheet
 
 Let's go through them with the help of a contrived example
 
-	worksheet borrower {
-		1:name text
-		2:greeting text computed {
-			return "Hello, " + name
-		}
-	}
+    worksheet borrower {
+    	1:name text
+    	2:greeting text computed {
+    		return "Hello, " + name
+    	}
+    }
 
 We can _propose_ the edit
 
-	set name "Joey"
+    set name "Joey"
 
 Which yields the _actual_ edit
 
-	[ on borrower(the-id-here) @ version 5 ]
-	[ set version 6                        ]
-	set name "Joey"
-	set greeting "Hello, Joey"
+    [ on borrower(the-id-here) @ version 5 ]
+    [ set version 6                        ]
+    set name "Joey"
+    set greeting "Hello, Joey"
 
 And when _applied_ mutates the worksheet as intended. (In future examples, we omit the concurrent modification part of edits.)
 
@@ -391,33 +390,33 @@ When a proposed edit block is applied to a worksheet, all computed fields whose 
 
 Let's consider the worksheet
 
-	worksheet borrower {
-		1:name text
-		2:name_short text computed {
-			if len(name) > 5 {
-				return substr(name, 5)
-			}
-			return name
-		}
-		3:greeting text computed {
-			return "Hello, " + name_short
-		}
-	}
+    worksheet borrower {
+    	1:name text
+    	2:name_short text computed {
+    		if len(name) > 5 {
+    			return substr(name, 5)
+    		}
+    		return name
+    	}
+    	3:greeting text computed {
+    		return "Hello, " + name_short
+    	}
+    }
 
 And the proposed edit
 
-	set name "Samantha"
+    set name "Samantha"
 
 The first tentative edit would be
 
-	set name "Samantha"
-	set name_short "Saman"
+    set name "Samantha"
+    set name_short "Saman"
 
 The second (and final) edit would be
 
-	set name "Samantha"
-	set name_short "Saman"
-	set greeting "Hello, Saman"
+    set name "Samantha"
+    set name_short "Saman"
+    set greeting "Hello, Saman"
 
 ## Applying Edits
 
@@ -429,28 +428,28 @@ We also make it possible for user specified code to intercept the fixed-point ca
 
 Example
 
-	func (myEditor *) OnEdit(current Worksheet, proposed_edit Edit) (Edit, error) {
-		if current.GetText("name") == "Joey" {
-			return proposed_edit.SetText("name", "Joey Pizzapie"), nil
-		}
-		return proposed_edit, nil
-	}
+    func (myEditor *) OnEdit(current Worksheet, proposed_edit Edit) (Edit, error) {
+    	if current.GetText("name") == "Joey" {
+    		return proposed_edit.SetText("name", "Joey Pizzapie"), nil
+    	}
+    	return proposed_edit, nil
+    }
 
 NOTE: We'd want the `Edit` struct to have sufficient introspection such that we can clearly write cases like the TRID Rule where we need to capture the _first_ time all 6 fields are set on a specific worksheet. Maybe we should also provide a pre/post worksheet with the state before any edit, the state after if the edit were to succeed as is? Need to think through what that code would look like and design the hook with that in mind.
 
 One idea would be to be able to verify 'is any of these six fields being modified?', and 'is the resulting edit one where all six fields are complete?', and 'has the trid rule triggered date been set?'.
 
-	if current.GetDate("trid_rule_triggered").IsUndefined() {
-		if proposed_edit.IsSetting("ssn")
-		proposed_edit.IsSetting("...") ||
-		proposed_edit.IsSetting("...") ||
-		... {
-			if !current.GetText("ssn").IsUndefined() &&
-			... {
+    if current.GetDate("trid_rule_triggered").IsUndefined() {
+    	if proposed_edit.IsSetting("ssn")
+    	proposed_edit.IsSetting("...") ||
+    	proposed_edit.IsSetting("...") ||
+    	... {
+    		if !current.GetText("ssn").IsUndefined() &&
+    		... {
 
-			}
-		}
-	}
+    		}
+    	}
+    }
 
 Though we'd not even need to verify whether these fields are part of the edit, it's implicit, and more 'underlying structure proof' not too. By 'underlying structure proof' we mean that the code assumes less about the internal structure of the fields, they could be inputs or computed fields, and we wouldn't really care.
 
@@ -458,49 +457,49 @@ Though we'd not even need to verify whether these fields are part of the edit, i
 
 Assume we have the worksheet
 
-	worksheet cyclic_edits {
-		1:right bool
-		2:wrong bool computed_by {
-			return !right
-		}
-	}
+    worksheet cyclic_edits {
+    	1:right bool
+    	2:wrong bool computed_by {
+    		return !right
+    	}
+    }
 
 And we propose the edit
 
-	set right false
+    set right false
 
 Due to the computed field, this would yield 'actual edit #1'
 
-	set right false
-	set wrong true
+    set right false
+    set wrong true
 
 Now, assume that we have edit reacting code which flips these fields around
 
-	if wrong {
-		set right true
-	} else {
-		set right false
-	}
+    if wrong {
+    	set right true
+    } else {
+    	set right false
+    }
 
 We would then yield the 'actual edit #2'
 
-	set right true
-	set wrong true
+    set right true
+    set wrong true
 
 And, due to the computed field, this would yield 'actual edit #3'
 
-	set right true
-	set wrong false
+    set right true
+    set wrong false
 
 Further modified via the event reacting code into 'actual edit #4'
 
-	set right false
-	set wrong false
+    set right false
+    set wrong false
 
 And again, due to the computed field, this would yield 'actual edit #5'
 
-	set right false
-	set wrong true
+    set right false
+    set wrong true
 
 Which is in fact the same as 'actual edit #1'. We have created an infinite loop in the fixed-point calculation!
 
@@ -533,7 +532,9 @@ To prevent such 'unstable edits', we detect cycles of edits, and error out, henc
 _to cover_
 
 ## ACLs
+
 ## Encyption
+
 ## Audit Trail
 
 # Introspection, and Reflection
@@ -566,17 +567,17 @@ ideas from
 
 We have a complex sheet requiring a formal sign off by an operator
 
-	worksheet requires_review { ...
+    worksheet requires_review { ...
 
 We track the version at which the operator signed off in `signed_off_version`, and the property of being `signed_off` is computed
 
-	worksheet sign_off {
-		1:requires_review requires_review
-		2:signed_off_version number[0]
-		3:signed_off computed {
-			return requires_review.version == signed_off_version
-		}
-	}
+    worksheet sign_off {
+    	1:requires_review requires_review
+    	2:signed_off_version number[0]
+    	3:signed_off computed {
+    		return requires_review.version == signed_off_version
+    	}
+    }
 
 This ensures that any modification to the sheet `requires_review` nullifies the sign off.
 

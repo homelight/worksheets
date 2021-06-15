@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 )
 
 // Definitions groups all definitions for a workbook, which may consists of
