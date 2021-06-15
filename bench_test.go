@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/helloeave/dat/sqlx-runner"
+	runner "github.com/homelight/dat/sqlx-runner"
 	_ "github.com/lib/pq"
 )
 

@@ -13,12 +13,13 @@
 package worksheets
 
 import (
+	"context"
 	"math"
 	"strings"
 	"time"
 
-	"github.com/helloeave/dat/sqlx-runner"
-	"github.com/satori/go.uuid"
+	runner "github.com/homelight/dat/sqlx-runner"
+	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,6 +38,29 @@ func (s *Zuite) TestDbExample() {
 		session := s.store.Open(tx)
 		var err error
 		wsFromStore, err = session.Load(ws.Id())
+		return err
+	})
+
+	require.Len(s.T(), wsFromStore.MustGet("id").String(), 38)
+	require.Equal(s.T(), `1`, wsFromStore.MustGet("version").String())
+	require.Equal(s.T(), `"Alice"`, wsFromStore.MustGet("name").String())
+}
+
+func (s *Zuite) TestDbContextExample() {
+	ws := s.store.defs.MustNewWorksheet("simple")
+	ws.MustSet("name", NewText("Alice"))
+
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		_, err := session.SaveContext(context.Background(), ws)
+		return err
+	})
+
+	var wsFromStore *Worksheet
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		var err error
+		wsFromStore, err = session.LoadContext(context.Background(), ws.Id())
 		return err
 	})
 
@@ -118,6 +142,87 @@ func (s *Zuite) TestSave() {
 
 		var err error
 		editCreatedAt, editTouchedWs, err = session.Edit(editId)
+		return err
+	})
+	require.Equal(s.T(), int64(1234), editCreatedAt.UnixNano())
+	require.Equal(s.T(), map[string]int{
+		ws.Id(): 1,
+	}, editTouchedWs)
+}
+
+func (s *Zuite) TestSaveContext() {
+	ws, err := s.store.defs.NewWorksheet("simple")
+	require.NoError(s.T(), err)
+
+	err = ws.Set("name", NewText("Alice"))
+	require.NoError(s.T(), err)
+
+	var editId string
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		session.clock = &fakeClock{1234}
+
+		var err error
+		editId, err = session.SaveContext(context.Background(), ws)
+		return err
+	})
+
+	snap := s.snapshotDbState()
+
+	require.Equal(s.T(), []rWorksheet{
+		{
+			Id:      ws.Id(),
+			Version: 1,
+			Name:    "simple",
+		},
+	}, snap.wsRecs)
+
+	require.Equal(s.T(), []rEdit{
+		{
+			EditId:      editId,
+			CreatedAt:   1234,
+			WorksheetId: ws.Id(),
+			ToVersion:   1,
+		},
+	}, snap.editRecs)
+
+	require.Equal(s.T(), []rValueForTesting{
+		{
+			WorksheetId: ws.Id(),
+			Index:       indexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       ws.Id(),
+		},
+		{
+			WorksheetId: ws.Id(),
+			Index:       indexVersion,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `1`,
+		},
+		{
+			WorksheetId: ws.Id(),
+			Index:       83,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       `Alice`,
+		},
+	}, snap.valuesRecs)
+
+	// Upon Save, orig needs to be set to data.
+	require.Empty(s.T(), ws.diff())
+
+	// Edit.
+	var (
+		editCreatedAt time.Time
+		editTouchedWs map[string]int
+	)
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+
+		var err error
+		editCreatedAt, editTouchedWs, err = session.EditContext(context.Background(), editId)
 		return err
 	})
 	require.Equal(s.T(), int64(1234), editCreatedAt.UnixNano())
@@ -235,6 +340,123 @@ func (s *Zuite) TestUpdate() {
 
 		var err error
 		updateCreatedAt, updateTouchedWs, err = session.Edit(updateId)
+		return err
+	})
+	require.Equal(s.T(), int64(2000), updateCreatedAt.UnixNano())
+	require.Equal(s.T(), map[string]int{
+		ws.Id(): 2,
+	}, updateTouchedWs)
+}
+
+func (s *Zuite) TestUpdateContext() {
+	ws, err := s.store.defs.NewWorksheet("simple")
+	require.NoError(s.T(), err)
+
+	err = ws.Set("name", NewText("Alice"))
+	require.NoError(s.T(), err)
+
+	var saveId string
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		session.clock = &fakeClock{1000}
+
+		var err error
+		saveId, err = session.SaveContext(context.Background(), ws)
+		return err
+	})
+
+	err = ws.Set("name", NewText("Bob"))
+	require.NoError(s.T(), err)
+
+	var updateId string
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+		session.clock = &fakeClock{2000}
+
+		var err error
+		updateId, err = session.UpdateContext(context.Background(), ws)
+		return err
+	})
+
+	snap := s.snapshotDbState()
+
+	require.Equal(s.T(), []rWorksheet{
+		{
+			Id:      ws.Id(),
+			Version: 2,
+			Name:    "simple",
+		},
+	}, snap.wsRecs)
+
+	require.Equal(s.T(), []rEdit{
+		{
+			EditId:      saveId,
+			CreatedAt:   1000,
+			WorksheetId: ws.Id(),
+			ToVersion:   1,
+		},
+		{
+			EditId:      updateId,
+			CreatedAt:   2000,
+			WorksheetId: ws.Id(),
+			ToVersion:   2,
+		},
+	}, snap.editRecs)
+
+	require.Equal(s.T(), []rValueForTesting{
+		{
+			WorksheetId: ws.Id(),
+			Index:       indexId,
+			FromVersion: 1,
+			ToVersion:   math.MaxInt32,
+			Value:       ws.Id(),
+		},
+		{
+			WorksheetId: ws.Id(),
+			Index:       indexVersion,
+			FromVersion: 1,
+			ToVersion:   1,
+			Value:       `1`,
+		},
+		{
+			WorksheetId: ws.Id(),
+			Index:       indexVersion,
+			FromVersion: 2,
+			ToVersion:   math.MaxInt32,
+			Value:       `2`,
+		},
+		{
+			WorksheetId: ws.Id(),
+			Index:       83,
+			FromVersion: 1,
+			ToVersion:   1,
+			Value:       `Alice`,
+		},
+		{
+			WorksheetId: ws.Id(),
+			Index:       83,
+			FromVersion: 2,
+			ToVersion:   math.MaxInt32,
+			Value:       `Bob`,
+		},
+	}, snap.valuesRecs)
+
+	// Upon update, version must increase
+	require.Equal(s.T(), 2, ws.Version())
+
+	// Upon Update, orig needs to be set to data.
+	require.Empty(s.T(), ws.diff())
+
+	// Edit.
+	var (
+		updateCreatedAt time.Time
+		updateTouchedWs map[string]int
+	)
+	s.MustRunTransaction(func(tx *runner.Tx) error {
+		session := s.store.Open(tx)
+
+		var err error
+		updateCreatedAt, updateTouchedWs, err = session.EditContext(context.Background(), updateId)
 		return err
 	})
 	require.Equal(s.T(), int64(2000), updateCreatedAt.UnixNano())

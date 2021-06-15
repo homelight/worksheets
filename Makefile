@@ -1,5 +1,5 @@
 fuzz: clean
-	go-fuzz-build github.com/helloeave/worksheets/fuzz
+	go-fuzz-build github.com/homelight/worksheets/fuzz
 	go-fuzz -bin=./worksheets-fuzz.zip -workdir=fuzz/
 
 clean:

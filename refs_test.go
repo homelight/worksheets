@@ -17,7 +17,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/helloeave/dat/sqlx-runner"
+	runner "github.com/homelight/dat/sqlx-runner"
 	"github.com/stretchr/testify/require"
 )
 
