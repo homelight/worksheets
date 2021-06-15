@@ -72,9 +72,15 @@ workflows:
   build_on_git_push:
     jobs:
       - buildGo1.13
+      - buildGo1.14
+      - buildGo1.15
+      - buildGo1.16
   build_nightly:
     jobs:
       - buildGo1.13
+      - buildGo1.14
+      - buildGo1.15
+      - buildGo1.16
     triggers:
       - schedule:
           cron: "0 0 * * *"
