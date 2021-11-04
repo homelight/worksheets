@@ -8,7 +8,7 @@ shared: &run_steps
         timeout: 5
 
     # postgres
-    - run: sudo apt-get update
+    - run: sudo apt-get update --allow-releaseinfo-change
     - run: sudo apt install postgresql-client
     - run: psql ws_test ws_user -h localhost -p 5432 -f /go/src/github.com/homelight/worksheets/schema.sql
 
