@@ -762,3 +762,22 @@ func (s *Zuite) TestDeprecatedField() {
 		return err
 	})
 }
+func (s *Zuite) TestSavingSlicesWithoutSliceElements() {
+	defs := MustNewDefinitions(strings.NewReader(`type some_worksheet worksheet {
+		1:field_one []text
+	}`))
+
+	store := NewStore(defs)
+
+	err := s.RunTransaction(func(tx *runner.Tx) error {
+		ws := defs.MustNewWorksheet("some_worksheet")
+		ws.MustAppend("field_one", NewText("one"))
+		ws.MustDel("field_one", 0)
+
+		session := store.Open(tx)
+		_, err := session.SaveOrUpdate(ws)
+		return err
+	})
+
+	require.NoError(s.T(), err)
+}

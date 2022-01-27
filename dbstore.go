@@ -600,9 +600,11 @@ func (p *persister) save(ctx context.Context, ws *Worksheet) error {
 
 	// insert rSliceElement
 	if len(slicesToInsert) != 0 {
+		atLeastOneSliceElementExists := false
 		insertSliceElements := p.s.tx.InsertInto("worksheet_slice_elements").Columns("*").Blacklist("id")
 		for _, slice := range slicesToInsert {
 			for _, element := range slice.elements {
+				atLeastOneSliceElementExists = true
 				insertSliceElements.Record(rSliceElement{
 					SliceId:     slice.id,
 					Rank:        element.rank,
@@ -612,8 +614,10 @@ func (p *persister) save(ctx context.Context, ws *Worksheet) error {
 				})
 			}
 		}
-		if _, err := insertSliceElements.ExecContext(ctx); err != nil {
-			return err
+		if atLeastOneSliceElementExists {
+			if _, err := insertSliceElements.ExecContext(ctx); err != nil {
+				return err
+			}
 		}
 	}
 
